@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../utils/api';
 import { StatCard, Card, Badge, Spinner } from '../../components/UI';
-import { Users, Send, Mail, TrendingUp, UserCheck, AlertCircle, TicketCheck, Activity } from 'lucide-react';
+import { Users, Send, Mail, TrendingUp, UserCheck, AlertCircle, Ticket, Activity } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function AdminDashboard() {
@@ -17,7 +17,7 @@ export default function AdminDashboard() {
         <StatCard icon={Users}      label="Total Users"    value={data?.totalUsers||0}     color="blue" />
         <StatCard icon={UserCheck}  label="Paid Users"     value={data?.paidUsers||0}      sub={`${data?.trialUsers||0} on trial`} color="green" />
         <StatCard icon={Send}       label="Emails Sent"    value={(data?.totalEmails||0).toLocaleString()} color="purple" />
-        <StatCard icon={TicketCheck} label="Open Tickets"  value={data?.openTickets||0}    color="yellow" />
+        <StatCard icon={Ticket}      label="Open Tickets"  value={data?.openTickets||0}    color="yellow" />
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:16, marginBottom:16 }}>
         <Card style={{ padding:20 }}>
