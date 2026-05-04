@@ -47,7 +47,7 @@ export default function Templates() {
       />
       {templates.length===0 ? (
         <Empty icon={FileText} title="No templates yet" description="Create reusable email templates to speed up campaign creation."
-          action={<div style={{ display:'flex', gap:8', justifyContent:'center' }}><Btn variant="secondary" onClick={handleGetDefaults}>Get Default Templates</Btn><Btn onClick={()=>setShowAdd(true)}>Add Template</Btn></div>} />
+          action={<div style={{ display:'flex', gap:8, justifyContent:'center' }}><Btn variant="secondary" onClick={handleGetDefaults}>Get Default Templates</Btn><Btn onClick={()=>setShowAdd(true)}>Add Template</Btn></div>} />
       ) : (
         <Card style={{ padding:0, overflow:'hidden' }}>
           <Table headers={['Name','Category','Subject Preview','Date','Actions']}>
