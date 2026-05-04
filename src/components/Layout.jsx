@@ -4,9 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Send, Mail, Users, MessageSquare,
   Ban, FileText, Settings, HelpCircle, LogOut,
-  ChevronDown, ChevronRight, Bell, Crown, UserCog,
-  CreditCard, Menu, X, Zap, Calendar, BarChart3,
-  Shield
+  ChevronDown, ChevronRight, Bell, Star, UserCog,
+  CreditCard, Menu, X, Zap, Calendar, BarChart2,
+  ShieldCheck
 } from 'lucide-react';
 
 const NAV = [
@@ -50,7 +50,7 @@ const NAV = [
 ];
 
 const ADMIN_NAV = [
-  { label: 'Overview', to: '/admin', icon: Shield },
+  { label: 'Overview', to: '/admin', icon: ShieldCheck },
   { label: 'Users', to: '/admin/users', icon: UserCog },
   { label: 'Plans', to: '/admin/plans', icon: CreditCard },
   { label: 'Support Tickets', to: '/admin/tickets', icon: HelpCircle },
@@ -202,7 +202,7 @@ export default function Layout({ children }) {
             <div style={{ padding:'8px 10px', marginBottom:4 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <div style={{ fontSize:13, fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{user?.name}</div>
-                {isAdmin && <Crown size={12} color="gold" />}
+                {isAdmin && <Star size={12} color="gold" />}
               </div>
               <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user?.email}</div>
             </div>
