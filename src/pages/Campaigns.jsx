@@ -167,14 +167,25 @@ function ViewCampaignModal({ campaign, onClose }) {
       )}
 
       {tab==='sends' && (
-        <div style={{ maxHeight:400, overflowY:'auto' }}>
+        <div>
+          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10, gap:8 }}>
+            <Btn size="sm" variant="secondary" onClick={async()=>{
+              try {
+                await api.post(`/campaigns/${campaign.id}/retry-failed`);
+                toast.success('Failed sends queued for retry!');
+                api.get(`/campaigns/${campaign.id}/sends`).then(r=>setSends(r.data));
+              } catch(e) { toast.error('Retry failed'); }
+            }}>🔄 Retry Failed</Btn>
+          </div>
+          <div style={{ maxHeight:400, overflowY:'auto' }}>
           {sends.length===0 ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>No sends yet</div> : (
-            <Table headers={['Email','Step','Status','Scheduled','Sent','Opened']}>
+            <Table headers={['Email','Step','Status','Error','Scheduled','Sent','Opened']}>
               {sends.map(s=>(
                 <TR key={s.id}>
                   <TD style={{ fontSize:12 }}>{s.email}</TD>
                   <TD style={{ fontSize:12 }}>#{s.step_number}</TD>
                   <TD><Badge color={s.status==='sent'?'green':s.status==='failed'?'red':s.status==='pending'?'yellow':'default'} style={{ fontSize:10 }}>{s.status}</Badge></TD>
+                  <TD style={{ fontSize:11, color:'var(--red)', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={s.error_message}>{s.error_message||'—'}</TD>
                   <TD style={{ fontSize:11, color:'var(--text3)' }}>{s.scheduled_at?new Date(s.scheduled_at).toLocaleString():'—'}</TD>
                   <TD style={{ fontSize:11, color:'var(--text3)' }}>{s.sent_at?new Date(s.sent_at).toLocaleString():'—'}</TD>
                   <TD style={{ fontSize:12 }}>{s.opened_at?'✅':'—'}</TD>
@@ -182,6 +193,7 @@ function ViewCampaignModal({ campaign, onClose }) {
               ))}
             </Table>
           )}
+          </div>
         </div>
       )}
     </Modal>
