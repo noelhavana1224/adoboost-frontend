@@ -16,6 +16,7 @@ export default function Contacts() {
   const [editContact, setEditContact] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,8 +103,6 @@ export default function Contacts() {
       load();
     } catch { toast.error('Failed'); }
   };
-
-  const [showMoveModal, setShowMoveModal] = useState(false);
 
   const handleBulkMove = async (listId) => {
     try {
