@@ -13,6 +13,7 @@ import Exclusions from './pages/Exclusions';
 import Templates from './pages/Templates';
 import Support from './pages/Support';
 import { Billing, SendingSpeed, UserSettings, UserPreferences, ApiKey } from './pages/Settings';
+import SendingCalendar from './pages/Calendar';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPlans from './pages/admin/AdminPlans';
@@ -72,7 +73,7 @@ export default function App() {
           <Route path="/dashboard"           element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/campaigns"           element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
           <Route path="/campaigns/new"       element={<ProtectedRoute><Campaigns showCreate /></ProtectedRoute>} />
-          <Route path="/campaigns/calendar"  element={<ProtectedRoute><CalendarPlaceholder /></ProtectedRoute>} />
+          <Route path="/campaigns/calendar"  element={<ProtectedRoute><SendingCalendar /></ProtectedRoute>} />
           <Route path="/campaigns/reports"   element={<ProtectedRoute><ReportsPlaceholder /></ProtectedRoute>} />
           <Route path="/email-accounts"      element={<ProtectedRoute><EmailAccounts /></ProtectedRoute>} />
           <Route path="/contacts"            element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
