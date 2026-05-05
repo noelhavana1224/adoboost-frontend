@@ -50,28 +50,46 @@ export default function Contacts() {
     }
   };
 
-  const handleDeleteOne = async (id) => {
-    if (!confirm('Delete this contact?')) return;
+  const handleDeleteOne = async (id, force = false) => {
+    if (!force && !confirm('Delete this contact?')) return;
     try {
-      await api.delete(`/contacts/${id}`);
+      await api.delete(`/contacts/${id}${force ? '?force=true' : ''}`);
       toast.success('Contact deleted');
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete');
+      if (err.response?.status === 409 && err.response?.data?.warning) {
+        const { message, campaign } = err.response.data;
+        const confirmed = confirm(
+          `⚠️ Warning!\n\n${message}\n\nDeleting this contact will also remove their email history from that campaign.\n\nAre you sure you want to delete anyway?`
+        );
+        if (confirmed) handleDeleteOne(id, true);
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to delete');
+      }
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = async (force = false) => {
     if (selected.size === 0) return;
-    if (!confirm(`Delete ${selected.size} selected contact${selected.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    if (!force && !confirm(`Delete ${selected.size} selected contact${selected.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
     setDeleting(true);
     try {
-      await api.post('/contacts/bulk-delete', { ids: Array.from(selected) });
-      toast.success(`${selected.size} contact${selected.size > 1 ? 's' : ''} deleted`);
+      const { data } = await api.post('/contacts/bulk-delete', { ids: Array.from(selected), force });
+      toast.success(`${data.deleted} contact${data.deleted > 1 ? 's' : ''} deleted`);
       setSelected(new Set());
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Bulk delete failed');
+      if (err.response?.status === 409 && err.response?.data?.warning) {
+        const { message, inCampaign } = err.response.data;
+        const campaignNames = [...new Set(inCampaign.map(c => c.campaign))].join(', ');
+        const emails = inCampaign.map(c => c.email).join(', ');
+        const confirmed = confirm(
+          `⚠️ Warning!\n\n${message}\n\nCampaign(s): ${campaignNames}\nAffected contacts: ${emails}\n\nDeleting will remove their email history from those campaigns.\n\nAre you sure you want to delete anyway?`
+        );
+        if (confirmed) handleBulkDelete(true);
+      } else {
+        toast.error(err.response?.data?.error || 'Bulk delete failed');
+      }
     } finally { setDeleting(false); }
   };
 
