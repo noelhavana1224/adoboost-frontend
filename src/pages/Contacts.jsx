@@ -103,7 +103,17 @@ export default function Contacts() {
     } catch { toast.error('Failed'); }
   };
 
-  const allSelected = contacts.length > 0 && selected.size === contacts.length;
+  const [showMoveModal, setShowMoveModal] = useState(false);
+
+  const handleBulkMove = async (listId) => {
+    try {
+      const { data } = await api.post('/contacts/bulk-move', { ids: Array.from(selected), list_id: listId });
+      toast.success(`${data.moved} contact${data.moved > 1 ? 's' : ''} moved to list`);
+      setSelected(new Set());
+      setShowMoveModal(false);
+      load();
+    } catch { toast.error('Failed to move contacts'); }
+  };
   const someSelected = selected.size > 0 && !allSelected;
 
   return (
@@ -176,9 +186,14 @@ export default function Contacts() {
                 style={{ width: '100%', background: '#fff', border: '1px solid var(--border2)', borderRadius: 8, padding: '9px 12px 9px 32px', fontSize: 14, outline: 'none', color: 'var(--text)' }} />
             </div>
             {selected.size > 0 && (
-              <Btn variant="danger" loading={deleting} onClick={handleBulkDelete}>
-                <Trash2 size={13} /> Delete {selected.size} selected
-              </Btn>
+              <div style={{ display:'flex', gap:8 }}>
+                <Btn variant="secondary" onClick={()=>setShowMoveModal(true)}>
+                  📂 Move {selected.size} to List
+                </Btn>
+                <Btn variant="danger" loading={deleting} onClick={()=>handleBulkDelete()}>
+                  <Trash2 size={13} /> Delete {selected.size} selected
+                </Btn>
+              </div>
             )}
           </div>
 
@@ -264,6 +279,7 @@ export default function Contacts() {
       <EditContactModal contact={editContact} onClose={() => setEditContact(null)} lists={lists} onSaved={() => { setEditContact(null); load(); }} />
       <ImportModal open={modal === 'import'} onClose={() => setModal(null)} lists={lists} onSaved={() => { setModal(null); load(); }} />
       <NewListModal open={modal === 'list'} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />
+      <MoveToListModal open={showMoveModal} onClose={()=>setShowMoveModal(false)} lists={lists} onMove={handleBulkMove} count={selected.size} />
     </div>
   );
 }
@@ -566,6 +582,29 @@ function ImportModal({ open, onClose, lists, onSaved }) {
           <Btn onClick={onSaved}>Done ✓</Btn>
         </div>
       )}
+    </Modal>
+  );
+}
+
+function MoveToListModal({ open, onClose, lists, onMove, count }) {
+  const [listId, setListId] = useState('');
+  return (
+    <Modal open={open} onClose={onClose} title={`Move ${count} Contact${count!==1?'s':''} to List`}>
+      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <p style={{ fontSize:13, color:'var(--text2)' }}>
+          Select which list to move the selected contacts to. This will update their list assignment.
+        </p>
+        <Select label="Select List" value={listId} onChange={e=>setListId(e.target.value)}>
+          <option value="">— Choose a list —</option>
+          {lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.total_contacts||0} contacts)</option>)}
+        </Select>
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+          <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+          <Btn onClick={()=>{ if(!listId) return; onMove(listId); }} disabled={!listId}>
+            📂 Move to List
+          </Btn>
+        </div>
+      </div>
     </Modal>
   );
 }
