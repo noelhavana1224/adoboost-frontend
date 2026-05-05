@@ -5,11 +5,36 @@ import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Select, Ale
 import { Mail, Plus, Trash2, CheckCircle, XCircle, Loader2, Edit2 } from 'lucide-react';
 
 const PRESETS = {
-  smtp:      { host:'', port:587, secure:false, hint:'Enter your SMTP server details' },
-  hostinger: { host:'smtp.hostinger.com', port:465, secure:true, hint:'Use your Hostinger email password. Port 465 with SSL ON is required.' },
-  gmail:     { host:'smtp.gmail.com', port:587, secure:false, hint:'Use an App Password from Google Account → Security → 2-Step Verification → App passwords' },
-  outlook:   { host:'smtp.office365.com', port:587, secure:false, hint:'Use your Microsoft 365 credentials' },
-  yahoo:     { host:'smtp.mail.yahoo.com', port:465, secure:true, hint:'Enable "Allow apps that use less secure sign in" in Yahoo settings' },
+  hostinger: {
+    host: 'smtp.hostinger.com', port: 465, secure: true,
+    hint: '📧 Hostinger Email: Use your full email address as username (e.g. you@yourdomain.com) and your Hostinger email password. Port 465 with SSL ON.',
+    userPlaceholder: 'you@yourdomain.com',
+    namePlaceholder: 'e.g. Company Main Email',
+  },
+  smtp: {
+    host: '', port: 587, secure: false,
+    hint: '⚙️ Custom SMTP: Enter your mail server details. Contact your email provider for the correct host, port and SSL settings.',
+    userPlaceholder: 'you@yourdomain.com',
+    namePlaceholder: 'e.g. My Email Account',
+  },
+  gmail: {
+    host: 'smtp.gmail.com', port: 587, secure: false,
+    hint: '📘 Gmail: You MUST use an App Password — NOT your regular Gmail password. Go to myaccount.google.com → Security → 2-Step Verification (enable it) → App passwords → Create one for "AdoBoost". Copy the 16-character password.',
+    userPlaceholder: 'yourname@gmail.com',
+    namePlaceholder: 'e.g. My Gmail Account',
+  },
+  outlook: {
+    host: 'smtp.office365.com', port: 587, secure: false,
+    hint: '🔷 Outlook / Microsoft 365: Use your full Microsoft email address and your regular password. If using 2FA, create an App Password in your Microsoft account security settings.',
+    userPlaceholder: 'yourname@outlook.com',
+    namePlaceholder: 'e.g. My Outlook Account',
+  },
+  yahoo: {
+    host: 'smtp.mail.yahoo.com', port: 465, secure: true,
+    hint: '🟣 Yahoo Mail: You must generate an App Password. Go to Yahoo Account Security → Generate app password. Use that password here instead of your regular Yahoo password.',
+    userPlaceholder: 'yourname@yahoo.com',
+    namePlaceholder: 'e.g. My Yahoo Account',
+  },
 };
 
 export default function EmailAccounts() {
@@ -120,7 +145,7 @@ function AccountModal({ open, account, onClose, onSaved }) {
   useEffect(() => {
     if (!open) return;
     if (account) {
-      // Edit mode — prefill form
+      // Edit mode — prefill form with existing account data
       setForm({
         name: account.name || '',
         host: account.host || '',
@@ -139,9 +164,19 @@ function AccountModal({ open, account, onClose, onSaved }) {
       else if (account.host?.includes('yahoo')) setType('yahoo');
       else setType('smtp');
     } else {
-      // Add mode — reset to Hostinger defaults
+      // Add mode — always start completely empty, just set the SMTP settings from preset
       setType('hostinger');
-      setForm({ name:'', host:'smtp.hostinger.com', port:465, secure:true, username:'', password:'', from_name:'', from_email:'', daily_limit:50 });
+      setForm({
+        name: '',
+        host: 'smtp.hostinger.com',
+        port: 465,
+        secure: true,
+        username: '',
+        password: '',
+        from_name: '',
+        from_email: '',
+        daily_limit: 50,
+      });
     }
     setTesting(null);
   }, [open, account]);
@@ -149,7 +184,16 @@ function AccountModal({ open, account, onClose, onSaved }) {
   const handleTypeChange = (t) => {
     setType(t);
     const preset = PRESETS[t];
-    setForm(p => ({ ...p, host: preset.host, port: preset.port, secure: preset.secure }));
+    // Only update SMTP settings, keep user-entered data if editing
+    setForm(p => ({
+      ...p,
+      host: preset.host,
+      port: preset.port,
+      secure: preset.secure,
+      // Clear user fields only when adding new account
+      ...(account ? {} : { username: '', password: '', from_name: '', from_email: '' })
+    }));
+    setTesting(null);
   };
 
   const handleTest = async () => {
@@ -214,7 +258,9 @@ function AccountModal({ open, account, onClose, onSaved }) {
           )}
         </div>
 
-        <Input label="Account Name" placeholder="e.g. Adobo Solutions Main" value={form.name} onChange={e => f('name', e.target.value)} />
+        <Input label="Account Name"
+          placeholder={PRESETS[type]?.namePlaceholder || 'e.g. My Email Account'}
+          value={form.name} onChange={e => f('name', e.target.value)} />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px', gap: 10 }}>
           <Input label="SMTP Host" value={form.host} onChange={e => f('host', e.target.value)} required />
@@ -229,7 +275,9 @@ function AccountModal({ open, account, onClose, onSaved }) {
           </div>
         </div>
 
-        <Input label="Username / Email Address" type="email" placeholder="denver.bacor@adobosolutions.com"
+        <Input label="Username / Email Address"
+          type="email"
+          placeholder={PRESETS[type]?.userPlaceholder || 'you@yourdomain.com'}
           value={form.username} onChange={e => f('username', e.target.value)} required />
         <Input label={account ? "Password (leave blank to keep current)" : "Password"}
           type="password" placeholder="••••••••"
@@ -237,8 +285,9 @@ function AccountModal({ open, account, onClose, onSaved }) {
           required={!account} />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Input label="From Name" placeholder="Denver Bacor" value={form.from_name} onChange={e => f('from_name', e.target.value)} />
-          <Input label="From Email" type="email" placeholder="denver.bacor@adobosolutions.com"
+          <Input label="From Name" placeholder="e.g. John Smith" value={form.from_name} onChange={e => f('from_name', e.target.value)} />
+          <Input label="From Email" type="email"
+            placeholder={PRESETS[type]?.userPlaceholder || 'you@yourdomain.com'}
             value={form.from_email} onChange={e => f('from_email', e.target.value)} required />
         </div>
 
