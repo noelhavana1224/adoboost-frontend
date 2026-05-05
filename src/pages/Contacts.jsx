@@ -113,6 +113,8 @@ export default function Contacts() {
       load();
     } catch { toast.error('Failed to move contacts'); }
   };
+
+  const allSelected = contacts.length > 0 && selected.size === contacts.length;
   const someSelected = selected.size > 0 && !allSelected;
 
   return (
