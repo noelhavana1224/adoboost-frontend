@@ -2,14 +2,39 @@ import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Alert, Table, TR, TD } from '../components/UI';
-import { Mail, Plus, Trash2, CheckCircle, XCircle, Loader2, Edit2 } from 'lucide-react';
+import { Mail, Plus, Trash2, CheckCircle, XCircle, Loader2, Edit2, Inbox } from 'lucide-react';
 
 const PRESETS = {
-  hostinger: { host:'smtp.hostinger.com', port:465, secure:true, hint:'Use your full Hostinger email address as username and your Hostinger email password. Port 465, SSL ON.', userPlaceholder:'you@yourdomain.com', namePlaceholder:'e.g. Company Main Email' },
-  gmail:     { host:'smtp.gmail.com', port:587, secure:false, hint:'You MUST use an App Password — go to myaccount.google.com → Security → 2-Step Verification → App passwords → create one for AdoBoost.', userPlaceholder:'yourname@gmail.com', namePlaceholder:'e.g. My Gmail Account' },
-  outlook:   { host:'smtp.office365.com', port:587, secure:false, hint:'Use your full Microsoft email and password. If using 2FA, create an App Password in Microsoft account security settings.', userPlaceholder:'yourname@outlook.com', namePlaceholder:'e.g. My Outlook Account' },
-  yahoo:     { host:'smtp.mail.yahoo.com', port:465, secure:true, hint:'Go to Yahoo Account Security → Generate App Password. Use that here instead of your regular Yahoo password.', userPlaceholder:'yourname@yahoo.com', namePlaceholder:'e.g. My Yahoo Account' },
-  smtp:      { host:'', port:587, secure:false, hint:'Enter your mail server details. Use your full email address as username. Contact your hosting provider for the correct SMTP settings.', userPlaceholder:'you@yourdomain.com', namePlaceholder:'e.g. My Email Account' },
+  hostinger: {
+    host:'smtp.hostinger.com', port:465, secure:true,
+    imap_host:'imap.hostinger.com', imap_port:993, imap_secure:true,
+    hint:'Use your full Hostinger email address as username and your Hostinger email password. Port 465, SSL ON.',
+    userPlaceholder:'you@yourdomain.com', namePlaceholder:'e.g. Company Main Email'
+  },
+  gmail: {
+    host:'smtp.gmail.com', port:587, secure:false,
+    imap_host:'imap.gmail.com', imap_port:993, imap_secure:true,
+    hint:'You MUST use an App Password — go to myaccount.google.com → Security → 2-Step Verification → App passwords → create one for AdoBoost.',
+    userPlaceholder:'yourname@gmail.com', namePlaceholder:'e.g. My Gmail Account'
+  },
+  outlook: {
+    host:'smtp.office365.com', port:587, secure:false,
+    imap_host:'outlook.office365.com', imap_port:993, imap_secure:true,
+    hint:'Use your full Microsoft email and password. If using 2FA, create an App Password in Microsoft account security settings.',
+    userPlaceholder:'yourname@outlook.com', namePlaceholder:'e.g. My Outlook Account'
+  },
+  yahoo: {
+    host:'smtp.mail.yahoo.com', port:465, secure:true,
+    imap_host:'imap.mail.yahoo.com', imap_port:993, imap_secure:true,
+    hint:'Go to Yahoo Account Security → Generate App Password. Use that here instead of your regular Yahoo password.',
+    userPlaceholder:'yourname@yahoo.com', namePlaceholder:'e.g. My Yahoo Account'
+  },
+  smtp: {
+    host:'', port:587, secure:false,
+    imap_host:'', imap_port:993, imap_secure:true,
+    hint:'Enter your mail server details. Use your full email address as username. Contact your hosting provider for the correct SMTP settings.',
+    userPlaceholder:'you@yourdomain.com', namePlaceholder:'e.g. My Email Account'
+  },
 };
 
 export default function EmailAccounts() {
@@ -18,6 +43,7 @@ export default function EmailAccounts() {
   const [showModal, setShowModal] = useState(false);
   const [editAccount, setEditAccount] = useState(null);
   const [testStatus, setTestStatus] = useState({});
+  const [syncing, setSyncing] = useState({});
 
   const load = useCallback(() => {
     api.get('/email-accounts').then(r => setAccounts(r.data)).finally(() => setLoading(false));
@@ -38,6 +64,18 @@ export default function EmailAccounts() {
     setTimeout(() => setTestStatus(s => ({ ...s, [id]: null })), 5000);
   };
 
+  const handleSync = async (id) => {
+    setSyncing(s => ({ ...s, [id]: true }));
+    try {
+      await api.post(`/email-accounts/${id}/sync-inbox`);
+      toast.success('Inbox synced! Check Messages for new replies.');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Sync failed — check IMAP settings');
+    }
+    setSyncing(s => ({ ...s, [id]: false }));
+  };
+
   const handleDelete = async (id) => {
     if (!confirm('Remove this email account?')) return;
     try { await api.delete(`/email-accounts/${id}`); toast.success('Removed'); load(); }
@@ -48,19 +86,20 @@ export default function EmailAccounts() {
 
   return (
     <div>
-      <PageHeader title="Email Accounts" subtitle="Connect SMTP accounts to send campaigns"
+      <PageHeader title="Email Accounts" subtitle="Connect SMTP/IMAP accounts to send and receive campaign replies"
         action={<Btn onClick={() => { setEditAccount(null); setShowModal(true); }}><Plus size={14} /> Add Account</Btn>}
       />
       <Alert type="info" title="Gmail Users">
-        Use an <strong>App Password</strong> — go to myaccount.google.com → Security → 2-Step Verification → App passwords
+        Use an <strong>App Password</strong> — go to myaccount.google.com → Security → 2-Step Verification → App passwords.
+        Also enable IMAP in Gmail Settings → See all settings → Forwarding and POP/IMAP.
       </Alert>
       <div style={{ marginTop:20 }}>
         {accounts.length === 0 ? (
-          <Empty icon={Mail} title="No email accounts" description="Connect an SMTP account to start sending campaigns."
+          <Empty icon={Mail} title="No email accounts" description="Connect an SMTP/IMAP account to send campaigns and receive replies."
             action={<Btn onClick={() => setShowModal(true)}><Plus size={14} /> Add Account</Btn>} />
         ) : (
           <Card style={{ padding:0, overflow:'hidden' }}>
-            <Table headers={['', 'Name', 'Email', 'Host', 'Port', 'SSL', 'Status', 'Limit', 'Sent', 'Actions']}>
+            <Table headers={['', 'Name', 'Email', 'SMTP Host', 'IMAP', 'SSL', 'Status', 'Limit', 'Sent', 'Actions']}>
               {accounts.map(a => (
                 <TR key={a.id}>
                   <TD style={{ width:40 }}>
@@ -71,7 +110,12 @@ export default function EmailAccounts() {
                   <TD style={{ fontWeight:500 }}>{a.name}</TD>
                   <TD style={{ fontSize:12, color:'var(--text2)' }}>{a.from_email}</TD>
                   <TD style={{ fontSize:12, color:'var(--text2)' }}>{a.host || '—'}</TD>
-                  <TD style={{ fontSize:12 }}>{a.port}</TD>
+                  <TD style={{ fontSize:12 }}>
+                    {a.imap_host
+                      ? <Badge color="green">✅ Set</Badge>
+                      : <Badge color="default">Not set</Badge>
+                    }
+                  </TD>
                   <TD><Badge color={a.secure ? 'green' : 'default'}>{a.secure ? 'ON' : 'OFF'}</Badge></TD>
                   <TD><Badge color={a.status === 'active' ? 'green' : 'yellow'}>{a.status}</Badge></TD>
                   <TD>{a.daily_limit}</TD>
@@ -82,6 +126,11 @@ export default function EmailAccounts() {
                       {testStatus[a.id] === 'ok' && <CheckCircle size={14} color="var(--green)" />}
                       {testStatus[a.id] === 'error' && <XCircle size={14} color="var(--red)" />}
                       <Btn size="sm" variant="secondary" onClick={() => handleTest(a.id)}>Test</Btn>
+                      {a.imap_host && (
+                        <Btn size="sm" variant="secondary" onClick={() => handleSync(a.id)} disabled={syncing[a.id]} title="Sync inbox replies">
+                          {syncing[a.id] ? <Loader2 size={12} style={{ animation:'spin 1s linear infinite' }} /> : <Inbox size={12} />}
+                        </Btn>
+                      )}
                       <Btn size="sm" variant="secondary" onClick={() => { setEditAccount(a); setShowModal(true); }}><Edit2 size={12} /></Btn>
                       <Btn size="sm" variant="danger" onClick={() => handleDelete(a.id)}><Trash2 size={12} /></Btn>
                     </div>
@@ -102,10 +151,15 @@ export default function EmailAccounts() {
 
 function AccountModal({ open, account, onClose, onSaved }) {
   const [type, setType] = useState('hostinger');
-  const [form, setForm] = useState({ name:'', host:'smtp.hostinger.com', port:465, secure:true, username:'', password:'', from_name:'', from_email:'', daily_limit:50 });
+  const [form, setForm] = useState({
+    name:'', host:'smtp.hostinger.com', port:465, secure:true,
+    imap_host:'imap.hostinger.com', imap_port:993, imap_secure:true,
+    username:'', password:'', from_name:'', from_email:'', daily_limit:50
+  });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(null);
   const [testError, setTestError] = useState('');
+  const [showImap, setShowImap] = useState(false);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -113,7 +167,13 @@ function AccountModal({ open, account, onClose, onSaved }) {
     if (!open) return;
     setTesting(null); setTestError('');
     if (account) {
-      setForm({ name:account.name||'', host:account.host||'', port:account.port||587, secure:account.secure===1, username:account.username||'', password:'', from_name:account.from_name||'', from_email:account.from_email||'', daily_limit:account.daily_limit||50 });
+      setForm({
+        name:account.name||'', host:account.host||'', port:account.port||587, secure:account.secure===1,
+        imap_host:account.imap_host||'', imap_port:account.imap_port||993, imap_secure:account.imap_secure===1,
+        username:account.username||'', password:'', from_name:account.from_name||'',
+        from_email:account.from_email||'', daily_limit:account.daily_limit||50
+      });
+      setShowImap(!!account.imap_host);
       if (account.host?.includes('hostinger')) setType('hostinger');
       else if (account.host?.includes('gmail')) setType('gmail');
       else if (account.host?.includes('office365')) setType('outlook');
@@ -121,14 +181,24 @@ function AccountModal({ open, account, onClose, onSaved }) {
       else setType('smtp');
     } else {
       setType('hostinger');
-      setForm({ name:'', host:'smtp.hostinger.com', port:465, secure:true, username:'', password:'', from_name:'', from_email:'', daily_limit:50 });
+      setShowImap(false);
+      setForm({
+        name:'', host:'smtp.hostinger.com', port:465, secure:true,
+        imap_host:'imap.hostinger.com', imap_port:993, imap_secure:true,
+        username:'', password:'', from_name:'', from_email:'', daily_limit:50
+      });
     }
   }, [open, account]);
 
   const handleTypeChange = (t) => {
     setType(t);
     const p = PRESETS[t];
-    setForm(prev => ({ ...prev, host:p.host, port:p.port, secure:p.secure, ...(account ? {} : { username:'', password:'', from_name:'', from_email:'' }) }));
+    setForm(prev => ({
+      ...prev,
+      host:p.host, port:p.port, secure:p.secure,
+      imap_host:p.imap_host, imap_port:p.imap_port, imap_secure:p.imap_secure,
+      ...(account ? {} : { username:'', password:'', from_name:'', from_email:'' })
+    }));
     setTesting(null); setTestError('');
   };
 
@@ -163,12 +233,17 @@ function AccountModal({ open, account, onClose, onSaved }) {
     if (!form.from_email) return toast.error('From email required');
     setSaving(true);
     try {
+      const payload = { ...form, type };
+      if (!showImap) {
+        payload.imap_host = '';
+        payload.imap_port = 993;
+        payload.imap_secure = true;
+      }
       if (account) {
-        const payload = { ...form, type };
         if (!payload.password) delete payload.password;
         await api.put(`/email-accounts/${account.id}`, payload);
       } else {
-        await api.post('/email-accounts', { ...form, type });
+        await api.post('/email-accounts', payload);
       }
       toast.success(account ? 'Account updated!' : 'Account connected!');
       onSaved();
@@ -177,8 +252,9 @@ function AccountModal({ open, account, onClose, onSaved }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={account ? `Edit — ${account.name}` : 'Connect Email Account'} width={600}>
+    <Modal open={open} onClose={onClose} title={account ? `Edit — ${account.name}` : 'Connect Email Account'} width={620}>
       <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
         {/* Provider tabs */}
         <div>
           <label style={{ fontSize:12, fontWeight:600, color:'var(--text2)', display:'block', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.05em' }}>Provider</label>
@@ -198,15 +274,19 @@ function AccountModal({ open, account, onClose, onSaved }) {
 
         <Input label="Account Name" placeholder={PRESETS[type]?.namePlaceholder||'My Email Account'} value={form.name} onChange={e => f('name', e.target.value)} />
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 80px', gap:10 }}>
-          <Input label="SMTP Host" value={form.host} onChange={e => f('host', e.target.value)} required />
-          <Input label="Port" type="number" value={form.port} onChange={e => f('port', +e.target.value)} required />
-          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-            <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)' }}>SSL</label>
-            <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, cursor:'pointer' }}>
-              <input type="checkbox" checked={form.secure} onChange={e => f('secure', e.target.checked)} style={{ width:16, height:16, accentColor:'var(--primary)' }} />
-              <span style={{ fontSize:13 }}>{form.secure ? 'ON' : 'OFF'}</span>
-            </label>
+        {/* SMTP Settings */}
+        <div style={{ background:'var(--bg3)', borderRadius:8, padding:'12px 14px' }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>📤 SMTP Settings (Sending)</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 80px', gap:10 }}>
+            <Input label="SMTP Host" value={form.host} onChange={e => f('host', e.target.value)} required />
+            <Input label="Port" type="number" value={form.port} onChange={e => f('port', +e.target.value)} required />
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)' }}>SSL</label>
+              <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, cursor:'pointer' }}>
+                <input type="checkbox" checked={form.secure} onChange={e => f('secure', e.target.checked)} style={{ width:16, height:16, accentColor:'var(--primary)' }} />
+                <span style={{ fontSize:13 }}>{form.secure ? 'ON' : 'OFF'}</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -220,6 +300,43 @@ function AccountModal({ open, account, onClose, onSaved }) {
 
         <Input label="Daily Send Limit" type="number" min={1} max={2000} value={form.daily_limit} onChange={e => f('daily_limit', +e.target.value)} />
 
+        {/* IMAP Settings Toggle */}
+        <div style={{ border:'1px solid var(--border)', borderRadius:8, overflow:'hidden' }}>
+          <button type="button" onClick={() => setShowImap(p => !p)} style={{
+            width:'100%', padding:'12px 14px',
+            background: showImap ? 'var(--primary-dim)' : 'var(--bg3)',
+            border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between',
+            fontSize:13, fontWeight:600, color: showImap ? 'var(--primary)' : 'var(--text2)', fontFamily:'inherit',
+          }}>
+            <span>📥 IMAP Settings (Receive Replies) — {showImap ? '✅ Enabled' : 'Click to enable'}</span>
+            <span style={{ fontSize:11, fontWeight:400, color:'var(--text3)' }}>
+              {showImap ? 'Replies sync automatically every 5 min' : 'Optional — sync inbox replies into AdoBoost'}
+            </span>
+          </button>
+
+          {showImap && (
+            <div style={{ padding:'14px', display:'flex', flexDirection:'column', gap:10, borderTop:'1px solid var(--border)' }}>
+              <div style={{ fontSize:12, color:'var(--text2)', padding:'8px 12px', background:'#eff6ff', borderRadius:6, borderLeft:'3px solid #3b82f6', lineHeight:1.6 }}>
+                📬 AdoBoost will check your inbox every 5 minutes and pull replies into the Messages section. Read and reply directly from AdoBoost — no need to open your email client!
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 80px', gap:10 }}>
+                <Input label="IMAP Host" value={form.imap_host} onChange={e => f('imap_host', e.target.value)} placeholder="imap.yourdomain.com" />
+                <Input label="IMAP Port" type="number" value={form.imap_port} onChange={e => f('imap_port', +e.target.value)} />
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)' }}>SSL</label>
+                  <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, cursor:'pointer' }}>
+                    <input type="checkbox" checked={form.imap_secure} onChange={e => f('imap_secure', e.target.checked)} style={{ width:16, height:16, accentColor:'var(--primary)' }} />
+                    <span style={{ fontSize:13 }}>{form.imap_secure ? 'ON' : 'OFF'}</span>
+                  </label>
+                </div>
+              </div>
+              <div style={{ fontSize:12, color:'var(--text3)', background:'var(--bg3)', padding:'8px 12px', borderRadius:6 }}>
+                💡 Same username and password as SMTP will be used for IMAP.
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Test Connection */}
         <div style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:8, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -231,8 +348,6 @@ function AccountModal({ open, account, onClose, onSaved }) {
             {testing==='loading' && <span style={{ fontSize:12, color:'var(--text3)' }}>Testing connection...</span>}
             {!testing && <span style={{ fontSize:12, color:'var(--text3)' }}>Verify your settings before saving</span>}
           </div>
-
-          {/* Simple error hints — no scary port tables */}
           {testError === 'auth' && (
             <div style={{ fontSize:12, color:'var(--text2)', background:'var(--yellow-dim)', border:'1px solid #faf089', borderRadius:6, padding:'10px 12px', lineHeight:1.7 }}>
               <strong style={{ color:'var(--yellow)' }}>Login failed — please check your credentials.</strong><br/>
@@ -244,7 +359,7 @@ function AccountModal({ open, account, onClose, onSaved }) {
           {testError === 'blocked' && (
             <div style={{ fontSize:12, color:'var(--text2)', background:'var(--red-dim)', border:'1px solid var(--red-border)', borderRadius:6, padding:'10px 12px', lineHeight:1.7 }}>
               <strong style={{ color:'var(--red)' }}>Connection failed.</strong><br/>
-              Please check your SMTP host and credentials, then try again. Contact your email provider if the issue persists.
+              Please check your SMTP host and credentials, then try again.
             </div>
           )}
           {testError === 'unknown' && (
