@@ -133,9 +133,7 @@ export default function EmailAccounts() {
                       {testStatus[a.id] === 'loading' && <Loader2 size={14} style={{ animation:'spin 1s linear infinite', color:'var(--primary)' }} />}
                       {testStatus[a.id] === 'ok' && <CheckCircle size={14} color="var(--green)" />}
                       {testStatus[a.id] === 'error' && <XCircle size={14} color="var(--red)" />}
-                      <Btn size="sm" variant="secondary" onClick={() => handleTest(a.id)} title="Test SMTP sending">
-                        📤 SMTP
-                      </Btn>
+                      <Btn size="sm" variant="secondary" onClick={() => handleTest(a.id)} title="Test SMTP sending">📤 SMTP</Btn>
                       {a.imap_host && (
                         <Btn size="sm" variant="secondary" onClick={() => handleSync(a.id)} disabled={syncing[a.id]} title="Sync IMAP inbox">
                           {syncing[a.id] ? <Loader2 size={12} style={{ animation:'spin 1s linear infinite' }} /> : <><Inbox size={12} /> Sync</>}
@@ -166,9 +164,8 @@ function AccountModal({ open, account, onClose, onSaved }) {
     imap_host:'imap.hostinger.com', imap_port:993, imap_secure:true,
     username:'', password:'', from_name:'', from_email:'', daily_limit:50
   });
-  const [imapUsername, setImapUsername] = useState('');
+  // Separate IMAP credentials
   const [imapPassword, setImapPassword] = useState('');
-  const [useSameCredentials, setUseSameCredentials] = useState(true);
   const [saving, setSaving] = useState(false);
   const [smtpTest, setSmtpTest] = useState(null);
   const [imapTest, setImapTest] = useState(null);
@@ -180,16 +177,18 @@ function AccountModal({ open, account, onClose, onSaved }) {
 
   useEffect(() => {
     if (!open) return;
-    setSmtpTest(null); setImapTest(null); setSmtpError(''); setImapError('');
-    setUseSameCredentials(true); setImapUsername(''); setImapPassword('');
+    setSmtpTest(null); setImapTest(null);
+    setSmtpError(''); setImapError('');
+    setImapPassword('');
     if (account) {
       setForm({
         name:account.name||'', host:account.host||'', port:account.port||587,
         secure:account.secure===1||account.secure===true,
         imap_host:account.imap_host||'', imap_port:account.imap_port||993,
         imap_secure:account.imap_secure===1||account.imap_secure===true,
-        username:account.username||'', password:'', from_name:account.from_name||'',
-        from_email:account.from_email||'', daily_limit:account.daily_limit||50
+        username:account.username||'', password:'',
+        from_name:account.from_name||'', from_email:account.from_email||'',
+        daily_limit:account.daily_limit||50
       });
       setShowImap(!!account.imap_host);
       if (account.host?.includes('hostinger')) setType('hostinger');
@@ -216,20 +215,15 @@ function AccountModal({ open, account, onClose, onSaved }) {
       imap_host:p.imap_host, imap_port:p.imap_port, imap_secure:p.imap_secure,
       ...(account ? {} : { username:'', password:'', from_name:'', from_email:'' })
     }));
-    setSmtpTest(null); setImapTest(null); setSmtpError(''); setImapError('');
+    setSmtpTest(null); setImapTest(null);
+    setSmtpError(''); setImapError('');
   };
 
-  // Auto-set imap_secure based on port
   const handleImapPortChange = (port) => {
     f('imap_port', +port);
     if (+port === 993) f('imap_secure', true);
     else if (+port === 143) f('imap_secure', false);
   };
-
-  const getImapCredentials = () => ({
-    username: useSameCredentials ? form.username : imapUsername,
-    password: useSameCredentials ? (form.password || '(saved)') : imapPassword,
-  });
 
   const handleTestSmtp = async () => {
     if (!form.host || !form.username || !form.password) return toast.error('Enter SMTP host, username and password first');
@@ -255,24 +249,23 @@ function AccountModal({ open, account, onClose, onSaved }) {
   };
 
   const handleTestImap = async () => {
-    const creds = getImapCredentials();
     if (!form.imap_host) return toast.error('Enter IMAP host first');
-    if (!creds.username) return toast.error('Enter username first');
-    if (!creds.password || creds.password === '(saved)') return toast.error('Enter password to test IMAP');
+    if (!form.username) return toast.error('Enter username first');
+    if (!imapPassword) return toast.error('Enter IMAP password to test connection');
     setImapTest('loading'); setImapError('');
     try {
       await api.post('/email-accounts/test-imap', {
         imap_host: form.imap_host,
         imap_port: form.imap_port,
         imap_secure: form.imap_secure,
-        username: creds.username,
-        password: creds.password,
+        username: form.username,
+        password: imapPassword,
       });
       setImapTest('ok');
       toast.success('✅ IMAP Connected! Inbox sync will work.', { duration:5000 });
     } catch (err) {
       setImapTest('error');
-      setImapError(err.response?.data?.error || 'IMAP connection failed — check host, port and credentials');
+      setImapError(err.response?.data?.error || 'IMAP connection failed');
     }
   };
 
@@ -326,7 +319,7 @@ function AccountModal({ open, account, onClose, onSaved }) {
 
         {/* ── SMTP Section ── */}
         <div style={{ background:'var(--bg3)', borderRadius:8, padding:'14px', border:'1px solid var(--border)' }}>
-          <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>📤 SMTP — Sending</div>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>📤 SMTP — Sending Emails</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 80px', gap:10, marginBottom:10 }}>
             <Input label="SMTP Host" value={form.host} onChange={e => f('host', e.target.value)} required />
             <Input label="Port" type="number" value={form.port} onChange={e => f('port', +e.target.value)} required />
@@ -340,7 +333,7 @@ function AccountModal({ open, account, onClose, onSaved }) {
           </div>
           <Input label="Username / Email" type="email" placeholder={PRESETS[type]?.userPlaceholder||'you@domain.com'} value={form.username} onChange={e => f('username', e.target.value)} required />
           <div style={{ marginTop:10 }}>
-            <Input label={account ? 'Password (leave blank to keep current)' : 'Password'} type="password" placeholder="••••••••" value={form.password} onChange={e => f('password', e.target.value)} required={!account} />
+            <Input label={account ? 'SMTP Password (leave blank to keep current)' : 'SMTP Password'} type="password" placeholder="••••••••" value={form.password} onChange={e => f('password', e.target.value)} required={!account} />
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
             <Input label="From Name" placeholder="John Smith" value={form.from_name} onChange={e => f('from_name', e.target.value)} />
@@ -357,7 +350,7 @@ function AccountModal({ open, account, onClose, onSaved }) {
             {smtpTest==='ok' && <span style={{ fontSize:13, color:'var(--green)', fontWeight:600 }}>✅ SMTP Connected!</span>}
             {smtpTest==='error' && <span style={{ fontSize:12, color:'var(--red)' }}>❌ {smtpError}</span>}
             {smtpTest==='loading' && <span style={{ fontSize:12, color:'var(--text3)' }}>Testing SMTP...</span>}
-            {!smtpTest && <span style={{ fontSize:12, color:'var(--text3)' }}>Test sending connection before saving</span>}
+            {!smtpTest && <span style={{ fontSize:12, color:'var(--text3)' }}>Test before saving</span>}
           </div>
         </div>
 
@@ -394,41 +387,42 @@ function AccountModal({ open, account, onClose, onSaved }) {
                 </div>
               </div>
 
-              {/* Same credentials toggle */}
-              <div style={{ background:'var(--bg3)', borderRadius:8, padding:'12px 14px' }}>
-                <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', marginBottom: useSameCredentials ? 0 : 12 }}>
-                  <input type="checkbox" checked={useSameCredentials} onChange={e => setUseSameCredentials(e.target.checked)} style={{ width:16, height:16, accentColor:'var(--primary)' }} />
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:600 }}>Use same credentials as SMTP</div>
-                    <div style={{ fontSize:12, color:'var(--text3)' }}>Same username and password for both SMTP and IMAP</div>
-                  </div>
-                </label>
+              {/* IMAP Username (same as SMTP) */}
+              <div style={{ background:'var(--bg3)', borderRadius:6, padding:'8px 12px', fontSize:12, color:'var(--text2)' }}>
+                👤 IMAP Username: <strong>{form.username || '(same as SMTP above)'}</strong>
+              </div>
 
-                {!useSameCredentials && (
-                  <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:12, color:'var(--text2)', fontWeight:600 }}>IMAP Credentials (different from SMTP)</div>
-                    <Input label="IMAP Username / Email" type="email" placeholder="imap-user@domain.com" value={imapUsername} onChange={e => setImapUsername(e.target.value)} />
-                    <Input label="IMAP Password" type="password" placeholder="••••••••" value={imapPassword} onChange={e => setImapPassword(e.target.value)} />
-                  </div>
-                )}
+              {/* IMAP Password — always separate, always visible */}
+              <div style={{ background: '#fff', border:'2px solid #3b82f6', borderRadius:8, padding:'12px 14px' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#1d4ed8', marginBottom:8 }}>
+                  🔑 IMAP Password
+                </div>
+                <Input
+                  label={account ? 'IMAP Password (enter to test or update)' : 'IMAP Password'}
+                  type="password"
+                  placeholder="Enter your email password for IMAP access"
+                  value={imapPassword}
+                  onChange={e => setImapPassword(e.target.value)}
+                />
+                <div style={{ fontSize:11, color:'var(--text3)', marginTop:6 }}>
+                  💡 Usually the same as your SMTP password. For Gmail, use the same App Password.
+                </div>
               </div>
 
               {/* IMAP Test Button */}
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                 <Btn type="button" variant="secondary" size="sm" onClick={handleTestImap} disabled={imapTest==='loading'}>
                   {imapTest==='loading' ? <Loader2 size={13} style={{ animation:'spin 1s linear infinite' }} /> : '📬'} Test IMAP
                 </Btn>
                 {imapTest==='ok' && <span style={{ fontSize:13, color:'var(--green)', fontWeight:600 }}>✅ IMAP Connected! Inbox sync ready.</span>}
                 {imapTest==='error' && (
-                  <div style={{ fontSize:12, color:'var(--red)' }}>
-                    ❌ {imapError}
-                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:4 }}>
-                      Check: correct IMAP host, port 993 with SSL ON, and valid credentials
-                    </div>
+                  <div>
+                    <div style={{ fontSize:12, color:'var(--red)', fontWeight:600 }}>❌ {imapError}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>Check: IMAP host, port 993 with SSL ON, correct password</div>
                   </div>
                 )}
                 {imapTest==='loading' && <span style={{ fontSize:12, color:'var(--text3)' }}>Testing IMAP connection...</span>}
-                {!imapTest && <span style={{ fontSize:12, color:'var(--text3)' }}>Test inbox connection before saving</span>}
+                {!imapTest && <span style={{ fontSize:12, color:'var(--text3)' }}>Enter password above and test before saving</span>}
               </div>
             </div>
           )}
