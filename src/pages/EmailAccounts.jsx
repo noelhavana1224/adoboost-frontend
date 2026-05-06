@@ -104,15 +104,14 @@ function AccountModal({ open, account, onClose, onSaved }) {
   const [type, setType] = useState('hostinger');
   const [form, setForm] = useState({ name:'', host:'smtp.hostinger.com', port:465, secure:true, username:'', password:'', from_name:'', from_email:'', daily_limit:50 });
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(null); // null | loading | ok | error
+  const [testing, setTesting] = useState(null);
   const [testError, setTestError] = useState('');
-  const [diagResults, setDiagResults] = useState([]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
     if (!open) return;
-    setTesting(null); setTestError(''); setDiagResults([]);
+    setTesting(null); setTestError('');
     if (account) {
       setForm({ name:account.name||'', host:account.host||'', port:account.port||587, secure:account.secure===1, username:account.username||'', password:'', from_name:account.from_name||'', from_email:account.from_email||'', daily_limit:account.daily_limit||50 });
       if (account.host?.includes('hostinger')) setType('hostinger');
@@ -130,29 +129,25 @@ function AccountModal({ open, account, onClose, onSaved }) {
     setType(t);
     const p = PRESETS[t];
     setForm(prev => ({ ...prev, host:p.host, port:p.port, secure:p.secure, ...(account ? {} : { username:'', password:'', from_name:'', from_email:'' }) }));
-    setTesting(null); setTestError(''); setDiagResults([]);
+    setTesting(null); setTestError('');
   };
 
   const handleTest = async () => {
     if (!form.host || !form.username || !form.password) return toast.error('Enter host, username and password first');
-    setTesting('loading'); setTestError(''); setDiagResults([]);
+    setTesting('loading'); setTestError('');
     try {
       const { data } = await api.post('/smtp-test/full-test', { host:form.host, username:form.username, password:form.password });
       const working = data.tests.find(t => t.smtpOk);
       const tcpOnly = data.tests.find(t => t.tcpOk);
-      setDiagResults(data.tests);
       if (working) {
-        f('port', working.port); f('secure', working.secure);
         setTesting('ok');
-        toast.success(`Connected on port ${working.port}! Settings auto-updated — click Save.`, { duration:6000 });
+        toast.success('Connection successful! ✅', { duration:6000 });
       } else if (tcpOnly) {
         setTesting('error');
         setTestError('auth');
-        toast.error('Port connects but login failed — check username/password', { duration:6000 });
       } else {
         setTesting('error');
         setTestError('blocked');
-        toast.error('All SMTP ports blocked — see details below', { duration:6000 });
       }
     } catch (err) {
       setTesting('error');
@@ -231,42 +226,31 @@ function AccountModal({ open, account, onClose, onSaved }) {
             <Btn type="button" variant="secondary" size="sm" onClick={handleTest} disabled={testing==='loading'}>
               {testing==='loading' ? <Loader2 size={13} style={{ animation:'spin 1s linear infinite' }} /> : '🔌'} Test Connection
             </Btn>
-            {testing==='ok' && <span style={{ fontSize:13, color:'var(--green)', fontWeight:600 }}>✅ Connected! Port auto-set — click Save!</span>}
-            {testing==='error' && <span style={{ fontSize:13, color:'var(--red)' }}>❌ Failed — see details below</span>}
-            {testing==='loading' && <span style={{ fontSize:12, color:'var(--text3)' }}>Testing all ports (587, 465, 25, 2525)...</span>}
-            {!testing && <span style={{ fontSize:12, color:'var(--text3)' }}>Auto-tests all ports — finds best one for your server</span>}
+            {testing==='ok' && <span style={{ fontSize:13, color:'var(--green)', fontWeight:600 }}>✅ Connection successful!</span>}
+            {testing==='error' && <span style={{ fontSize:13, color:'var(--red)' }}>❌ Connection failed</span>}
+            {testing==='loading' && <span style={{ fontSize:12, color:'var(--text3)' }}>Testing connection...</span>}
+            {!testing && <span style={{ fontSize:12, color:'var(--text3)' }}>Verify your settings before saving</span>}
           </div>
 
-          {/* Diagnostic table */}
-          {diagResults.length > 0 && (
-            <div>
-              <div style={{ border:'1px solid var(--border)', borderRadius:6, overflow:'hidden', marginBottom:8 }}>
-                {diagResults.map((t, i) => (
-                  <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 80px 80px 1fr', padding:'6px 10px', borderBottom: i < diagResults.length-1 ? '1px solid var(--border)' : 'none', background: t.smtpOk?'#f0fff4': t.tcpOk?'#fffff0':'var(--bg2)', fontSize:12, alignItems:'center' }}>
-                    <span style={{ fontWeight:500 }}>{t.name}</span>
-                    <span style={{ color: t.tcpOk?'var(--green)':'var(--red)' }}>{t.tcpOk ? '✅ Open' : '❌ Blocked'}</span>
-                    <span style={{ color: t.smtpOk?'var(--green)': t.tcpOk?'var(--yellow)':'var(--text3)' }}>{t.smtpOk ? '✅ Auth' : t.tcpOk ? '⚠️ Auth?' : '—'}</span>
-                    <span style={{ color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{!t.smtpOk && t.error ? t.error.slice(0,50) : ''}</span>
-                  </div>
-                ))}
-              </div>
-              {testError === 'blocked' && (
-                <div style={{ fontSize:12, color:'var(--text2)', background:'var(--red-dim)', border:'1px solid var(--red-border)', borderRadius:6, padding:'10px 12px', lineHeight:1.7 }}>
-                  <strong style={{ color:'var(--red)' }}>All SMTP ports are blocked.</strong><br/>
-                  1. Go to <strong>railway.app</strong> → your project → backend service<br/>
-                  2. Click <strong>"Deployments"</strong> → click <strong>"..."</strong> → <strong>"Redeploy"</strong><br/>
-                  3. After redeploy, try Test again<br/>
-                  4. If still blocked, contact Railway at <strong>railway.app/help</strong> and say <em>"enable outbound SMTP ports 25, 465, 587"</em>
-                </div>
-              )}
-              {testError === 'auth' && (
-                <div style={{ fontSize:12, color:'var(--text2)', background:'var(--yellow-dim)', border:'1px solid #faf089', borderRadius:6, padding:'10px 12px', lineHeight:1.7 }}>
-                  <strong style={{ color:'var(--yellow)' }}>Port connects but login failed.</strong><br/>
-                  • <strong>Gmail:</strong> Use App Password (16 chars), not your Gmail password<br/>
-                  • <strong>Hostinger/cPanel:</strong> Use your full email as username<br/>
-                  • <strong>All:</strong> No spaces, check caps lock, copy-paste the password
-                </div>
-              )}
+          {/* Simple error hints — no scary port tables */}
+          {testError === 'auth' && (
+            <div style={{ fontSize:12, color:'var(--text2)', background:'var(--yellow-dim)', border:'1px solid #faf089', borderRadius:6, padding:'10px 12px', lineHeight:1.7 }}>
+              <strong style={{ color:'var(--yellow)' }}>Login failed — please check your credentials.</strong><br/>
+              • <strong>Gmail:</strong> Use an App Password (16 chars), not your regular Gmail password<br/>
+              • <strong>Hostinger:</strong> Use your full email address as username<br/>
+              • <strong>All providers:</strong> Double-check for typos and make sure Caps Lock is off
+            </div>
+          )}
+          {testError === 'blocked' && (
+            <div style={{ fontSize:12, color:'var(--text2)', background:'var(--red-dim)', border:'1px solid var(--red-border)', borderRadius:6, padding:'10px 12px', lineHeight:1.7 }}>
+              <strong style={{ color:'var(--red)' }}>Connection failed.</strong><br/>
+              Please check your SMTP host and credentials, then try again. Contact your email provider if the issue persists.
+            </div>
+          )}
+          {testError === 'unknown' && (
+            <div style={{ fontSize:12, color:'var(--text2)', background:'var(--red-dim)', border:'1px solid var(--red-border)', borderRadius:6, padding:'10px 12px', lineHeight:1.7 }}>
+              <strong style={{ color:'var(--red)' }}>Something went wrong.</strong><br/>
+              Please check your settings and try again.
             </div>
           )}
         </div>
