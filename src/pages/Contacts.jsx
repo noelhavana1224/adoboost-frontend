@@ -7,6 +7,7 @@ import { Users, Plus, Upload, Trash2, Search, Edit2, CheckSquare, Square, List }
 export default function Contacts() {
   const [contacts, setContacts] = useState([]);
   const [lists, setLists] = useState([]);
+  const [allTotal, setAllTotal] = useState(0); // total count regardless of filter
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -17,18 +18,23 @@ export default function Contacts() {
   const [selected, setSelected] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
+  const [dragOverList, setDragOverList] = useState(null);
+  const [draggingContact, setDraggingContact] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setSelected(new Set());
     try {
-      const [cr, lr] = await Promise.all([
+      const [cr, lr, allCr] = await Promise.all([
         api.get('/contacts', { params: { list_id: selectedList || undefined, search: search || undefined, page, limit: 50 } }),
         api.get('/contacts/lists'),
+        // Always fetch total count without filter for "All Contacts" badge
+        api.get('/contacts', { params: { page: 1, limit: 1 } }),
       ]);
       setContacts(cr.data.contacts);
       setTotal(cr.data.total);
       setLists(lr.data);
+      setAllTotal(allCr.data.total);
     } finally { setLoading(false); }
   }, [page, search, selectedList]);
 
@@ -59,10 +65,8 @@ export default function Contacts() {
       load();
     } catch (err) {
       if (err.response?.status === 409 && err.response?.data?.warning) {
-        const { message, campaign } = err.response.data;
-        const confirmed = confirm(
-          `⚠️ Warning!\n\n${message}\n\nDeleting this contact will also remove their email history from that campaign.\n\nAre you sure you want to delete anyway?`
-        );
+        const { message } = err.response.data;
+        const confirmed = confirm(`⚠️ Warning!\n\n${message}\n\nAre you sure you want to delete anyway?`);
         if (confirmed) handleDeleteOne(id, true);
       } else {
         toast.error(err.response?.data?.error || 'Failed to delete');
@@ -84,9 +88,7 @@ export default function Contacts() {
         const { message, inCampaign } = err.response.data;
         const campaignNames = [...new Set(inCampaign.map(c => c.campaign))].join(', ');
         const emails = inCampaign.map(c => c.email).join(', ');
-        const confirmed = confirm(
-          `⚠️ Warning!\n\n${message}\n\nCampaign(s): ${campaignNames}\nAffected contacts: ${emails}\n\nDeleting will remove their email history from those campaigns.\n\nAre you sure you want to delete anyway?`
-        );
+        const confirmed = confirm(`⚠️ Warning!\n\n${message}\n\nCampaign(s): ${campaignNames}\nAffected: ${emails}\n\nDelete anyway?`);
         if (confirmed) handleBulkDelete(true);
       } else {
         toast.error(err.response?.data?.error || 'Bulk delete failed');
@@ -95,7 +97,7 @@ export default function Contacts() {
   };
 
   const handleDeleteList = async (id) => {
-    if (!confirm('Delete this list and all its contacts?')) return;
+    if (!confirm('Delete this list? Contacts will not be deleted, just removed from the list.')) return;
     try {
       await api.delete(`/contacts/lists/${id}`);
       toast.success('List deleted');
@@ -114,12 +116,59 @@ export default function Contacts() {
     } catch { toast.error('Failed to move contacts'); }
   };
 
+  // Drag & Drop handlers
+  const handleDragStart = (e, contact) => {
+    setDraggingContact(contact);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', contact.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingContact(null);
+    setDragOverList(null);
+  };
+
+  const handleDragOver = (e, listId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverList(listId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverList(null);
+  };
+
+  const handleDrop = async (e, listId) => {
+    e.preventDefault();
+    setDragOverList(null);
+    if (!draggingContact) return;
+    if (draggingContact.list_id === listId) return;
+    try {
+      await api.post('/contacts/bulk-move', { ids: [draggingContact.id], list_id: listId });
+      toast.success(`Moved ${draggingContact.email} to list`);
+      load();
+    } catch { toast.error('Failed to move contact'); }
+    setDraggingContact(null);
+  };
+
+  const handleDropToAll = async (e) => {
+    e.preventDefault();
+    setDragOverList(null);
+    if (!draggingContact) return;
+    try {
+      await api.post('/contacts/bulk-move', { ids: [draggingContact.id], list_id: null });
+      toast.success(`Removed ${draggingContact.email} from list`);
+      load();
+    } catch { toast.error('Failed'); }
+    setDraggingContact(null);
+  };
+
   const allSelected = contacts.length > 0 && selected.size === contacts.length;
   const someSelected = selected.size > 0 && !allSelected;
 
   return (
     <div>
-      <PageHeader title="Contacts" subtitle={`${total.toLocaleString()} total contacts`}
+      <PageHeader title="Contacts" subtitle={`${allTotal.toLocaleString()} total contacts`}
         action={
           <div style={{ display: 'flex', gap: 8 }}>
             <Btn variant="secondary" onClick={() => setModal('list')}><List size={14} /> New List</Btn>
@@ -133,28 +182,49 @@ export default function Contacts() {
         {/* Lists Sidebar */}
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Lists</div>
+          {draggingContact && (
+            <div style={{ fontSize: 11, color: 'var(--primary)', marginBottom: 6, padding: '4px 8px', background: 'var(--primary-dim)', borderRadius: 6, textAlign: 'center' }}>
+              🖱️ Drop onto a list to move
+            </div>
+          )}
           <Card style={{ padding: 8 }}>
-            <button onClick={() => { setSelectedList(''); setPage(1); }} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              width: '100%', padding: '8px 10px', borderRadius: 6, border: 'none',
-              background: selectedList === '' ? 'var(--primary-dim)' : 'transparent',
-              color: selectedList === '' ? 'var(--primary)' : 'var(--text2)',
-              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-              fontWeight: selectedList === '' ? 600 : 400,
-            }}>
+            {/* All Contacts — always shows total regardless of filter */}
+            <button
+              onClick={() => { setSelectedList(''); setPage(1); }}
+              onDragOver={(e) => handleDragOver(e, 'all')}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDropToAll}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', padding: '8px 10px', borderRadius: 6, border: dragOverList === 'all' ? '2px dashed var(--primary)' : '2px solid transparent',
+                background: selectedList === '' ? 'var(--primary-dim)' : dragOverList === 'all' ? 'var(--primary-dim)' : 'transparent',
+                color: selectedList === '' ? 'var(--primary)' : 'var(--text2)',
+                cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+                fontWeight: selectedList === '' ? 600 : 400,
+                transition: 'all 0.15s',
+              }}>
               <span>All Contacts</span>
-              <span style={{ fontSize: 12, background: 'var(--bg3)', padding: '1px 7px', borderRadius: 10 }}>{total}</span>
+              <span style={{ fontSize: 12, background: 'var(--bg3)', padding: '1px 7px', borderRadius: 10 }}>{allTotal}</span>
             </button>
+
+            {/* Individual Lists */}
             {lists.map(l => (
               <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <button onClick={() => { setSelectedList(l.id); setPage(1); }} style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 10px', borderRadius: 6, border: 'none',
-                  background: selectedList === l.id ? 'var(--primary-dim)' : 'transparent',
-                  color: selectedList === l.id ? 'var(--primary)' : 'var(--text2)',
-                  cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-                  fontWeight: selectedList === l.id ? 600 : 400,
-                }}>
+                <button
+                  onClick={() => { setSelectedList(l.id); setPage(1); }}
+                  onDragOver={(e) => handleDragOver(e, l.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, l.id)}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 10px', borderRadius: 6,
+                    border: dragOverList === l.id ? '2px dashed var(--primary)' : '2px solid transparent',
+                    background: selectedList === l.id ? 'var(--primary-dim)' : dragOverList === l.id ? 'var(--primary-dim)' : 'transparent',
+                    color: selectedList === l.id ? 'var(--primary)' : 'var(--text2)',
+                    cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+                    fontWeight: selectedList === l.id ? 600 : 400,
+                    transition: 'all 0.15s',
+                  }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{l.name}</span>
                   <span style={{ fontSize: 11, flexShrink: 0, background: 'var(--bg3)', padding: '1px 6px', borderRadius: 10 }}>{l.total_contacts || 0}</span>
                 </button>
@@ -169,9 +239,9 @@ export default function Contacts() {
               <div style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 10px', textAlign: 'center' }}>No lists yet</div>
             )}
           </Card>
-          {lists.length > 0 && (
-            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)' }}>
-              {lists.reduce((a, l) => a + (l.good_contacts || 0), 0)} good · {lists.reduce((a, l) => a + (l.bad_contacts || 0), 0)} bad
+          {draggingContact && (
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
+              Moving: {draggingContact.email}
             </div>
           )}
         </div>
@@ -187,12 +257,12 @@ export default function Contacts() {
                 style={{ width: '100%', background: '#fff', border: '1px solid var(--border2)', borderRadius: 8, padding: '9px 12px 9px 32px', fontSize: 14, outline: 'none', color: 'var(--text)' }} />
             </div>
             {selected.size > 0 && (
-              <div style={{ display:'flex', gap:8 }}>
-                <Btn variant="secondary" onClick={()=>setShowMoveModal(true)}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Btn variant="secondary" onClick={() => setShowMoveModal(true)}>
                   📂 Move {selected.size} to List
                 </Btn>
-                <Btn variant="danger" loading={deleting} onClick={()=>handleBulkDelete()}>
-                  <Trash2 size={13} /> Delete {selected.size} selected
+                <Btn variant="danger" loading={deleting} onClick={() => handleBulkDelete()}>
+                  <Trash2 size={13} /> Delete {selected.size}
                 </Btn>
               </div>
             )}
@@ -200,7 +270,7 @@ export default function Contacts() {
 
           {loading ? <Spinner /> : contacts.length === 0 ? (
             <Empty icon={Users} title="No contacts found"
-              description={search ? 'Try a different search term' : 'Add contacts manually or import a CSV file.'}
+              description={search ? 'Try a different search term' : selectedList ? 'This list is empty. Import contacts or drag contacts here from All Contacts.' : 'Add contacts manually or import a CSV file.'}
               action={!search && <Btn onClick={() => setModal('import')}><Upload size={14} /> Import CSV</Btn>} />
           ) : (
             <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -208,30 +278,36 @@ export default function Contacts() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg3)', borderBottom: '2px solid var(--border)' }}>
-                      {/* Select All checkbox */}
                       <th style={{ padding: '10px 14px', width: 40 }}>
                         <button onClick={toggleSelectAll} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: allSelected ? 'var(--primary)' : 'var(--text3)' }}>
                           {allSelected ? <CheckSquare size={16} /> : someSelected ? <CheckSquare size={16} color="var(--primary)" style={{ opacity: 0.5 }} /> : <Square size={16} />}
                         </button>
                       </th>
-                      {['Email', 'Name', 'Company', 'Title', 'Status', 'Actions'].map(h => (
+                      {['', 'Email', 'Name', 'Company', 'Title', 'Status', 'Actions'].map(h => (
                         <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {contacts.map(c => (
-                      <tr key={c.id} style={{
-                        borderBottom: '1px solid var(--border)',
-                        background: selected.has(c.id) ? 'var(--primary-dim)' : 'transparent',
-                        transition: 'background 0.1s',
-                      }}>
-                        {/* Checkbox */}
+                      <tr key={c.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, c)}
+                        onDragEnd={handleDragEnd}
+                        style={{
+                          borderBottom: '1px solid var(--border)',
+                          background: selected.has(c.id) ? 'var(--primary-dim)' : draggingContact?.id === c.id ? 'var(--bg3)' : 'transparent',
+                          transition: 'background 0.1s',
+                          cursor: 'grab',
+                          opacity: draggingContact?.id === c.id ? 0.5 : 1,
+                        }}>
                         <td style={{ padding: '10px 14px', width: 40 }}>
                           <button onClick={() => toggleSelect(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: selected.has(c.id) ? 'var(--primary)' : 'var(--text3)' }}>
                             {selected.has(c.id) ? <CheckSquare size={16} /> : <Square size={16} />}
                           </button>
                         </td>
+                        {/* Drag handle */}
+                        <td style={{ padding: '10px 6px', width: 20, color: 'var(--text3)', fontSize: 16, cursor: 'grab' }} title="Drag to move to a list">⠿</td>
                         <td style={{ padding: '10px 14px', fontSize: 13, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</td>
                         <td style={{ padding: '10px 14px', fontSize: 13 }}>
                           {[c.first_name, c.last_name].filter(Boolean).join(' ') || <span style={{ color: 'var(--text3)' }}>—</span>}
@@ -259,13 +335,12 @@ export default function Contacts() {
                 </table>
               </div>
 
-              {/* Footer with count + pagination */}
               <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: 12, color: 'var(--text3)' }}>
                   {selected.size > 0 ? (
-                    <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{selected.size} selected</span>
+                    <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{selected.size} selected — drag to a list or use Move button</span>
                   ) : (
-                    <span>Showing {contacts.length} of {total.toLocaleString()} contacts</span>
+                    <span>Showing {contacts.length} of {total.toLocaleString()} contacts{draggingContact ? ' — drop on a list to move' : ' — drag rows to move between lists'}</span>
                   )}
                 </div>
                 <Pagination page={page} total={total} limit={50} onChange={setPage} />
@@ -278,9 +353,9 @@ export default function Contacts() {
       {/* Modals */}
       <AddContactModal open={modal === 'add'} onClose={() => setModal(null)} lists={lists} onSaved={() => { setModal(null); load(); }} />
       <EditContactModal contact={editContact} onClose={() => setEditContact(null)} lists={lists} onSaved={() => { setEditContact(null); load(); }} />
-      <ImportModal open={modal === 'import'} onClose={() => setModal(null)} lists={lists} onSaved={() => { setModal(null); load(); }} />
+      <ImportModal open={modal === 'import'} onClose={() => setModal(null)} lists={lists} selectedList={selectedList} onSaved={() => { setModal(null); load(); }} />
       <NewListModal open={modal === 'list'} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />
-      <MoveToListModal open={showMoveModal} onClose={()=>setShowMoveModal(false)} lists={lists} onMove={handleBulkMove} count={selected.size} />
+      <MoveToListModal open={showMoveModal} onClose={() => setShowMoveModal(false)} lists={lists} onMove={handleBulkMove} count={selected.size} />
     </div>
   );
 }
@@ -382,7 +457,8 @@ function NewListModal({ open, onClose, onSaved }) {
   );
 }
 
-function ImportModal({ open, onClose, lists, onSaved }) {
+// FIX: Pass selectedList as default listId so imported contacts go to the right list
+function ImportModal({ open, onClose, lists, selectedList, onSaved }) {
   const [step, setStep] = useState(1);
   const [listId, setListId] = useState('');
   const [file, setFile] = useState(null);
@@ -405,8 +481,13 @@ function ImportModal({ open, onClose, lists, onSaved }) {
   ];
 
   useEffect(() => {
-    if (!open) { setStep(1); setFile(null); setHeaders([]); setPreview([]); setMapping({}); setResult(null); }
-  }, [open]);
+    if (!open) {
+      setStep(1); setFile(null); setHeaders([]); setPreview([]); setMapping({}); setResult(null);
+    } else {
+      // FIX: Pre-select current list when opening import modal
+      setListId(selectedList || '');
+    }
+  }, [open, selectedList]);
 
   const handleFileSelect = (e) => {
     const f = e.target.files[0];
@@ -453,6 +534,7 @@ function ImportModal({ open, onClose, lists, onSaved }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
+      // FIX: Always send list_id if selected — this was the main bug
       if (listId) fd.append('list_id', listId);
       fd.append('mapping', JSON.stringify(mapping));
       fd.append('duplicate_action', duplicateAction);
@@ -460,7 +542,7 @@ function ImportModal({ open, onClose, lists, onSaved }) {
       const { data } = await api.post('/contacts/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setResult(data);
       setStep(4);
-      toast.success(`Import complete! ${data.imported} contacts added`);
+      toast.success(`Import complete! ${data.imported} contacts added${listId ? ' to list' : ''}`);
     } catch (err) { toast.error(err.response?.data?.error || 'Import failed'); }
     finally { setLoading(false); }
   };
@@ -490,6 +572,11 @@ function ImportModal({ open, onClose, lists, onSaved }) {
             <option value="">No list — just import contacts</option>
             {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>
+          {listId && (
+            <div style={{ fontSize: 12, color: 'var(--green)', padding: '6px 10px', background: '#f0fff4', borderRadius: 6, border: '1px solid #9ae6b4' }}>
+              ✅ Contacts will be imported into: <strong>{lists.find(l => l.id === listId)?.name}</strong>
+            </div>
+          )}
         </div>
       )}
 
@@ -542,6 +629,11 @@ function ImportModal({ open, onClose, lists, onSaved }) {
 
       {step === 3 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {listId && (
+            <div style={{ fontSize: 12, color: 'var(--green)', padding: '6px 10px', background: '#f0fff4', borderRadius: 6, border: '1px solid #9ae6b4' }}>
+              ✅ Will import into list: <strong>{lists.find(l => l.id === listId)?.name}</strong>
+            </div>
+          )}
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>If a contact already exists (same email):</div>
             {[{ value: 'skip', label: 'Skip — keep existing data unchanged', desc: 'Safe — existing contact info is preserved' }, { value: 'update', label: 'Update — overwrite with CSV data', desc: 'Updates name, company, title etc.' }].map(opt => (
@@ -553,12 +645,12 @@ function ImportModal({ open, onClose, lists, onSaved }) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Fallback values when a field is empty</div>
-            <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>If a contact has no first name, use this instead. e.g. "Hi <strong>there</strong>" instead of "Hi "</p>
+            <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>If a contact has no first name, use this instead in your emails.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Input label="First Name fallback" placeholder="there" value={fallbacks.first_name} onChange={e => fb('first_name', e.target.value)} hint='Used in {{first_name}} if empty' />
-              <Input label="Last Name fallback" placeholder="(leave blank)" value={fallbacks.last_name} onChange={e => fb('last_name', e.target.value)} hint='Used in {{last_name}} if empty' />
-              <Input label="Company fallback" placeholder="your company" value={fallbacks.company} onChange={e => fb('company', e.target.value)} hint='Used in {{company}} if empty' />
-              <Input label="Title fallback" placeholder="(leave blank)" value={fallbacks.title} onChange={e => fb('title', e.target.value)} hint='Used in {{title}} if empty' />
+              <Input label="First Name fallback" placeholder="there" value={fallbacks.first_name} onChange={e => fb('first_name', e.target.value)} />
+              <Input label="Last Name fallback" placeholder="(leave blank)" value={fallbacks.last_name} onChange={e => fb('last_name', e.target.value)} />
+              <Input label="Company fallback" placeholder="your company" value={fallbacks.company} onChange={e => fb('company', e.target.value)} />
+              <Input label="Title fallback" placeholder="(leave blank)" value={fallbacks.title} onChange={e => fb('title', e.target.value)} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -580,6 +672,7 @@ function ImportModal({ open, onClose, lists, onSaved }) {
               </div>
             ))}
           </div>
+          {listId && <p style={{ fontSize: 13, color: 'var(--green)', marginBottom: 16 }}>✅ Contacts added to: <strong>{lists.find(l => l.id === listId)?.name}</strong></p>}
           <Btn onClick={onSaved}>Done ✓</Btn>
         </div>
       )}
@@ -589,19 +682,21 @@ function ImportModal({ open, onClose, lists, onSaved }) {
 
 function MoveToListModal({ open, onClose, lists, onMove, count }) {
   const [listId, setListId] = useState('');
+  useEffect(() => { if (!open) setListId(''); }, [open]);
   return (
-    <Modal open={open} onClose={onClose} title={`Move ${count} Contact${count!==1?'s':''} to List`}>
-      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        <p style={{ fontSize:13, color:'var(--text2)' }}>
-          Select which list to move the selected contacts to. This will update their list assignment.
+    <Modal open={open} onClose={onClose} title={`Move ${count} Contact${count !== 1 ? 's' : ''} to List`}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <p style={{ fontSize: 13, color: 'var(--text2)' }}>
+          Select which list to move the selected contacts to.
         </p>
-        <Select label="Select List" value={listId} onChange={e=>setListId(e.target.value)}>
+        <Select label="Select List" value={listId} onChange={e => setListId(e.target.value)}>
           <option value="">— Choose a list —</option>
-          {lists.map(l=><option key={l.id} value={l.id}>{l.name} ({l.total_contacts||0} contacts)</option>)}
+          <option value="none">Remove from list (No list)</option>
+          {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_contacts || 0} contacts)</option>)}
         </Select>
-        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
-          <Btn onClick={()=>{ if(!listId) return; onMove(listId); }} disabled={!listId}>
+          <Btn onClick={() => { if (!listId) return; onMove(listId === 'none' ? null : listId); }} disabled={!listId}>
             📂 Move to List
           </Btn>
         </div>
