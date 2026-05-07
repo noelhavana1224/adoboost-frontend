@@ -112,7 +112,7 @@ export default function EmailAccounts() {
                   <TD style={{ fontSize:12 }}>
                     <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                       <span style={{ color:'var(--text2)', fontSize:11 }}>{a.host}:{a.port}</span>
-                      <Badge color={a.secure ? 'green' : 'default'}>SSL {a.secure ? 'ON' : 'OFF'}</Badge>
+                      <Badge color={(a.secure===1||a.secure===true||a.port===465) ? 'green' : 'default'}>SSL {(a.secure===1||a.secure===true||a.port===465) ? 'ON' : 'OFF'}</Badge>
                     </div>
                   </TD>
                   <TD style={{ fontSize:12 }}>
@@ -181,11 +181,15 @@ function AccountModal({ open, account, onClose, onSaved }) {
     setSmtpError(''); setImapError('');
     setImapPassword('');
     if (account) {
+      // Normalize SQLite 0/1/null → boolean, with port-based fallback
+      const smtpSecure = account.secure===1 || account.secure===true || account.port===465;
+      const imapPort   = account.imap_port || 993;
+      const imapSecure = account.imap_secure===1 || account.imap_secure===true || imapPort===993;
       setForm({
         name:account.name||'', host:account.host||'', port:account.port||587,
-        secure:account.secure===1||account.secure===true,
-        imap_host:account.imap_host||'', imap_port:account.imap_port||993,
-        imap_secure:account.imap_secure===1||account.imap_secure===true,
+        secure: smtpSecure,
+        imap_host:account.imap_host||'', imap_port: imapPort,
+        imap_secure: imapSecure,
         username:account.username||'', password:'',
         from_name:account.from_name||'', from_email:account.from_email||'',
         daily_limit:account.daily_limit||50
@@ -223,6 +227,12 @@ function AccountModal({ open, account, onClose, onSaved }) {
     f('imap_port', +port);
     if (+port === 993) f('imap_secure', true);
     else if (+port === 143) f('imap_secure', false);
+  };
+
+  const handleSmtpPortChange = (port) => {
+    f('port', +port);
+    if (+port === 465) f('secure', true);
+    else if (+port === 587 || +port === 25) f('secure', false);
   };
 
   const handleTestSmtp = async () => {
@@ -322,7 +332,7 @@ function AccountModal({ open, account, onClose, onSaved }) {
           <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>📤 SMTP — Sending Emails</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 80px', gap:10, marginBottom:10 }}>
             <Input label="SMTP Host" value={form.host} onChange={e => f('host', e.target.value)} required />
-            <Input label="Port" type="number" value={form.port} onChange={e => f('port', +e.target.value)} required />
+            <Input label="Port" type="number" value={form.port} onChange={e => handleSmtpPortChange(e.target.value)} required />
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
               <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)' }}>SSL</label>
               <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, cursor:'pointer' }}>
