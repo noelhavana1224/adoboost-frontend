@@ -34,10 +34,8 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ── Extract only the NEW reply (strip quoted thread) ──
 function extractNewMessage(body) {
   if (!body) return '';
-  // Split on common quote markers
   const cutMarkers = [
     /^On .+wrote:$/m,
     /^-----Original Message-----/m,
@@ -48,10 +46,7 @@ function extractNewMessage(body) {
   let text = body;
   for (const marker of cutMarkers) {
     const match = text.search(marker);
-    if (match > 20) { // at least 20 chars of new content before the quote
-      text = text.substring(0, match).trim();
-      break;
-    }
+    if (match > 20) { text = text.substring(0, match).trim(); break; }
   }
   return text.trim();
 }
@@ -66,12 +61,8 @@ function SyncModal({ open, onClose, onSynced }) {
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    setSyncStatus({});
-    setSyncResult({});
-    api.get('/email-accounts')
-      .then(r => setAccounts(r.data.filter(a => a.imap_host)))
-      .finally(() => setLoading(false));
+    setLoading(true); setSyncStatus({}); setSyncResult({});
+    api.get('/email-accounts').then(r => setAccounts(r.data.filter(a => a.imap_host))).finally(() => setLoading(false));
   }, [open]);
 
   const syncOne = async (acc) => {
@@ -81,12 +72,8 @@ function SyncModal({ open, onClose, onSynced }) {
       const count = data.synced || 0;
       setSyncStatus(s => ({ ...s, [acc.id]: 'done' }));
       setSyncResult(s => ({ ...s, [acc.id]: count }));
-      onSynced(count);
-      return count;
-    } catch {
-      setSyncStatus(s => ({ ...s, [acc.id]: 'error' }));
-      return 0;
-    }
+      onSynced(count); return count;
+    } catch { setSyncStatus(s => ({ ...s, [acc.id]: 'error' })); return 0; }
   };
 
   const syncAll = async () => {
@@ -105,9 +92,9 @@ function SyncModal({ open, onClose, onSynced }) {
         </div>
         {loading ? <Spinner /> : accounts.length === 0 ? (
           <div style={{ textAlign:'center', padding:'24px', color:'var(--text3)', fontSize:13 }}>
-            <Inbox size={32} style={{ opacity:0.3, marginBottom:8, display:'block', margin:'0 auto 8px' }} />
+            <Inbox size={32} style={{ opacity:0.3, display:'block', margin:'0 auto 8px' }} />
             <div style={{ fontWeight:600, marginBottom:4 }}>No IMAP accounts configured</div>
-            <div style={{ fontSize:12 }}>Go to <strong>Email Accounts</strong> and enable IMAP to receive replies.</div>
+            <div style={{ fontSize:12 }}>Go to <strong>Email Accounts</strong> and enable IMAP.</div>
           </div>
         ) : (
           <>
@@ -123,49 +110,78 @@ function SyncModal({ open, onClose, onSynced }) {
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {accounts.map(acc => {
                 const status = syncStatus[acc.id];
-                const isSyncing = status === 'syncing';
-                const isDone    = status === 'done';
-                const isError   = status === 'error';
+                const isSyncing = status==='syncing', isDone=status==='done', isError=status==='error';
                 return (
-                  <div key={acc.id} style={{
-                    display:'flex', alignItems:'center', justifyContent:'space-between',
-                    padding:'12px 14px', borderRadius:10,
-                    border:`1px solid ${isDone ? '#86efac' : isError ? '#fca5a5' : 'var(--border2)'}`,
-                    background: isDone ? '#f0fff4' : isError ? '#fff5f5' : '#fff',
-                    transition:'all 0.2s',
-                  }}>
+                  <div key={acc.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderRadius:10, border:`1px solid ${isDone?'#86efac':isError?'#fca5a5':'var(--border2)'}`, background:isDone?'#f0fff4':isError?'#fff5f5':'#fff', transition:'all 0.2s' }}>
                     <div style={{ minWidth:0 }}>
                       <div style={{ fontWeight:600, fontSize:13 }}>{acc.name}</div>
                       <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{acc.from_email} · {acc.imap_host}:{acc.imap_port}</div>
                       <div style={{ fontSize:11, color:'var(--text3)', marginTop:3 }}>
                         Last synced: <strong>{timeAgo(acc.last_synced_at)}</strong>
-                        {isDone && <span style={{ color:'#16a34a', fontWeight:600, marginLeft:8 }}>✅ {syncResult[acc.id]} new message{syncResult[acc.id] !== 1 ? 's' : ''}</span>}
+                        {isDone && <span style={{ color:'#16a34a', fontWeight:600, marginLeft:8 }}>✅ {syncResult[acc.id]} new message{syncResult[acc.id]!==1?'s':''}</span>}
                         {isError && <span style={{ color:'#dc2626', fontWeight:600, marginLeft:8 }}>❌ Sync failed</span>}
                       </div>
                     </div>
-                    <button onClick={() => syncOne(acc)} disabled={isSyncing || syncingAll} style={{
-                      flexShrink:0, marginLeft:12, padding:'6px 14px', borderRadius:8, fontSize:12, fontWeight:600,
-                      border:'none', cursor: isSyncing ? 'wait' : 'pointer', fontFamily:'inherit',
-                      background: isDone ? '#dcfce7' : isError ? '#fee2e2' : 'var(--primary)',
-                      color: isDone ? '#16a34a' : isError ? '#dc2626' : '#fff',
-                      display:'flex', alignItems:'center', gap:6, transition:'all 0.15s',
-                    }}>
-                      {isSyncing ? <><Loader2 size={12} style={{ animation:'spin 1s linear infinite' }} /> Syncing...</>
-                       : isDone   ? <><CheckCircle size={12} /> Synced</>
-                       : isError  ? <>❌ Retry</>
-                       : <><RefreshCw size={12} /> Sync</>}
+                    <button onClick={() => syncOne(acc)} disabled={isSyncing||syncingAll} style={{ flexShrink:0, marginLeft:12, padding:'6px 14px', borderRadius:8, fontSize:12, fontWeight:600, border:'none', cursor:isSyncing?'wait':'pointer', fontFamily:'inherit', background:isDone?'#dcfce7':isError?'#fee2e2':'var(--primary)', color:isDone?'#16a34a':isError?'#dc2626':'#fff', display:'flex', alignItems:'center', gap:6, transition:'all 0.15s' }}>
+                      {isSyncing?<><Loader2 size={12} style={{ animation:'spin 1s linear infinite' }}/> Syncing...</>:isDone?<><CheckCircle size={12}/> Synced</>:isError?<>❌ Retry</>:<><RefreshCw size={12}/> Sync</>}
                     </button>
                   </div>
                 );
               })}
             </div>
             <div style={{ display:'flex', justifyContent:'flex-end' }}>
-              <Btn variant="secondary" onClick={onClose}>{anyDone ? 'Done' : 'Cancel'}</Btn>
+              <Btn variant="secondary" onClick={onClose}>{anyDone?'Done':'Cancel'}</Btn>
             </div>
           </>
         )}
       </div>
     </Modal>
+  );
+}
+
+// ── Tag Selector Dropdown (fixed positioning) ───
+function TagSelector({ currentTag, loading, onTag }) {
+  const [open, setOpen] = useState(false);
+  const tag = TAG_MAP[currentTag];
+  return (
+    <div style={{ position:'relative' }}>
+      <button onClick={() => setOpen(p => !p)} disabled={loading} style={{
+        background: tag ? tag.bg : 'var(--bg3)',
+        border:`1px solid ${tag ? tag.border : 'var(--border2)'}`,
+        borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:12,
+        color: tag ? tag.color : 'var(--text3)',
+        display:'flex', alignItems:'center', gap:4, fontFamily:'inherit', whiteSpace:'nowrap',
+      }}>
+        <Tag size={11} />
+        {loading ? 'Saving...' : tag ? tag.label : 'Tag'}
+        <ChevronDown size={10} />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:999 }} />
+          {/* FIX: opens UPWARD so it's never cut off at bottom */}
+          <div style={{
+            position:'absolute', right:0,
+            bottom:'100%',   /* ← opens upward */
+            marginBottom:4,
+            background:'#fff', border:'1px solid var(--border2)', borderRadius:8,
+            boxShadow:'0 -4px 20px rgba(0,0,0,0.12)', zIndex:1000,
+            minWidth:190, overflow:'hidden',
+          }}>
+            {currentTag && (
+              <button onClick={() => { onTag(null); setOpen(false); }} style={{ width:'100%', padding:'8px 12px', border:'none', background:'none', textAlign:'left', cursor:'pointer', fontSize:12, color:'var(--text3)', display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid var(--border)' }}>
+                <X size={11} /> Remove tag
+              </button>
+            )}
+            {TAGS.filter(t => t.key !== 'auto_reply').map(t => (
+              <button key={t.key} onClick={() => { onTag(t.key); setOpen(false); }} style={{ width:'100%', padding:'9px 12px', border:'none', background:currentTag===t.key?t.bg:'transparent', textAlign:'left', cursor:'pointer', fontSize:13, color:t.color, fontWeight:currentTag===t.key?700:400, display:'flex', alignItems:'center', gap:8, fontFamily:'inherit' }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -187,9 +203,7 @@ export default function Messages({ type = 'inbox' }) {
     setLoading(true);
     try {
       const endpoint = type === 'inbox' ? '/messages/inbox' : '/messages/auto-replies';
-      const { data } = await api.get(endpoint, {
-        params: { search: search || undefined, page, limit: 20, tag: filterTag || undefined }
-      });
+      const { data } = await api.get(endpoint, { params: { search: search||undefined, page, limit:20, tag: filterTag||undefined } });
       setMessages(data.messages || []);
       setTotal(data.total || 0);
       setUnread(data.unread || 0);
@@ -225,30 +239,16 @@ export default function Messages({ type = 'inbox' }) {
     <div>
       <PageHeader
         title="Messages"
-        subtitle={type === 'inbox'
-          ? `Track and reply to campaign responses${unread > 0 ? ` · ${unread} unread` : ''}`
-          : 'Auto-reply responses filtered automatically'}
-        action={type === 'inbox' && (
-          <Btn onClick={() => setShowSyncModal(true)}>
-            <RefreshCw size={14} /> Sync Inbox
-          </Btn>
-        )}
+        subtitle={type==='inbox' ? `Track and reply to campaign responses${unread>0?` · ${unread} unread`:''}` : 'Auto-reply responses filtered automatically'}
+        action={type==='inbox' && <Btn onClick={() => setShowSyncModal(true)}><RefreshCw size={14}/> Sync Inbox</Btn>}
       />
 
       {/* Tabs */}
       <div style={{ display:'flex', gap:0, borderBottom:'2px solid var(--border)', marginBottom:20 }}>
-        {[
-          { label: `📥 Inbox${unread > 0 ? ` (${unread})` : ''}`, path: '/messages/inbox' },
-          { label: '⚙️ Auto-replies', path: '/messages/auto-replies' }
+        {[{ label:`📥 Inbox${unread>0?` (${unread})`:''}`  , path:'/messages/inbox' },
+          { label:'⚙️ Auto-replies', path:'/messages/auto-replies' }
         ].map(t => (
-          <a key={t.path} href={t.path} style={{
-            padding:'10px 18px',
-            borderBottom:`2px solid ${activeTab===t.path ? 'var(--primary)' : 'transparent'}`,
-            marginBottom:-2,
-            color: activeTab===t.path ? 'var(--primary)' : 'var(--text2)',
-            fontWeight: activeTab===t.path ? 600 : 400,
-            fontSize:14, textDecoration:'none', transition:'all 0.15s'
-          }}>{t.label}</a>
+          <a key={t.path} href={t.path} style={{ padding:'10px 18px', borderBottom:`2px solid ${activeTab===t.path?'var(--primary)':'transparent'}`, marginBottom:-2, color:activeTab===t.path?'var(--primary)':'var(--text2)', fontWeight:activeTab===t.path?600:400, fontSize:14, textDecoration:'none', transition:'all 0.15s' }}>{t.label}</a>
         ))}
       </div>
 
@@ -256,28 +256,14 @@ export default function Messages({ type = 'inbox' }) {
       <div style={{ display:'flex', gap:10, marginBottom:16, alignItems:'center', flexWrap:'wrap' }}>
         <div style={{ position:'relative', flex:1, minWidth:200 }}>
           <Search size={14} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--text3)' }} />
-          <input placeholder="Search messages..." value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          <input placeholder="Search messages..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
             style={{ width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8, padding:'9px 12px 9px 32px', fontSize:14, outline:'none' }} />
         </div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
           <span style={{ fontSize:12, color:'var(--text3)', fontWeight:600 }}>Filter:</span>
-          <button onClick={() => setFilterTag('')} style={{
-            padding:'5px 12px', borderRadius:20,
-            border:`1px solid ${!filterTag ? 'var(--primary)' : 'var(--border2)'}`,
-            background: !filterTag ? 'var(--primary-dim)' : '#fff',
-            color: !filterTag ? 'var(--primary)' : 'var(--text2)',
-            fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight: !filterTag ? 600 : 400,
-          }}>All</button>
+          <button onClick={() => setFilterTag('')} style={{ padding:'5px 12px', borderRadius:20, border:`1px solid ${!filterTag?'var(--primary)':'var(--border2)'}`, background:!filterTag?'var(--primary-dim)':'#fff', color:!filterTag?'var(--primary)':'var(--text2)', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:!filterTag?600:400 }}>All</button>
           {TAGS.filter(t => t.key !== 'auto_reply').map(tag => (
-            <button key={tag.key} onClick={() => setFilterTag(filterTag === tag.key ? '' : tag.key)} style={{
-              padding:'5px 12px', borderRadius:20,
-              border:`1px solid ${filterTag===tag.key ? tag.color : 'var(--border2)'}`,
-              background: filterTag===tag.key ? tag.bg : '#fff',
-              color: filterTag===tag.key ? tag.color : 'var(--text2)',
-              fontSize:12, cursor:'pointer', fontFamily:'inherit',
-              fontWeight: filterTag===tag.key ? 600 : 400,
-            }}>{tag.label}</button>
+            <button key={tag.key} onClick={() => setFilterTag(filterTag===tag.key?'':tag.key)} style={{ padding:'5px 12px', borderRadius:20, border:`1px solid ${filterTag===tag.key?tag.color:'var(--border2)'}`, background:filterTag===tag.key?tag.bg:'#fff', color:filterTag===tag.key?tag.color:'var(--text2)', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:filterTag===tag.key?600:400 }}>{tag.label}</button>
           ))}
         </div>
       </div>
@@ -285,21 +271,16 @@ export default function Messages({ type = 'inbox' }) {
       {/* Auto-sync hint */}
       {type === 'inbox' && (
         <div style={{ fontSize:12, color:'var(--text3)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
-          <RefreshCw size={11} /> Auto-syncs every 5 minutes ·{' '}
-          <button onClick={() => setShowSyncModal(true)}
-            style={{ background:'none', border:'none', color:'var(--primary)', cursor:'pointer', fontSize:12, padding:0, fontFamily:'inherit' }}>
-            Sync now
-          </button>
+          <RefreshCw size={11}/> Auto-syncs every 5 minutes ·{' '}
+          <button onClick={() => setShowSyncModal(true)} style={{ background:'none', border:'none', color:'var(--primary)', cursor:'pointer', fontSize:12, padding:0, fontFamily:'inherit' }}>Sync now</button>
         </div>
       )}
 
       {loading ? <Spinner /> : messages.length === 0 ? (
         <Empty icon={MessageSquare}
-          title={filterTag ? `No ${TAG_MAP[filterTag]?.label} messages` : type === 'inbox' ? 'No messages yet' : 'No auto-replies yet'}
-          description={filterTag ? 'Try a different filter.' : type === 'inbox' ? 'Replies from your campaigns will appear here.' : 'Auto-replies will appear here.'}
-          action={type === 'inbox' && !filterTag && (
-            <Btn onClick={() => setShowSyncModal(true)} variant="secondary"><RefreshCw size={14} /> Sync Inbox</Btn>
-          )}
+          title={filterTag?`No ${TAG_MAP[filterTag]?.label} messages`:type==='inbox'?'No messages yet':'No auto-replies yet'}
+          description={filterTag?'Try a different filter.':type==='inbox'?'Replies from your campaigns will appear here.':'Auto-replies will appear here.'}
+          action={type==='inbox'&&!filterTag&&<Btn onClick={() => setShowSyncModal(true)} variant="secondary"><RefreshCw size={14}/> Sync Inbox</Btn>}
         />
       ) : (
         <Card style={{ padding:0, overflow:'hidden' }}>
@@ -308,121 +289,95 @@ export default function Messages({ type = 'inbox' }) {
             const detectedAutoReply = isAutoReply(m);
             const isExpanded = expandedId === m.id;
             const isUnread = m.status === 'unread';
+            const isSent = m.status === 'sent'; // our outgoing reply
             const newMessage = extractNewMessage(m.body);
             const hasQuotedThread = m.body && newMessage.length < m.body.trim().length - 10;
 
             return (
               <div key={m.id} style={{
                 borderBottom: i < messages.length-1 ? '1px solid var(--border)' : 'none',
-                background: isUnread ? '#f8faff' : m.tag==='positive' ? '#f0fff4' : m.tag==='meeting_booked' ? '#f5f3ff' : 'transparent',
-                borderLeft: isUnread ? '3px solid var(--primary)' : '3px solid transparent',
+                background: isSent ? '#f0f9ff'  // light blue for our sent replies
+                  : isUnread ? '#f8faff'
+                  : m.tag==='positive' ? '#f0fff4'
+                  : m.tag==='meeting_booked' ? '#f5f3ff'
+                  : 'transparent',
+                borderLeft: isSent ? '3px solid #3b82f6'
+                  : isUnread ? '3px solid var(--primary)'
+                  : '3px solid transparent',
                 transition:'background 0.15s',
               }}>
-                <div style={{ padding:'12px 16px' }}>
-
-                  {/* ── Row 1: Sender info + badges ── */}
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4, gap:8 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', minWidth:0 }}>
-                      {isUnread && <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--primary)', flexShrink:0, display:'inline-block' }} />}
-                      <span style={{ fontWeight: isUnread ? 700 : 600, fontSize:14 }}>{m.from_name || m.from_email}</span>
-                      <span style={{ fontSize:12, color:'var(--text3)' }}>{m.from_email}</span>
-                      {detectedAutoReply && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#f1f5f9', color:'#64748b', border:'1px solid #e2e8f0' }}>⚙️ Auto-Reply</span>}
-                      {m.replied===1 && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#f0fff4', color:'#16a34a', border:'1px solid #86efac' }}>✅ Replied</span>}
-                      {tag && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:tag.bg, color:tag.color, border:`1px solid ${tag.border}`, fontWeight:600 }}>{tag.label}</span>}
+                <div style={{ padding:'12px 16px', display:'grid', gridTemplateColumns:'1fr auto', gap:12, alignItems:'start' }}>
+                  <div style={{ minWidth:0 }}>
+                    {/* Row 1: Sender + badges + timestamp */}
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4, gap:8 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', minWidth:0 }}>
+                        {isUnread && <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--primary)', flexShrink:0, display:'inline-block' }} />}
+                        {/* FIX: show "You" for sent replies, sender name for received */}
+                        {isSent
+                          ? <span style={{ fontWeight:600, fontSize:14, color:'#3b82f6' }}>↗ You (sent reply)</span>
+                          : <span style={{ fontWeight:isUnread?700:600, fontSize:14 }}>{m.from_name || m.from_email}</span>
+                        }
+                        <span style={{ fontSize:12, color:'var(--text3)' }}>{m.from_email}</span>
+                        {detectedAutoReply && !isSent && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#f1f5f9', color:'#64748b', border:'1px solid #e2e8f0' }}>⚙️ Auto-Reply</span>}
+                        {m.replied===1 && !isSent && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#f0fff4', color:'#16a34a', border:'1px solid #86efac' }}>✅ Replied</span>}
+                        {tag && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:tag.bg, color:tag.color, border:`1px solid ${tag.border}`, fontWeight:600 }}>{tag.label}</span>}
+                      </div>
+                      <span style={{ fontSize:11, color:'var(--text3)', flexShrink:0 }}>{new Date(m.received_at).toLocaleString()}</span>
                     </div>
-                    {/* Timestamp top right */}
-                    <span style={{ fontSize:11, color:'var(--text3)', flexShrink:0 }}>{new Date(m.received_at).toLocaleString()}</span>
+
+                    {/* Row 2: Subject */}
+                    <div style={{ fontSize:13, fontWeight:isUnread?600:500, marginBottom:4, color:'var(--text)' }}>{m.subject||'(no subject)'}</div>
+
+                    {/* Row 3: Campaign */}
+                    {m.campaign_name && <div style={{ fontSize:12, color:'var(--text3)', marginBottom:6 }}>📢 {m.campaign_name}</div>}
+
+                    {/* Row 4: Message preview */}
+                    {(newMessage || m.body) && (
+                      <div style={{
+                        fontSize:13, color:'var(--text2)', lineHeight:1.6,
+                        padding:'8px 12px', background: isSent ? '#dbeafe' : 'var(--bg3)',
+                        borderRadius:8, borderLeft:`3px solid ${isSent ? '#3b82f6' : 'var(--primary)'}`,
+                        marginBottom:6,
+                        maxHeight: isExpanded ? 'none' : '60px',
+                        overflow: isExpanded ? 'visible' : 'hidden',
+                        whiteSpace:'pre-wrap',
+                      }}>
+                        {newMessage || m.body}
+                      </div>
+                    )}
+
+                    {/* Row 5: Full quoted thread when expanded */}
+                    {isExpanded && hasQuotedThread && !isSent && (
+                      <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, padding:'8px 12px', background:'#f8f9fa', borderRadius:8, marginBottom:6, whiteSpace:'pre-wrap', borderLeft:'3px solid var(--border2)' }}>
+                        <div style={{ fontWeight:600, marginBottom:4, fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em' }}>📧 Original thread</div>
+                        {m.body}
+                      </div>
+                    )}
                   </div>
 
-                  {/* ── Row 2: Subject ── */}
-                  <div style={{ fontSize:13, fontWeight: isUnread ? 600 : 500, marginBottom:4, color:'var(--text)' }}>
-                    {m.subject || '(no subject)'}
-                  </div>
-
-                  {/* ── Row 3: Campaign meta ── */}
-                  {m.campaign_name && (
-                    <div style={{ fontSize:12, color:'var(--text3)', marginBottom:8 }}>
-                      📢 {m.campaign_name}
-                    </div>
-                  )}
-
-                  {/* ── Row 4: NEW message preview (always visible) ── */}
-                  {newMessage && (
-                    <div style={{
-                      fontSize:13, color:'var(--text2)', lineHeight:1.6,
-                      padding:'8px 12px', background:'var(--bg3)', borderRadius:8,
-                      borderLeft:'3px solid var(--primary)',
-                      marginBottom:8,
-                      maxHeight: isExpanded ? 'none' : '60px',
-                      overflow: isExpanded ? 'visible' : 'hidden',
-                      whiteSpace:'pre-wrap',
-                    }}>
-                      {newMessage}
-                    </div>
-                  )}
-
-                  {/* ── Row 5: Quoted thread (only when expanded) ── */}
-                  {isExpanded && hasQuotedThread && (
-                    <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, padding:'8px 12px', background:'#f8f9fa', borderRadius:8, marginBottom:8, whiteSpace:'pre-wrap', borderLeft:'3px solid var(--border2)' }}>
-                      <div style={{ fontWeight:600, marginBottom:4, fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em' }}>📧 Original thread</div>
-                      {m.body}
-                    </div>
-                  )}
-
-                  {/* ── Row 6: Action bar (always visible) ── */}
-                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:4 }}>
-
-                    {/* Expand/collapse */}
-                    <button onClick={() => {
-                      setExpandedId(isExpanded ? null : m.id);
-                      if (!isExpanded && isUnread) handleMarkRead(m.id);
-                    }} style={{
-                      background:'none', border:'1px solid var(--border2)', borderRadius:6,
-                      padding:'4px 10px', cursor:'pointer', fontSize:12, color:'var(--text2)',
-                      display:'flex', alignItems:'center', gap:4,
-                    }}>
-                      {isExpanded ? <><ChevronUp size={12} /> Collapse</> : <><ChevronDown size={12} /> {hasQuotedThread ? 'Show thread' : 'Expand'}</>}
+                  {/* Right side: actions */}
+                  <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'flex-end', flexShrink:0 }}>
+                    {/* Expand/Collapse */}
+                    <button onClick={() => { setExpandedId(isExpanded?null:m.id); if (!isExpanded&&isUnread) handleMarkRead(m.id); }} style={{ background:'none', border:'1px solid var(--border2)', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:12, color:'var(--text2)', display:'flex', alignItems:'center', gap:4 }}>
+                      {isExpanded ? <><ChevronUp size={13}/> Collapse</> : <><ChevronDown size={13}/> {hasQuotedThread?'Show thread':'View'}</>}
                     </button>
 
-                    {/* Reply */}
-                    {type === 'inbox' && !detectedAutoReply && (
-                      <button onClick={() => { setReplyModal(m); if (isUnread) handleMarkRead(m.id); }} style={{
-                        background:'var(--primary)', border:'none', borderRadius:6,
-                        padding:'4px 10px', cursor:'pointer', fontSize:12, color:'#fff',
-                        display:'flex', alignItems:'center', gap:4,
-                      }}>
-                        <Reply size={12} /> Reply
+                    {/* Reply — only for received messages, not our own sent replies */}
+                    {type==='inbox' && !detectedAutoReply && !isSent && (
+                      <button onClick={() => { setReplyModal(m); if (isUnread) handleMarkRead(m.id); }} style={{ background:'var(--primary)', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:12, color:'#fff', display:'flex', alignItems:'center', gap:4 }}>
+                        <Reply size={12}/> Reply
                       </button>
                     )}
 
-                    {/* ── FIX 1: Tag pills — always visible, no dropdown needed ── */}
-                    <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginLeft:'auto', alignItems:'center' }}>
-                      <span style={{ fontSize:11, color:'var(--text3)' }}>Tag:</span>
-                      {TAGS.filter(t => t.key !== 'auto_reply').map(t => (
-                        <button key={t.key}
-                          onClick={() => handleTag(m.id, m.tag === t.key ? null : t.key)}
-                          disabled={tagLoading[m.id]}
-                          style={{
-                            padding:'3px 9px', borderRadius:20, fontSize:11, cursor:'pointer',
-                            fontFamily:'inherit', fontWeight: m.tag===t.key ? 700 : 400,
-                            border:`1px solid ${m.tag===t.key ? t.color : 'var(--border2)'}`,
-                            background: m.tag===t.key ? t.bg : '#fff',
-                            color: m.tag===t.key ? t.color : 'var(--text3)',
-                            transition:'all 0.15s',
-                            opacity: tagLoading[m.id] ? 0.5 : 1,
-                          }}>
-                          {t.label}
-                        </button>
-                      ))}
-                      {m.tag && (
-                        <button onClick={() => handleTag(m.id, null)} disabled={tagLoading[m.id]}
-                          style={{ padding:'3px 6px', borderRadius:20, fontSize:11, cursor:'pointer', border:'1px solid var(--border2)', background:'#fff', color:'var(--text3)', fontFamily:'inherit' }}>
-                          <X size={10} />
-                        </button>
-                      )}
-                    </div>
+                    {/* Tag dropdown — fixed to open upward */}
+                    {!isSent && (
+                      <TagSelector
+                        currentTag={m.tag}
+                        loading={tagLoading[m.id]}
+                        onTag={(tag) => handleTag(m.id, tag)}
+                      />
+                    )}
                   </div>
-
                 </div>
               </div>
             );
@@ -430,7 +385,7 @@ export default function Messages({ type = 'inbox' }) {
 
           <div style={{ padding:'10px 16px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <span style={{ fontSize:12, color:'var(--text3)' }}>
-              {total} message{total!==1?'s':''}{unread>0 && ` · ${unread} unread`}{filterTag && ` · ${TAG_MAP[filterTag]?.label}`}
+              {total} message{total!==1?'s':''}{unread>0&&` · ${unread} unread`}{filterTag&&` · ${TAG_MAP[filterTag]?.label}`}
             </span>
             <Pagination page={page} total={total} limit={20} onChange={setPage} />
           </div>
@@ -438,11 +393,7 @@ export default function Messages({ type = 'inbox' }) {
       )}
 
       <SyncModal open={showSyncModal} onClose={() => setShowSyncModal(false)} onSynced={handleSynced} />
-
-      {replyModal && (
-        <ReplyModal message={replyModal} onClose={() => setReplyModal(null)}
-          onSent={() => { setReplyModal(null); load(); toast.success('Reply sent! ✅'); }} />
-      )}
+      {replyModal && <ReplyModal message={replyModal} onClose={() => setReplyModal(null)} onSent={() => { setReplyModal(null); load(); toast.success('Reply sent! ✅'); }} />}
     </div>
   );
 }
@@ -453,15 +404,10 @@ function ReplyModal({ message, onClose, onSent }) {
   const [sending, setSending]     = useState(false);
   const [accounts, setAccounts]   = useState([]);
   const [accountId, setAccountId] = useState('');
-
-  // Extract just the new part of the message for context
   const newMessage = extractNewMessage(message.body);
 
   useEffect(() => {
-    api.get('/email-accounts').then(r => {
-      setAccounts(r.data);
-      if (r.data.length > 0) setAccountId(r.data[0].id);
-    });
+    api.get('/email-accounts').then(r => { setAccounts(r.data); if (r.data.length > 0) setAccountId(r.data[0].id); });
   }, []);
 
   const handleSend = async () => {
@@ -478,8 +424,7 @@ function ReplyModal({ message, onClose, onSent }) {
   return (
     <Modal open={true} onClose={onClose} title={`Reply to ${message.from_name || message.from_email}`} width={620}>
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-
-        {/* Their message — clean, just the new part */}
+        {/* Their message */}
         <div style={{ background:'var(--bg3)', borderRadius:8, padding:'12px 14px', borderLeft:'3px solid var(--primary)' }}>
           <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>
             💬 {message.from_name || message.from_email} wrote:
@@ -492,10 +437,7 @@ function ReplyModal({ message, onClose, onSent }) {
         {/* Send from */}
         <div>
           <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)', display:'block', marginBottom:6 }}>Send from</label>
-          <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{
-            width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8,
-            padding:'9px 12px', fontSize:13, outline:'none', color:'var(--text)',
-          }}>
+          <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', color:'var(--text)' }}>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.from_name} &lt;{a.from_email}&gt;</option>)}
           </select>
         </div>
@@ -504,17 +446,13 @@ function ReplyModal({ message, onClose, onSent }) {
         <div>
           <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)', display:'block', marginBottom:6 }}>Your reply</label>
           <textarea value={body} onChange={e => setBody(e.target.value)}
-            placeholder={`Hi ${message.from_name || 'there'},\n\n`}
-            rows={8} style={{
-              width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8,
-              padding:'10px 12px', fontSize:13, outline:'none', color:'var(--text)',
-              resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box',
-            }} />
+            placeholder={`Hi ${message.from_name || 'there'},\n\n`} rows={8}
+            style={{ width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8, padding:'10px 12px', fontSize:13, outline:'none', color:'var(--text)', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box' }} />
         </div>
 
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
           <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
-          <Btn loading={sending} onClick={handleSend}><Reply size={13} /> Send Reply</Btn>
+          <Btn loading={sending} onClick={handleSend}><Reply size={13}/> Send Reply</Btn>
         </div>
       </div>
     </Modal>
