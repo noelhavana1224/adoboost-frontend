@@ -416,11 +416,13 @@ export default function Messages({ type = 'inbox' }) {
     setLoading(true);
     try{
       const ep=type==='inbox'?'/messages/inbox':'/messages/auto-replies';
-      const{data}=await api.get(ep,{params:{search:search||undefined,page,limit:50,tag:filterTag||undefined}});
+      // Always fetch ALL messages (no tag filter sent to backend)
+      // Tag filtering happens client-side at the THREAD level so full conversations always show
+      const{data}=await api.get(ep,{params:{search:search||undefined,page,limit:50}});
       setMessages(data.messages||[]);setTotal(data.total||0);setUnread(data.unread||0);
     }catch{toast.error('Failed to load');}
     finally{setLoading(false);}
-  },[type,search,page,filterTag]);
+  },[type,search,page]); // tag filter is client-side, no need to refetch
 
   useEffect(()=>{load();},[load]);
 
@@ -435,7 +437,13 @@ export default function Messages({ type = 'inbox' }) {
     if(updates?.status==='read')setUnread(u=>Math.max(0,u-1));
   },[load]);
 
-  const threads = groupThreads(messages);
+  // Client-side tag filtering at THREAD level:
+  // A thread is included if ANY message in it has the tag.
+  // All messages in that thread are shown (including sent replies with no tag).
+  const allThreads = groupThreads(messages);
+  const threads = filterTag
+    ? allThreads.filter(t => t.msgs.some(m => m.tag === filterTag))
+    : allThreads;
   const activeTab = type==='inbox'?'/messages/inbox':'/messages/auto-replies';
 
   return(
@@ -472,8 +480,8 @@ export default function Messages({ type = 'inbox' }) {
       )}
       {loading?<Spinner/>:threads.length===0?(
         <Empty icon={MessageSquare}
-          title={filterTag?`No ${TAG_MAP[filterTag]?.label} messages`:type==='inbox'?'No messages yet':'No auto-replies yet'}
-          description={type==='inbox'?'Replies from your campaigns will appear here.':'Auto-replies will appear here.'}
+          title={filterTag ? `No conversations tagged ${TAG_MAP[filterTag]?.label}` : type==='inbox' ? 'No messages yet' : 'No auto-replies yet'}
+          description={filterTag ? 'Try a different tag filter, or tag a conversation first.' : type==='inbox' ? 'Replies from your campaigns will appear here.' : 'Auto-replies will appear here.'}
           action={type==='inbox'&&!filterTag&&<Btn onClick={()=>setShowSyncModal(true)} variant="secondary"><RefreshCw size={14}/> Sync Inbox</Btn>}
         />
       ):(
@@ -520,7 +528,11 @@ export default function Messages({ type = 'inbox' }) {
             );
           })}
           <div style={{padding:'10px 16px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',background:'#fafafa'}}>
-            <span style={{fontSize:12,color:'var(--text3)'}}>{threads.length} conversation{threads.length!==1?'s':''}{unread>0&&` · ${unread} unread`}</span>
+            <span style={{fontSize:12,color:'var(--text3)'}}>
+              {threads.length} conversation{threads.length!==1?'s':''}
+              {filterTag && ` tagged ${TAG_MAP[filterTag]?.label}`}
+              {unread>0&&` · ${unread} unread`}
+            </span>
             <Pagination page={page} total={total} limit={50} onChange={setPage}/>
           </div>
         </div>
