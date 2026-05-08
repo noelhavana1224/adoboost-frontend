@@ -18,6 +18,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPlans from './pages/admin/AdminPlans';
 import AdminTickets from './pages/admin/AdminTickets';
+import Pipeline from './pages/Pipeline';
 
 function ProtectedRoute({ children, adminOnly }) {
   const { user } = useAuth();
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="/contacts"            element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/messages/inbox"      element={<ProtectedRoute><Messages type="inbox" /></ProtectedRoute>} />
           <Route path="/messages/auto-replies" element={<ProtectedRoute><Messages type="auto-replies" /></ProtectedRoute>} />
+          <Route path="/pipeline"            element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
           <Route path="/exclusions"          element={<ProtectedRoute><Exclusions type="exclusions" /></ProtectedRoute>} />
           <Route path="/exclusions/unsubscribes" element={<ProtectedRoute><Exclusions type="unsubscribes" /></ProtectedRoute>} />
           <Route path="/templates"           element={<ProtectedRoute><Templates /></ProtectedRoute>} />
