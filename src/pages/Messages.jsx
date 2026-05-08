@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { PageHeader, Card, Badge, Spinner, Empty, Pagination, Modal, Btn, Input } from '../components/UI';
+import { PageHeader, Card, Spinner, Empty, Pagination, Modal, Btn } from '../components/UI';
 import { MessageSquare, Search, Tag, Reply, ChevronDown, ChevronUp, X, RefreshCw, Inbox, CheckCircle, Loader2 } from 'lucide-react';
 
 const TAGS = [
@@ -34,7 +34,29 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ── Sync Inbox Modal ────────────────────────────
+// ── Extract only the NEW reply (strip quoted thread) ──
+function extractNewMessage(body) {
+  if (!body) return '';
+  // Split on common quote markers
+  const cutMarkers = [
+    /^On .+wrote:$/m,
+    /^-----Original Message-----/m,
+    /^From:.+Sent:/m,
+    /^_{3,}/m,
+    /^>{1,}/m,
+  ];
+  let text = body;
+  for (const marker of cutMarkers) {
+    const match = text.search(marker);
+    if (match > 20) { // at least 20 chars of new content before the quote
+      text = text.substring(0, match).trim();
+      break;
+    }
+  }
+  return text.trim();
+}
+
+// ── Sync Modal ──────────────────────────────────
 function SyncModal({ open, onClose, onSynced }) {
   const [accounts, setAccounts]     = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -78,11 +100,9 @@ function SyncModal({ open, onClose, onSynced }) {
   return (
     <Modal open={open} onClose={onClose} title="🔄 Sync Inboxes" width={520}>
       <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
         <div style={{ fontSize:13, color:'var(--text2)', background:'var(--bg3)', borderRadius:8, padding:'10px 14px', borderLeft:'3px solid var(--primary)', lineHeight:1.6 }}>
           📬 AdoBoost auto-syncs every <strong>5 minutes</strong>. Use this to check immediately or sync a specific inbox.
         </div>
-
         {loading ? <Spinner /> : accounts.length === 0 ? (
           <div style={{ textAlign:'center', padding:'24px', color:'var(--text3)', fontSize:13 }}>
             <Inbox size={32} style={{ opacity:0.3, marginBottom:8, display:'block', margin:'0 auto 8px' }} />
@@ -91,19 +111,15 @@ function SyncModal({ open, onClose, onSynced }) {
           </div>
         ) : (
           <>
-            {/* Sync All */}
             <Btn onClick={syncAll} disabled={syncingAll} style={{ width:'100%', justifyContent:'center' }}>
               <RefreshCw size={14} style={{ animation: syncingAll ? 'spin 1s linear infinite' : 'none' }} />
               {syncingAll ? 'Syncing All Inboxes...' : '⚡ Sync All Inboxes'}
             </Btn>
-
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <div style={{ flex:1, height:1, background:'var(--border)' }} />
               <span style={{ fontSize:12, color:'var(--text3)' }}>or sync individually</span>
               <div style={{ flex:1, height:1, background:'var(--border)' }} />
             </div>
-
-            {/* Per-account rows */}
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {accounts.map(acc => {
                 const status = syncStatus[acc.id];
@@ -120,22 +136,15 @@ function SyncModal({ open, onClose, onSynced }) {
                   }}>
                     <div style={{ minWidth:0 }}>
                       <div style={{ fontWeight:600, fontSize:13 }}>{acc.name}</div>
-                      <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>
-                        {acc.from_email} · {acc.imap_host}:{acc.imap_port}
-                      </div>
+                      <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{acc.from_email} · {acc.imap_host}:{acc.imap_port}</div>
                       <div style={{ fontSize:11, color:'var(--text3)', marginTop:3 }}>
                         Last synced: <strong>{timeAgo(acc.last_synced_at)}</strong>
-                        {isDone && (
-                          <span style={{ color:'#16a34a', fontWeight:600, marginLeft:8 }}>
-                            ✅ {syncResult[acc.id]} new message{syncResult[acc.id] !== 1 ? 's' : ''}
-                          </span>
-                        )}
+                        {isDone && <span style={{ color:'#16a34a', fontWeight:600, marginLeft:8 }}>✅ {syncResult[acc.id]} new message{syncResult[acc.id] !== 1 ? 's' : ''}</span>}
                         {isError && <span style={{ color:'#dc2626', fontWeight:600, marginLeft:8 }}>❌ Sync failed</span>}
                       </div>
                     </div>
                     <button onClick={() => syncOne(acc)} disabled={isSyncing || syncingAll} style={{
-                      flexShrink:0, marginLeft:12,
-                      padding:'6px 14px', borderRadius:8, fontSize:12, fontWeight:600,
+                      flexShrink:0, marginLeft:12, padding:'6px 14px', borderRadius:8, fontSize:12, fontWeight:600,
                       border:'none', cursor: isSyncing ? 'wait' : 'pointer', fontFamily:'inherit',
                       background: isDone ? '#dcfce7' : isError ? '#fee2e2' : 'var(--primary)',
                       color: isDone ? '#16a34a' : isError ? '#dc2626' : '#fff',
@@ -150,7 +159,6 @@ function SyncModal({ open, onClose, onSynced }) {
                 );
               })}
             </div>
-
             <div style={{ display:'flex', justifyContent:'flex-end' }}>
               <Btn variant="secondary" onClick={onClose}>{anyDone ? 'Done' : 'Cancel'}</Btn>
             </div>
@@ -191,7 +199,7 @@ export default function Messages({ type = 'inbox' }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleSynced = (count) => { load(); };
+  const handleSynced = () => { load(); };
 
   const handleTag = async (messageId, tag) => {
     setTagLoading(p => ({ ...p, [messageId]: true }));
@@ -288,13 +296,9 @@ export default function Messages({ type = 'inbox' }) {
       {loading ? <Spinner /> : messages.length === 0 ? (
         <Empty icon={MessageSquare}
           title={filterTag ? `No ${TAG_MAP[filterTag]?.label} messages` : type === 'inbox' ? 'No messages yet' : 'No auto-replies yet'}
-          description={filterTag ? 'Try a different filter or clear the tag filter.'
-            : type === 'inbox' ? 'Replies from your campaigns will appear here. Click "Sync Inbox" to check immediately.'
-            : 'Auto-replies from your campaigns will appear here.'}
+          description={filterTag ? 'Try a different filter.' : type === 'inbox' ? 'Replies from your campaigns will appear here.' : 'Auto-replies will appear here.'}
           action={type === 'inbox' && !filterTag && (
-            <Btn onClick={() => setShowSyncModal(true)} variant="secondary">
-              <RefreshCw size={14} /> Sync Inbox
-            </Btn>
+            <Btn onClick={() => setShowSyncModal(true)} variant="secondary"><RefreshCw size={14} /> Sync Inbox</Btn>
           )}
         />
       ) : (
@@ -304,6 +308,9 @@ export default function Messages({ type = 'inbox' }) {
             const detectedAutoReply = isAutoReply(m);
             const isExpanded = expandedId === m.id;
             const isUnread = m.status === 'unread';
+            const newMessage = extractNewMessage(m.body);
+            const hasQuotedThread = m.body && newMessage.length < m.body.trim().length - 10;
+
             return (
               <div key={m.id} style={{
                 borderBottom: i < messages.length-1 ? '1px solid var(--border)' : 'none',
@@ -311,9 +318,11 @@ export default function Messages({ type = 'inbox' }) {
                 borderLeft: isUnread ? '3px solid var(--primary)' : '3px solid transparent',
                 transition:'background 0.15s',
               }}>
-                <div style={{ padding:'12px 16px', display:'grid', gridTemplateColumns:'1fr auto', gap:12, alignItems:'start' }}>
-                  <div style={{ minWidth:0 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
+                <div style={{ padding:'12px 16px' }}>
+
+                  {/* ── Row 1: Sender info + badges ── */}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4, gap:8 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', minWidth:0 }}>
                       {isUnread && <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--primary)', flexShrink:0, display:'inline-block' }} />}
                       <span style={{ fontWeight: isUnread ? 700 : 600, fontSize:14 }}>{m.from_name || m.from_email}</span>
                       <span style={{ fontSize:12, color:'var(--text3)' }}>{m.from_email}</span>
@@ -321,26 +330,61 @@ export default function Messages({ type = 'inbox' }) {
                       {m.replied===1 && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#f0fff4', color:'#16a34a', border:'1px solid #86efac' }}>✅ Replied</span>}
                       {tag && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:tag.bg, color:tag.color, border:`1px solid ${tag.border}`, fontWeight:600 }}>{tag.label}</span>}
                     </div>
-                    <div style={{ fontSize:13, fontWeight: isUnread ? 600 : 500, marginBottom:2, color:'var(--text)' }}>{m.subject || '(no subject)'}</div>
-                    <div style={{ fontSize:12, color:'var(--text3)', display:'flex', gap:12 }}>
-                      {m.campaign_name && <span>📢 {m.campaign_name}</span>}
-                      <span>🕐 {new Date(m.received_at).toLocaleString()}</span>
-                    </div>
-                    {isExpanded && m.body && (
-                      <div style={{ marginTop:12, padding:'12px 14px', background:'var(--bg3)', borderRadius:8, fontSize:13, lineHeight:1.7, color:'var(--text)', whiteSpace:'pre-wrap', maxHeight:300, overflowY:'auto' }}>
-                        {m.body}
-                      </div>
-                    )}
+                    {/* Timestamp top right */}
+                    <span style={{ fontSize:11, color:'var(--text3)', flexShrink:0 }}>{new Date(m.received_at).toLocaleString()}</span>
                   </div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'flex-end', flexShrink:0 }}>
-                    <button onClick={() => { setExpandedId(isExpanded ? null : m.id); if (!isExpanded && isUnread) handleMarkRead(m.id); }} style={{
+
+                  {/* ── Row 2: Subject ── */}
+                  <div style={{ fontSize:13, fontWeight: isUnread ? 600 : 500, marginBottom:4, color:'var(--text)' }}>
+                    {m.subject || '(no subject)'}
+                  </div>
+
+                  {/* ── Row 3: Campaign meta ── */}
+                  {m.campaign_name && (
+                    <div style={{ fontSize:12, color:'var(--text3)', marginBottom:8 }}>
+                      📢 {m.campaign_name}
+                    </div>
+                  )}
+
+                  {/* ── Row 4: NEW message preview (always visible) ── */}
+                  {newMessage && (
+                    <div style={{
+                      fontSize:13, color:'var(--text2)', lineHeight:1.6,
+                      padding:'8px 12px', background:'var(--bg3)', borderRadius:8,
+                      borderLeft:'3px solid var(--primary)',
+                      marginBottom:8,
+                      maxHeight: isExpanded ? 'none' : '60px',
+                      overflow: isExpanded ? 'visible' : 'hidden',
+                      whiteSpace:'pre-wrap',
+                    }}>
+                      {newMessage}
+                    </div>
+                  )}
+
+                  {/* ── Row 5: Quoted thread (only when expanded) ── */}
+                  {isExpanded && hasQuotedThread && (
+                    <div style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, padding:'8px 12px', background:'#f8f9fa', borderRadius:8, marginBottom:8, whiteSpace:'pre-wrap', borderLeft:'3px solid var(--border2)' }}>
+                      <div style={{ fontWeight:600, marginBottom:4, fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em' }}>📧 Original thread</div>
+                      {m.body}
+                    </div>
+                  )}
+
+                  {/* ── Row 6: Action bar (always visible) ── */}
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:4 }}>
+
+                    {/* Expand/collapse */}
+                    <button onClick={() => {
+                      setExpandedId(isExpanded ? null : m.id);
+                      if (!isExpanded && isUnread) handleMarkRead(m.id);
+                    }} style={{
                       background:'none', border:'1px solid var(--border2)', borderRadius:6,
                       padding:'4px 10px', cursor:'pointer', fontSize:12, color:'var(--text2)',
                       display:'flex', alignItems:'center', gap:4,
                     }}>
-                      {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                      {isExpanded ? 'Collapse' : 'View'}
+                      {isExpanded ? <><ChevronUp size={12} /> Collapse</> : <><ChevronDown size={12} /> {hasQuotedThread ? 'Show thread' : 'Expand'}</>}
                     </button>
+
+                    {/* Reply */}
                     {type === 'inbox' && !detectedAutoReply && (
                       <button onClick={() => { setReplyModal(m); if (isUnread) handleMarkRead(m.id); }} style={{
                         background:'var(--primary)', border:'none', borderRadius:6,
@@ -350,15 +394,43 @@ export default function Messages({ type = 'inbox' }) {
                         <Reply size={12} /> Reply
                       </button>
                     )}
-                    <TagSelector currentTag={m.tag} loading={tagLoading[m.id]} onTag={(tag) => handleTag(m.id, tag)} />
+
+                    {/* ── FIX 1: Tag pills — always visible, no dropdown needed ── */}
+                    <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginLeft:'auto', alignItems:'center' }}>
+                      <span style={{ fontSize:11, color:'var(--text3)' }}>Tag:</span>
+                      {TAGS.filter(t => t.key !== 'auto_reply').map(t => (
+                        <button key={t.key}
+                          onClick={() => handleTag(m.id, m.tag === t.key ? null : t.key)}
+                          disabled={tagLoading[m.id]}
+                          style={{
+                            padding:'3px 9px', borderRadius:20, fontSize:11, cursor:'pointer',
+                            fontFamily:'inherit', fontWeight: m.tag===t.key ? 700 : 400,
+                            border:`1px solid ${m.tag===t.key ? t.color : 'var(--border2)'}`,
+                            background: m.tag===t.key ? t.bg : '#fff',
+                            color: m.tag===t.key ? t.color : 'var(--text3)',
+                            transition:'all 0.15s',
+                            opacity: tagLoading[m.id] ? 0.5 : 1,
+                          }}>
+                          {t.label}
+                        </button>
+                      ))}
+                      {m.tag && (
+                        <button onClick={() => handleTag(m.id, null)} disabled={tagLoading[m.id]}
+                          style={{ padding:'3px 6px', borderRadius:20, fontSize:11, cursor:'pointer', border:'1px solid var(--border2)', background:'#fff', color:'var(--text3)', fontFamily:'inherit' }}>
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
                   </div>
+
                 </div>
               </div>
             );
           })}
+
           <div style={{ padding:'10px 16px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <span style={{ fontSize:12, color:'var(--text3)' }}>
-              {total} message{total!==1?'s':''}{unread>0 && ` · ${unread} unread`}{filterTag && ` · filtered by ${TAG_MAP[filterTag]?.label}`}
+              {total} message{total!==1?'s':''}{unread>0 && ` · ${unread} unread`}{filterTag && ` · ${TAG_MAP[filterTag]?.label}`}
             </span>
             <Pagination page={page} total={total} limit={20} onChange={setPage} />
           </div>
@@ -375,49 +447,23 @@ export default function Messages({ type = 'inbox' }) {
   );
 }
 
-// ── Tag Selector ────────────────────────────────
-function TagSelector({ currentTag, loading, onTag }) {
-  const [open, setOpen] = useState(false);
-  const tag = TAG_MAP[currentTag];
-  return (
-    <div style={{ position:'relative' }}>
-      <button onClick={() => setOpen(p => !p)} disabled={loading} style={{
-        background: tag ? tag.bg : 'var(--bg3)', border:`1px solid ${tag ? tag.border : 'var(--border2)'}`,
-        borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:12,
-        color: tag ? tag.color : 'var(--text3)', display:'flex', alignItems:'center', gap:4, fontFamily:'inherit',
-      }}>
-        <Tag size={11} />{loading ? 'Saving...' : tag ? tag.label : 'Tag'}
-      </button>
-      {open && (
-        <>
-          <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:99 }} />
-          <div style={{ position:'absolute', right:0, top:'100%', marginTop:4, background:'#fff', border:'1px solid var(--border2)', borderRadius:8, boxShadow:'0 4px 20px rgba(0,0,0,0.12)', zIndex:100, minWidth:180, overflow:'hidden' }}>
-            {currentTag && (
-              <button onClick={() => { onTag(null); setOpen(false); }} style={{ width:'100%', padding:'8px 12px', border:'none', background:'none', textAlign:'left', cursor:'pointer', fontSize:12, color:'var(--text3)', display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid var(--border)' }}>
-                <X size={11} /> Remove tag
-              </button>
-            )}
-            {TAGS.filter(t => t.key !== 'auto_reply').map(t => (
-              <button key={t.key} onClick={() => { onTag(t.key); setOpen(false); }} style={{ width:'100%', padding:'8px 12px', border:'none', background: currentTag===t.key ? t.bg : 'transparent', textAlign:'left', cursor:'pointer', fontSize:12, color:t.color, fontWeight: currentTag===t.key ? 600 : 400, display:'flex', alignItems:'center', gap:8 }}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 // ── Reply Modal ─────────────────────────────────
 function ReplyModal({ message, onClose, onSent }) {
   const [body, setBody]           = useState('');
   const [sending, setSending]     = useState(false);
   const [accounts, setAccounts]   = useState([]);
   const [accountId, setAccountId] = useState('');
+
+  // Extract just the new part of the message for context
+  const newMessage = extractNewMessage(message.body);
+
   useEffect(() => {
-    api.get('/email-accounts').then(r => { setAccounts(r.data); if (r.data.length > 0) setAccountId(r.data[0].id); });
+    api.get('/email-accounts').then(r => {
+      setAccounts(r.data);
+      if (r.data.length > 0) setAccountId(r.data[0].id);
+    });
   }, []);
+
   const handleSend = async () => {
     if (!body.trim()) return toast.error('Please write a reply first');
     if (!accountId) return toast.error('Select an email account');
@@ -428,27 +474,44 @@ function ReplyModal({ message, onClose, onSent }) {
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to send reply'); }
     finally { setSending(false); }
   };
+
   return (
-    <Modal open={true} onClose={onClose} title={`Reply to ${message.from_name || message.from_email}`} width={600}>
+    <Modal open={true} onClose={onClose} title={`Reply to ${message.from_name || message.from_email}`} width={620}>
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        <div style={{ background:'var(--bg3)', borderRadius:8, padding:'10px 14px', fontSize:12, color:'var(--text2)', borderLeft:'3px solid var(--border2)' }}>
-          <div style={{ fontWeight:600, marginBottom:4 }}>Original: {message.subject}</div>
-          <div style={{ color:'var(--text3)', lineHeight:1.6, maxHeight:100, overflowY:'auto' }}>
-            {message.body ? message.body.slice(0,300)+(message.body.length>300?'...':'') : '(no body)'}
+
+        {/* Their message — clean, just the new part */}
+        <div style={{ background:'var(--bg3)', borderRadius:8, padding:'12px 14px', borderLeft:'3px solid var(--primary)' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>
+            💬 {message.from_name || message.from_email} wrote:
+          </div>
+          <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.7, maxHeight:120, overflowY:'auto', whiteSpace:'pre-wrap' }}>
+            {newMessage || message.body?.slice(0, 300) || '(no body)'}
           </div>
         </div>
+
+        {/* Send from */}
         <div>
           <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)', display:'block', marginBottom:6 }}>Send from</label>
-          <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', color:'var(--text)' }}>
+          <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{
+            width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8,
+            padding:'9px 12px', fontSize:13, outline:'none', color:'var(--text)',
+          }}>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.from_name} &lt;{a.from_email}&gt;</option>)}
           </select>
         </div>
+
+        {/* Reply body */}
         <div>
           <label style={{ fontSize:13, fontWeight:500, color:'var(--text2)', display:'block', marginBottom:6 }}>Your reply</label>
           <textarea value={body} onChange={e => setBody(e.target.value)}
-            placeholder={`Hi ${message.from_name || 'there'},\n\nThank you for your reply...`} rows={8}
-            style={{ width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8, padding:'10px 12px', fontSize:13, outline:'none', color:'var(--text)', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box' }} />
+            placeholder={`Hi ${message.from_name || 'there'},\n\n`}
+            rows={8} style={{
+              width:'100%', background:'#fff', border:'1px solid var(--border2)', borderRadius:8,
+              padding:'10px 12px', fontSize:13, outline:'none', color:'var(--text)',
+              resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box',
+            }} />
         </div>
+
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
           <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
           <Btn loading={sending} onClick={handleSend}><Reply size={13} /> Send Reply</Btn>
