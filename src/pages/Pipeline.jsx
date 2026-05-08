@@ -281,11 +281,13 @@ export default function Pipeline() {
     try {
       const [msgRes, campRes] = await Promise.all([
         api.get('/messages/inbox', { params: { limit:200 } }),
-        api.get('/campaigns'),
+        api.get('/campaigns').catch(() => ({ data: [] })),
       ]);
 
       const messages = msgRes.data.messages || [];
-      const campMap  = Object.fromEntries((campRes.data||[]).map(c=>[c.id,c]));
+      // campaigns endpoint returns array directly
+      const camps = Array.isArray(campRes.data) ? campRes.data : (campRes.data?.campaigns || []);
+      const campMap = Object.fromEntries(camps.map(c=>[c.id,c]));
 
       // Build lead map keyed by contact email
       const leadMap = {};
@@ -350,7 +352,7 @@ export default function Pipeline() {
         const contactEmails = Object.keys(leadMap);
         if (contactEmails.length) {
           const contactRes = await api.get('/contacts', { params:{ limit:200 } });
-          const contacts = contactRes.data.contacts || [];
+          const contacts = Array.isArray(contactRes.data) ? contactRes.data : (contactRes.data?.contacts || []);
           for (const c of contacts) {
             const email = c.email?.toLowerCase();
             if (leadMap[email]) {
@@ -395,8 +397,9 @@ export default function Pipeline() {
         meeting:  (grouped['meeting_booked']||[]).length,
         won:      (grouped['closed_won']||[]).length,
       });
-    } catch {
-      toast.error('Failed to load pipeline');
+    } catch (e) {
+      console.error('Pipeline load error:', e);
+      toast.error('Failed to load pipeline: ' + (e.response?.data?.error || e.message));
     } finally {
       setLoading(false);
     }
@@ -414,12 +417,20 @@ export default function Pipeline() {
     e.dataTransfer.dropEffect = 'move';
     setOverCol(colId);
   };
-  const handleDragLeave = () => setOverCol(null);
+  const handleDragLeave = (e) => {
+    // Only clear if leaving the column entirely (not moving between children)
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setOverCol(null);
+    }
+  };
 
   const handleDrop = async (e, targetColId) => {
     e.preventDefault();
     if (!dragItem) return;
-    const sourceColId = dragItem.tag && grouped?.[dragItem.tag] ? dragItem.tag : dragItem.reply_count > 0 ? 'contacted' : 'new';
+    // Determine source column from lead's current tag
+    const sourceColId = dragItem.tag && COLUMNS.find(c => c.id === dragItem.tag)
+      ? dragItem.tag
+      : dragItem.reply_count > 0 ? 'contacted' : 'new';
     if (sourceColId === targetColId) { setDragItem(null); setOverCol(null); return; }
 
     const newTag = ['new','contacted'].includes(targetColId) ? null : targetColId;
