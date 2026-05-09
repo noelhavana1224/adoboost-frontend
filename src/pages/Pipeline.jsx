@@ -194,27 +194,13 @@ function QuickReplyModal({ lead, onClose, onSent }) {
         const { data: accs } = await api.get('/email-accounts');
         setAccounts(accs);
 
-        // FIX 3: Find correct From account — look at sent messages to this contact
-        // The account that sent TO this contact is the correct From
+        // Load all messages for history + account matching
         const { data: msgData } = await api.get('/messages/inbox', { params:{ limit:200 } });
         const allMsgs = msgData.messages || [];
 
-        // Find sent messages related to this contact's email
-        const sentToContact = allMsgs.filter(m =>
-          m.status === 'sent' && m.campaign_id === lead.campaign_id
-        );
-
+        // FIX 2: Get campaign to find correct email_account_id
         let matched = null;
-        if (sentToContact.length > 0) {
-          // from_email on sent messages is the account that sent it
-          const sentFromEmail = sentToContact[0]?.from_email;
-          if (sentFromEmail) {
-            matched = accs.find(a => a.from_email?.toLowerCase() === sentFromEmail?.toLowerCase());
-          }
-        }
-
-        // Fallback: try campaign lookup
-        if (!matched && lead.campaign_id) {
+        if (lead.campaign_id) {
           try {
             const { data: camp } = await api.get(`/campaigns/${lead.campaign_id}`);
             if (camp?.email_account_id) {
@@ -222,18 +208,32 @@ function QuickReplyModal({ lead, onClose, onSent }) {
             }
           } catch {}
         }
-
+        // Fallback: look at from_email of sent messages in same campaign
+        if (!matched) {
+          const sentMsg = allMsgs.find(m => m.status === 'sent' && m.campaign_id === lead.campaign_id);
+          if (sentMsg?.from_email) {
+            matched = accs.find(a => a.from_email?.toLowerCase() === sentMsg.from_email.toLowerCase()
+              || a.username?.toLowerCase() === sentMsg.from_email.toLowerCase());
+          }
+        }
         setAccountId(matched?.id || accs[0]?.id || '');
 
-        // FIX 4: Load conversation history — only messages FROM the prospect or sent TO them
-        const history = allMsgs.filter(m => {
+        // FIX 3: Full conversation history - received FROM contact + sent in same campaign
+        const contactEmail = lead.contact_email?.toLowerCase();
+        const convHistory = allMsgs.filter(m => {
           const fromEmail = m.from_email?.toLowerCase();
-          const contactEmail = lead.contact_email?.toLowerCase();
-          // Include: messages received from this contact, OR sent messages in their campaign
-          return fromEmail === contactEmail || (m.status === 'sent' && m.campaign_id === lead.campaign_id);
+          // Include messages received from this specific contact
+          if (!m.status || m.status === 'unread' || m.status === 'read' || m.status === 'engaging') {
+            return fromEmail === contactEmail;
+          }
+          // Include sent messages in this campaign
+          if (m.status === 'sent') {
+            return m.campaign_id === lead.campaign_id;
+          }
+          return fromEmail === contactEmail;
         }).sort((a,b) => new Date(a.received_at) - new Date(b.received_at));
 
-        setHistory(history);
+        setHistory(convHistory);
       } catch(e) {
         console.error('Modal load error:', e);
       } finally {
@@ -371,9 +371,10 @@ export default function Pipeline() {
       const campMap = Object.fromEntries(camps.map(c=>[c.id,c]));
       const accounts = accRes.data || [];
 
-      // FIX 1: Build set of OUR email addresses to exclude from leads
+      // FIX 1: Only exclude emails that are our SMTP usernames (login emails)
+      // NOT from_email addresses - those can be custom like noel@adobosolutions.com
+      // which could also be a prospect's email
       const ourEmails = new Set([
-        ...accounts.map(a => a.from_email?.toLowerCase()).filter(Boolean),
         ...accounts.map(a => a.username?.toLowerCase()).filter(Boolean),
       ]);
       setMyEmails(ourEmails);
@@ -415,8 +416,12 @@ export default function Pipeline() {
 
         const lead = leadMap[email];
         if (m.from_name && !lead.contact_name) lead.contact_name = m.from_name;
-        // FIX 1: Use the LATEST tag — most recently tagged message wins
-        if (m.tag) lead.tag = m.tag;
+        // Use the tag from the most recent message that has one
+        if (m.tag) {
+          if (!lead.tag || !lead.last_reply_at || new Date(m.received_at) >= new Date(lead.last_reply_at)) {
+            lead.tag = m.tag;
+          }
+        }
         lead.reply_count++;
         if (!lead.last_reply_at || new Date(m.received_at) > new Date(lead.last_reply_at)) {
           lead.last_reply_at = m.received_at;
@@ -505,16 +510,19 @@ export default function Pipeline() {
     });
 
     if (!dragItem.last_message_id) {
-      toast('Cannot tag leads with no replies yet');
+      toast('Cannot tag leads with no replies yet — reply first then move');
       setTimeout(loadPipeline, 500);
       setDragItem(null); setOverCol(null); return;
     }
 
     try {
+      // Tag the most recent message from this contact
+      // This is what the pipeline reads back on reload
       await api.post(`/messages/${dragItem.last_message_id}/tag`, { tag: newTag });
       toast.success(`Moved to ${COL_MAP[targetColId]?.label} ${COL_MAP[targetColId]?.emoji}`);
+      // Don't reload — keep optimistic state so position doesn't jump
     } catch {
-      toast.error('Failed to save');
+      toast.error('Failed to save — reverting');
       loadPipeline();
     }
     setDragItem(null); setOverCol(null);
