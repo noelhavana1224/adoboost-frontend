@@ -465,16 +465,20 @@ export default function Contacts() {
 
 // ── Add Contact Modal ────────────────────────────
 function AddContactModal({ open, onClose, lists, onSaved }) {
-  const [form, setForm] = useState({ email: '', first_name: '', last_name: '', company: '', title: '', phone: '', list_id: '', linkedin: '', value_prop: '', tags: '' });
+  const [form, setForm] = useState({ email: '', first_name: '', last_name: '', company: '', title: '', phone: '', website: '', list_id: '', linkedin: '', value_prop: '', tags: '', city: '', country: '', location: '', company_location: '' });
   const [loading, setLoading] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  useEffect(() => { if (open) setForm({ email: '', first_name: '', last_name: '', company: '', title: '', phone: '', list_id: '', linkedin: '', value_prop: '', tags: '' }); }, [open]);
+  useEffect(() => { if (open) setForm({ email: '', first_name: '', last_name: '', company: '', title: '', phone: '', website: '', list_id: '', linkedin: '', value_prop: '', tags: '', city: '', country: '', location: '', company_location: '' }); }, [open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true);
     try {
       const tags = form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-      const custom_fields = JSON.stringify({ linkedin: form.linkedin, value_prop: form.value_prop });
+      const custom_fields = JSON.stringify({
+        linkedin: form.linkedin, value_prop: form.value_prop,
+        city: form.city, country: form.country,
+        location: form.location, company_location: form.company_location,
+      });
       await api.post('/contacts', { ...form, tags: JSON.stringify(tags), custom_fields });
       toast.success('Contact added'); onSaved();
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
@@ -482,16 +486,24 @@ function AddContactModal({ open, onClose, lists, onSaved }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Add Contact" width={560}>
+    <Modal open={open} onClose={onClose} title="Add Contact" width={620}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Input label="Email *" type="email" value={form.email} onChange={e => f('email', e.target.value)} required />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Input label="First Name" value={form.first_name} onChange={e => f('first_name', e.target.value)} />
           <Input label="Last Name" value={form.last_name} onChange={e => f('last_name', e.target.value)} />
-          <Input label="Company" value={form.company} onChange={e => f('company', e.target.value)} />
+          <Input label="Company Name" value={form.company} onChange={e => f('company', e.target.value)} />
           <Input label="Job Title" value={form.title} onChange={e => f('title', e.target.value)} />
-          <Input label="Phone" value={form.phone} onChange={e => f('phone', e.target.value)} />
-          <Input label="LinkedIn URL or username" value={form.linkedin} onChange={e => f('linkedin', e.target.value)} placeholder="linkedin.com/in/username" />
+          <Input label="Phone / Mobile" value={form.phone} onChange={e => f('phone', e.target.value)} />
+          <Input label="Website" value={form.website} onChange={e => f('website', e.target.value)} placeholder="https://..." />
+        </div>
+        <Input label="LI Profile URL" value={form.linkedin} onChange={e => f('linkedin', e.target.value)} placeholder="https://www.linkedin.com/in/username" />
+        <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: -4 }}>📍 Location</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Input label="Contact City" value={form.city} onChange={e => f('city', e.target.value)} />
+          <Input label="Contact Country" value={form.country} onChange={e => f('country', e.target.value)} />
+          <Input label="Contact Location" value={form.location} onChange={e => f('location', e.target.value)} placeholder="e.g. New York, USA" />
+          <Input label="Company Location" value={form.company_location} onChange={e => f('company_location', e.target.value)} placeholder="e.g. San Francisco, CA" />
         </div>
         <Input label="Value Proposition" value={form.value_prop} onChange={e => f('value_prop', e.target.value)} placeholder="What value do you offer this contact?" />
         <Input label="Tags (comma separated)" value={form.tags} onChange={e => f('tags', e.target.value)} placeholder="e.g. hot lead, decision maker, Q2" />
@@ -519,10 +531,20 @@ function EditContactModal({ contact, onClose, lists, onSaved }) {
       const custom = (() => { try { return JSON.parse(contact.custom_fields || '{}'); } catch { return {}; } })();
       const tags = (() => { try { return JSON.parse(contact.tags || '[]').join(', '); } catch { return ''; } })();
       setForm({
-        email: contact.email, first_name: contact.first_name || '', last_name: contact.last_name || '',
-        company: contact.company || '', title: contact.title || '', phone: contact.phone || '',
-        list_id: contact.list_id || '',
-        linkedin: custom.linkedin || '', value_prop: custom.value_prop || '',
+        email:            contact.email,
+        first_name:       contact.first_name || '',
+        last_name:        contact.last_name || '',
+        company:          contact.company || '',
+        title:            contact.title || '',
+        phone:            contact.phone || '',
+        website:          contact.website || '',
+        list_id:          contact.list_id || '',
+        linkedin:         custom.linkedin || '',
+        value_prop:       custom.value_prop || '',
+        city:             custom.city || contact.city || '',
+        country:          custom.country || contact.country || '',
+        location:         custom.location || '',
+        company_location: custom.company_location || '',
         tags,
       });
     }
@@ -532,7 +554,14 @@ function EditContactModal({ contact, onClose, lists, onSaved }) {
     e.preventDefault(); setLoading(true);
     try {
       const tags = form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-      const custom_fields = JSON.stringify({ linkedin: form.linkedin, value_prop: form.value_prop });
+      const custom_fields = JSON.stringify({
+        linkedin:         form.linkedin,
+        value_prop:       form.value_prop,
+        city:             form.city,
+        country:          form.country,
+        location:         form.location,
+        company_location: form.company_location,
+      });
       await api.put(`/contacts/${contact.id}`, { ...form, tags: JSON.stringify(tags), custom_fields });
       toast.success('Contact updated'); onSaved();
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
@@ -540,23 +569,41 @@ function EditContactModal({ contact, onClose, lists, onSaved }) {
   };
 
   return (
-    <Modal open={!!contact} onClose={onClose} title="Edit Contact" width={560}>
+    <Modal open={!!contact} onClose={onClose} title="Edit Contact" width={620}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Input label="Email *" type="email" value={form.email || ''} onChange={e => f('email', e.target.value)} required />
+
+        {/* Name + Company */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Input label="First Name" value={form.first_name || ''} onChange={e => f('first_name', e.target.value)} />
           <Input label="Last Name" value={form.last_name || ''} onChange={e => f('last_name', e.target.value)} />
-          <Input label="Company" value={form.company || ''} onChange={e => f('company', e.target.value)} />
+          <Input label="Company Name" value={form.company || ''} onChange={e => f('company', e.target.value)} />
           <Input label="Job Title" value={form.title || ''} onChange={e => f('title', e.target.value)} />
-          <Input label="Phone" value={form.phone || ''} onChange={e => f('phone', e.target.value)} />
-          <Input label="LinkedIn URL or username" value={form.linkedin || ''} onChange={e => f('linkedin', e.target.value)} placeholder="linkedin.com/in/username" />
+          <Input label="Phone / Mobile" value={form.phone || ''} onChange={e => f('phone', e.target.value)} />
+          <Input label="Website" value={form.website || ''} onChange={e => f('website', e.target.value)} placeholder="https://..." />
         </div>
+
+        {/* LinkedIn */}
+        <Input label="LI Profile URL" value={form.linkedin || ''} onChange={e => f('linkedin', e.target.value)} placeholder="https://www.linkedin.com/in/username" />
+
+        {/* Location fields */}
+        <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: -4 }}>📍 Location</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Input label="Contact City" value={form.city || ''} onChange={e => f('city', e.target.value)} />
+          <Input label="Contact Country" value={form.country || ''} onChange={e => f('country', e.target.value)} />
+          <Input label="Contact Location" value={form.location || ''} onChange={e => f('location', e.target.value)} placeholder="e.g. New York, USA" />
+          <Input label="Company Location" value={form.company_location || ''} onChange={e => f('company_location', e.target.value)} placeholder="e.g. San Francisco, CA" />
+        </div>
+
+        {/* Value Prop + Tags */}
         <Input label="Value Proposition" value={form.value_prop || ''} onChange={e => f('value_prop', e.target.value)} placeholder="What value do you offer this contact?" />
-        <Input label="Tags (comma separated)" value={form.tags || ''} onChange={e => f('tags', e.target.value)} placeholder="e.g. hot lead, decision maker, Q2" />
+        <Input label="Tags (comma separated)" value={form.tags || ''} onChange={e => f('tags', e.target.value)} placeholder="e.g. Food & Bev, hot lead, Q2" />
+
         <Select label="List" value={form.list_id || ''} onChange={e => f('list_id', e.target.value)}>
           <option value="">No list</option>
           {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
         </Select>
+
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
           <Btn type="submit" loading={loading}>Save Changes</Btn>
