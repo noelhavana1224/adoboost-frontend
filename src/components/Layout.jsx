@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Send, Mail, Users, MessageSquare,
   Ban, FileText, Settings, HelpCircle, LogOut,
   ChevronDown, ChevronRight, Bell, Star, UserCog,
-  CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck
+  CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare
 } from 'lucide-react';
 
 const NAV = [
@@ -25,6 +25,7 @@ const NAV = [
       { label: 'Auto-replies', to: '/messages/auto-replies' },
     ]
   },
+  { label: 'Pipeline', to: '/pipeline', icon: KanbanSquare },
   {
     label: 'Exclusions', icon: Ban, children: [
       { label: 'Exclusions', to: '/exclusions' },
