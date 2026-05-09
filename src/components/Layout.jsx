@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Send, Mail, Users, MessageSquare,
   Ban, FileText, Settings, HelpCircle, LogOut,
   ChevronDown, ChevronRight, Bell, Star, UserCog,
-  CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare
+  CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck
 } from 'lucide-react';
 
 const NAV = [
@@ -25,7 +25,6 @@ const NAV = [
       { label: 'Auto-replies', to: '/messages/auto-replies' },
     ]
   },
-  { label: 'Pipeline', to: '/pipeline', icon: KanbanSquare },
   {
     label: 'Exclusions', icon: Ban, children: [
       { label: 'Exclusions', to: '/exclusions' },
@@ -37,6 +36,7 @@ const NAV = [
     label: 'Settings', icon: Settings, children: [
       { label: 'Billing', to: '/settings/billing' },
       { label: 'Sending Speed', to: '/settings/sending-speed' },
+      { label: 'Email Warmup 🔥', to: '/settings/warmup' },
       { label: 'User Settings', to: '/settings/user' },
       { label: 'User Preferences', to: '/settings/preferences' },
       { label: 'API Key', to: '/settings/api-key' },
