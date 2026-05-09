@@ -100,12 +100,9 @@ function RichBodyEditor({ value, onChange, placeholder }) {
   const editorRef = useRef(null);
   const [initialized, setInitialized] = useState(false);
 
-  // Initialize content once
   useEffect(() => {
     if (editorRef.current && !initialized) {
-      // Convert plain text to HTML if needed
-      const html = value ? value.replace(/\n/g, '<br>') : '';
-      editorRef.current.innerHTML = html;
+      editorRef.current.innerHTML = value ? value.replace(/\n/g, '<br>') : '';
       setInitialized(true);
     }
   }, [initialized]);
@@ -122,12 +119,25 @@ function RichBodyEditor({ value, onChange, placeholder }) {
     onChange(editorRef.current?.innerHTML || '');
   };
 
-  const toolBtn = (icon, cmd, title, val = null) => (
-    <button type="button" title={title} onMouseDown={e => { e.preventDefault(); exec(cmd, val); }}
-      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 4, color: 'var(--text2)', display: 'flex', alignItems: 'center' }}
-      onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
-      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-      {icon}
+  const insertLink = () => {
+    const url = prompt('Enter URL:');
+    if (url) exec('createLink', url.startsWith('http') ? url : 'https://' + url);
+  };
+
+  const sep = () => <div style={{ width: 1, height: 18, background: '#d1d5db', margin: '0 4px', flexShrink: 0 }}/>;
+
+  const T = ({ title, onCmd, children, active }) => (
+    <button type="button" title={title}
+      onMouseDown={e => { e.preventDefault(); onCmd(); }}
+      style={{
+        background: active ? '#e0e7ff' : 'none', border: 'none', cursor: 'pointer',
+        padding: '4px 7px', borderRadius: 5, color: active ? '#4f46e5' : '#374151',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 12, fontFamily: 'inherit', transition: 'background 0.1s',
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6'; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'none'; }}>
+      {children}
     </button>
   );
 
@@ -137,59 +147,132 @@ function RichBodyEditor({ value, onChange, placeholder }) {
         <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>Email Body</label>
         <VarsDropdown onInsert={insertVar} label="Add Variable" />
       </div>
-      <div style={{ border: '1.5px solid var(--border2)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}
-        onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-        onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--border2)'}>
-        {/* Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '5px 8px', borderBottom: '1px solid var(--border)', background: '#f8fafc', flexWrap: 'wrap' }}>
-          {toolBtn(<Bold size={13}/>, 'bold', 'Bold')}
-          {toolBtn(<Italic size={13}/>, 'italic', 'Italic')}
-          {toolBtn(<Underline size={13}/>, 'underline', 'Underline')}
-          <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 3px' }}/>
-          {toolBtn(<List size={13}/>, 'insertUnorderedList', 'Bullet List')}
-          <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 3px' }}/>
-          {/* Font color */}
-          <select onMouseDown={e => e.stopPropagation()} onChange={e => exec('foreColor', e.target.value)}
-            style={{ border: 'none', background: 'none', fontSize: 11, cursor: 'pointer', color: 'var(--text2)', outline: 'none', fontFamily: 'inherit' }}>
-            <option value="">🎨 Color</option>
-            <option value="#000000">Black</option>
-            <option value="#dc2626">Red</option>
-            <option value="#2563eb">Blue</option>
-            <option value="#16a34a">Green</option>
-            <option value="#d97706">Orange</option>
-            <option value="#7c3aed">Purple</option>
+      <div style={{ border: '1.5px solid #d1d5db', borderRadius: 10, overflow: 'hidden', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+        onFocusCapture={e => e.currentTarget.style.borderColor = '#6366f1'}
+        onBlurCapture={e => e.currentTarget.style.borderColor = '#d1d5db'}>
+
+        {/* ── Toolbar ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '6px 10px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', flexWrap: 'wrap' }}>
+
+          {/* Undo / Redo */}
+          <T title="Undo" onCmd={() => exec('undo')}>↩</T>
+          <T title="Redo" onCmd={() => exec('redo')}>↪</T>
+          {sep()}
+
+          {/* Font family */}
+          <select onMouseDown={e => e.stopPropagation()} onChange={e => exec('fontName', e.target.value)}
+            style={{ border: '1px solid #e5e7eb', background: '#fff', fontSize: 12, cursor: 'pointer', color: '#374151', outline: 'none', fontFamily: 'inherit', borderRadius: 5, padding: '3px 6px' }}>
+            <option value="sans-serif">Sans Serif</option>
+            <option value="serif">Serif</option>
+            <option value="monospace">Monospace</option>
+            <option value="Arial">Arial</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Tahoma">Tahoma</option>
           </select>
-          {/* Background color */}
-          <select onMouseDown={e => e.stopPropagation()} onChange={e => exec('hiliteColor', e.target.value)}
-            style={{ border: 'none', background: 'none', fontSize: 11, cursor: 'pointer', color: 'var(--text2)', outline: 'none', fontFamily: 'inherit' }}>
-            <option value="">🖍 Highlight</option>
-            <option value="#fef08a">Yellow</option>
-            <option value="#bbf7d0">Green</option>
-            <option value="#bfdbfe">Blue</option>
-            <option value="#fecaca">Red</option>
-            <option value="transparent">None</option>
-          </select>
+
           {/* Font size */}
           <select onMouseDown={e => e.stopPropagation()} onChange={e => exec('fontSize', e.target.value)}
-            style={{ border: 'none', background: 'none', fontSize: 11, cursor: 'pointer', color: 'var(--text2)', outline: 'none', fontFamily: 'inherit' }}>
-            <option value="">📏 Size</option>
-            <option value="2">Small</option>
-            <option value="3">Normal</option>
-            <option value="4">Large</option>
-            <option value="5">Larger</option>
+            style={{ border: '1px solid #e5e7eb', background: '#fff', fontSize: 12, cursor: 'pointer', color: '#374151', outline: 'none', fontFamily: 'inherit', borderRadius: 5, padding: '3px 6px', width: 52 }}>
+            <option value="1">8</option>
+            <option value="2">10</option>
+            <option value="3" selected>12</option>
+            <option value="4">14</option>
+            <option value="5">18</option>
+            <option value="6">24</option>
+            <option value="7">36</option>
           </select>
+          {sep()}
+
+          {/* Bold Italic Underline Strikethrough */}
+          <T title="Bold (Ctrl+B)" onCmd={() => exec('bold')}><strong>B</strong></T>
+          <T title="Italic (Ctrl+I)" onCmd={() => exec('italic')}><em style={{ fontStyle: 'italic' }}>I</em></T>
+          <T title="Underline (Ctrl+U)" onCmd={() => exec('underline')}><span style={{ textDecoration: 'underline' }}>U</span></T>
+          <T title="Strikethrough" onCmd={() => exec('strikeThrough')}><span style={{ textDecoration: 'line-through' }}>S</span></T>
+          {sep()}
+
+          {/* Font color */}
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <button type="button" title="Font Color"
+              onMouseDown={e => { e.preventDefault(); e.currentTarget.querySelector('input').click(); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 5, fontSize: 13, color: '#374151', display: 'flex', alignItems: 'center', gap: 2 }}>
+              <span style={{ fontWeight: 700 }}>A</span>
+              <input type="color" defaultValue="#000000"
+                onChange={e => exec('foreColor', e.target.value)}
+                style={{ width: 0, height: 0, opacity: 0, position: 'absolute', pointerEvents: 'none' }} />
+            </button>
+          </div>
+
+          {/* Highlight color */}
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <button type="button" title="Highlight Color"
+              onMouseDown={e => { e.preventDefault(); e.currentTarget.querySelector('input').click(); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 5, fontSize: 13, color: '#374151', display: 'flex', alignItems: 'center', gap: 2 }}>
+              <span style={{ background: '#fef08a', padding: '0 3px', borderRadius: 2, fontWeight: 700 }}>A</span>
+              <input type="color" defaultValue="#fef08a"
+                onChange={e => exec('hiliteColor', e.target.value)}
+                style={{ width: 0, height: 0, opacity: 0, position: 'absolute', pointerEvents: 'none' }} />
+            </button>
+          </div>
+          {sep()}
+
+          {/* Alignment */}
+          <T title="Align Left" onCmd={() => exec('justifyLeft')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+          </T>
+          <T title="Align Center" onCmd={() => exec('justifyCenter')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+          </T>
+          <T title="Align Right" onCmd={() => exec('justifyRight')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+          </T>
+          {sep()}
+
+          {/* Lists */}
+          <T title="Bullet List" onCmd={() => exec('insertUnorderedList')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
+          </T>
+          <T title="Numbered List" onCmd={() => exec('insertOrderedList')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="2" y="8" fontSize="7" fill="currentColor" stroke="none">1.</text><text x="2" y="14" fontSize="7" fill="currentColor" stroke="none">2.</text><text x="2" y="20" fontSize="7" fill="currentColor" stroke="none">3.</text></svg>
+          </T>
+          {sep()}
+
+          {/* Indent */}
+          <T title="Indent" onCmd={() => exec('indent')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="9 12 13 12"/><line x1="13" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><polyline points="3 9 6 12 3 15"/></svg>
+          </T>
+          <T title="Outdent" onCmd={() => exec('outdent')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><polyline points="15 9 12 12 15 15"/></svg>
+          </T>
+          {sep()}
+
+          {/* Link */}
+          <T title="Insert Link" onCmd={insertLink}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+          </T>
+
+          {/* Remove formatting */}
+          <T title="Clear Formatting" onCmd={() => exec('removeFormat')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3H7l-4 9h4l-2 9 12-12h-4l4-6z"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
+          </T>
         </div>
-        {/* Editable area */}
+
+        {/* Editable content area */}
         <div
           ref={editorRef}
           contentEditable
           suppressContentEditableWarning
           onInput={() => onChange(editorRef.current?.innerHTML || '')}
           data-placeholder={placeholder || 'Hi {{first_name}},\n\nI noticed {{company}} is...'}
-          style={{ minHeight: 150, padding: '10px 14px', fontSize: 13, lineHeight: 1.7, color: 'var(--text)', outline: 'none', wordBreak: 'break-word' }}
+          style={{ minHeight: 160, padding: '12px 16px', fontSize: 13, lineHeight: 1.8, color: '#111827', outline: 'none', wordBreak: 'break-word' }}
         />
       </div>
-      <style>{`[contenteditable]:empty:before{content:attr(data-placeholder);color:#94a3b8;pointer-events:none;white-space:pre}`}</style>
+      <style>{`
+        [contenteditable]:empty:before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; white-space: pre; }
+        [contenteditable] a { color: #4f46e5; text-decoration: underline; }
+        [contenteditable] ul { padding-left: 20px; }
+        [contenteditable] ol { padding-left: 20px; }
+      `}</style>
     </div>
   );
 }
