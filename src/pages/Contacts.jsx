@@ -605,15 +605,18 @@ function ImportModal({ open, onClose, lists, selectedList, onSaved }) {
   const [loading, setLoading] = useState(false);
 
   const FIELDS = [
-    { key: 'email', label: 'Email *', required: true },
+    { key: 'email',    label: 'Email *',          required: true },
     { key: 'first_name', label: 'First Name' },
-    { key: 'last_name', label: 'Last Name' },
-    { key: 'company', label: 'Company' },
-    { key: 'title', label: 'Job Title' },
-    { key: 'phone', label: 'Phone' },
-    { key: 'website', label: 'Website' },
-    { key: 'linkedin', label: 'LinkedIn' },
-    { key: 'value_prop', label: 'Value Prop' },
+    { key: 'last_name',  label: 'Last Name' },
+    { key: 'title',    label: 'Title / Job Title' },
+    { key: 'company',  label: 'Company Name' },
+    { key: 'website',  label: 'Website' },
+    { key: 'linkedin', label: 'LI Profile URL' },
+    { key: 'phone',    label: 'Phone / Mobile Phone' },
+    { key: 'city',     label: 'Contact City' },
+    { key: 'country',  label: 'Contact Country' },
+    { key: 'location', label: 'Contact Location' },
+    { key: 'company_location', label: 'Company Location' },
   ];
 
   useEffect(() => {
@@ -633,15 +636,18 @@ function ImportModal({ open, onClose, lists, selectedList, onSaved }) {
       setHeaders(rawHeaders);
       const autoMap = {};
       const aliases = {
-        email: ['email', 'e-mail', 'email address', 'emailaddress', 'mail'],
-        first_name: ['first_name', 'firstname', 'first name', 'fname', 'first'],
-        last_name: ['last_name', 'lastname', 'last name', 'lname', 'last'],
-        company: ['company', 'company name', 'organization', 'org', 'business'],
-        title: ['title', 'job title', 'jobtitle', 'position', 'role'],
-        phone: ['phone', 'phone number', 'mobile', 'cell', 'telephone'],
-        website: ['website', 'url', 'web', 'domain'],
-        linkedin: ['linkedin', 'linkedin url', 'linkedin profile'],
-        value_prop: ['value_prop', 'value proposition', 'value prop'],
+        email:            ['email', 'e-mail', 'email address', 'emailaddress', 'mail', 'work email'],
+        first_name:       ['first_name', 'firstname', 'first name', 'fname', 'first'],
+        last_name:        ['last_name', 'lastname', 'last name', 'lname', 'last'],
+        company:          ['company', 'company name', 'organization', 'org', 'business', 'employer'],
+        title:            ['title', 'job title', 'jobtitle', 'position', 'role'],
+        phone:            ['phone', 'phone number', 'mobile', 'mobile phone', 'cell', 'telephone'],
+        website:          ['website', 'url', 'web', 'domain', 'company website'],
+        linkedin:         ['linkedin', 'linkedin url', 'linkedin profile', 'li profile url', 'linkedin profile url', 'li profile'],
+        city:             ['city', 'contact city', 'town'],
+        country:          ['country', 'contact country'],
+        location:         ['location', 'contact location', 'contact loc'],
+        company_location: ['company location', 'company loc', 'hq location', 'office location'],
       };
       rawHeaders.forEach(h => {
         const hl = h.toLowerCase().trim();
