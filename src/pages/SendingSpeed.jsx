@@ -431,7 +431,7 @@ export default function SendingSpeed() {
           <div style={{ fontSize: 13, color: '#0369a1', lineHeight: 1.6 }}>
             Settings are applied <strong>per email account</strong> for maximum safety. Each account has its own speed profile.
             Random delays between emails make your sending pattern look human and avoid spam filters.
-            The <strong>hard limit is 1,500 emails/day</strong> — but we strongly recommend staying under 300/day per account.
+            The <strong>hard limit is 1,500 emails/day</strong> — but we strongly recommend staying under 99/day per account.
           </div>
         </div>
       </div>
