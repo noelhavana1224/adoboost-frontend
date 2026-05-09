@@ -14,6 +14,7 @@ import Templates from './pages/Templates';
 import Support from './pages/Support';
 import { Billing, UserSettings, UserPreferences, ApiKey } from './pages/Settings';
 import SendingSpeed from './pages/SendingSpeed';
+import Warmup from './pages/Warmup';
 import SendingCalendar from './pages/Calendar';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="/templates"           element={<ProtectedRoute><Templates /></ProtectedRoute>} />
           <Route path="/settings/billing"    element={<ProtectedRoute><Billing /></ProtectedRoute>} />
           <Route path="/settings/sending-speed" element={<ProtectedRoute><SendingSpeed /></ProtectedRoute>} />
+          <Route path="/settings/warmup"        element={<ProtectedRoute><Warmup /></ProtectedRoute>} />
           <Route path="/settings/user"       element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path="/settings/preferences" element={<ProtectedRoute><UserPreferences /></ProtectedRoute>} />
           <Route path="/settings/sub-accounts" element={<ProtectedRoute><SubAccountsPlaceholder /></ProtectedRoute>} />
