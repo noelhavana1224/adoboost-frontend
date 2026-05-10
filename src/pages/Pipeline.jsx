@@ -113,7 +113,7 @@ function RichEditor({ onChange, placeholder, minHeight = 150 }) {
 }
 
 // ── Kanban Card ─────────────────────────────────
-function KanbanCard({ lead, col, onDragStart, onQuickReply }) {
+function KanbanCard({ lead, col, onDragStart, onQuickReply, onDelete }) {
   const initials = (lead.contact_name || lead.contact_email || '?').charAt(0).toUpperCase();
   return (
     <div draggable onDragStart={e => onDragStart(e, lead)}
@@ -149,6 +149,9 @@ function KanbanCard({ lead, col, onDragStart, onQuickReply }) {
               <Mail size={10}/> Reply
             </button>
           )}
+          <button onClick={e=>{ e.stopPropagation(); onDelete(lead); }} title="Remove from pipeline" style={{ background:'none', border:'1px solid #fca5a5', borderRadius:7, padding:'4px 7px', cursor:'pointer', fontSize:11, color:'#dc2626', display:'flex', alignItems:'center' }}>
+            ✕
+          </button>
         </div>
       </div>
     </div>
@@ -156,7 +159,7 @@ function KanbanCard({ lead, col, onDragStart, onQuickReply }) {
 }
 
 // ── Kanban Column ───────────────────────────────
-function KanbanColumn({ col, leads, onDragStart, onDrop, onDragOver, onDragLeave, onQuickReply, isOver }) {
+function KanbanColumn({ col, leads, onDragStart, onDrop, onDragOver, onDragLeave, onQuickReply, onDelete, isOver }) {
   return (
     <div style={{ minWidth:250, maxWidth:260, flex:'0 0 250px', display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'10px 14px', borderRadius:'10px 10px 0 0', background:col.bg, border:`1px solid ${col.border}`, borderBottom:'none', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -170,7 +173,7 @@ function KanbanColumn({ col, leads, onDragStart, onDrop, onDragOver, onDragLeave
         style={{ flex:1, minHeight:140, padding:8, background:isOver?col.light:'#f8fafc', border:`1px solid ${isOver?col.color:col.border}`, borderTop:'none', borderRadius:'0 0 10px 10px', display:'flex', flexDirection:'column', gap:8, transition:'background 0.15s, border-color 0.15s', overflowY:'auto', maxHeight:'calc(100vh - 280px)', boxShadow:isOver?`inset 0 0 0 2px ${col.color}33`:'none' }}>
         {leads.length === 0
           ? <div style={{ textAlign:'center', padding:'24px 10px', color:'var(--text3)', fontSize:12, opacity:0.5 }}>{isOver?'⬇️ Drop here':'No leads yet'}</div>
-          : leads.map(lead => <KanbanCard key={lead.id} lead={lead} col={col} onDragStart={onDragStart} onQuickReply={onQuickReply}/>)
+          : leads.map(lead => <KanbanCard key={lead.id} lead={lead} col={col} onDragStart={onDragStart} onQuickReply={onQuickReply} onDelete={onDelete}/>)
         }
       </div>
     </div>
@@ -488,6 +491,26 @@ export default function Pipeline() {
 
   useEffect(() => { loadPipeline(); }, [loadPipeline]);
 
+  const handleDeleteLead = async (lead) => {
+    if (!confirm(`Remove ${lead.contact_name || lead.contact_email} from pipeline?`)) return;
+    // Remove from view immediately (optimistic)
+    setLeads(prev => {
+      const next = {};
+      for (const k of Object.keys(prev)) next[k] = prev[k].filter(l => l.id !== lead.id);
+      return next;
+    });
+    // Delete all messages from this contact from the DB
+    try {
+      if (lead.last_message_id) {
+        await api.delete(`/messages/${lead.last_message_id}`);
+      }
+      toast.success(`${lead.contact_name || lead.contact_email} removed from pipeline`);
+    } catch {
+      // Still removed from view even if backend fails
+      toast.success('Removed from pipeline view');
+    }
+  };
+
   const handleDragStart = (e, lead) => { setDragItem(lead); e.dataTransfer.effectAllowed='move'; };
   const handleDragOver  = (e, colId) => { e.preventDefault(); e.dataTransfer.dropEffect='move'; setOverCol(colId); };
   const handleDragLeave = (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOverCol(null); };
@@ -560,7 +583,7 @@ export default function Pipeline() {
               <KanbanColumn key={col.id} col={col} leads={leads[col.id]||[]}
                 onDragStart={handleDragStart} onDrop={handleDrop}
                 onDragOver={e=>handleDragOver(e,col.id)} onDragLeave={handleDragLeave}
-                onQuickReply={setQuickReply} isOver={overCol===col.id}
+                onQuickReply={setQuickReply} onDelete={handleDeleteLead} isOver={overCol===col.id}
               />
             ))}
           </div>
