@@ -15,6 +15,8 @@ import Support from './pages/Support';
 import { Billing, UserSettings, UserPreferences, ApiKey } from './pages/Settings';
 import SendingSpeed from './pages/SendingSpeed';
 import Reports from './pages/Reports';
+import TeamMembers from './pages/TeamMembers';
+import AdminTeam from './pages/admin/AdminTeam';
 import Warmup from './pages/Warmup';
 import SendingCalendar from './pages/Calendar';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -92,7 +94,7 @@ export default function App() {
           <Route path="/settings/warmup"        element={<ProtectedRoute><Warmup /></ProtectedRoute>} />
           <Route path="/settings/user"       element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path="/settings/preferences" element={<ProtectedRoute><UserPreferences /></ProtectedRoute>} />
-          <Route path="/settings/sub-accounts" element={<ProtectedRoute><SubAccountsPlaceholder /></ProtectedRoute>} />
+          <Route path="/settings/team-members" element={<ProtectedRoute><TeamMembers /></ProtectedRoute>} />
           <Route path="/settings/api-key"    element={<ProtectedRoute><ApiKey /></ProtectedRoute>} />
           <Route path="/support/ticket"      element={<ProtectedRoute><Support /></ProtectedRoute>} />
 
@@ -101,6 +103,7 @@ export default function App() {
           <Route path="/admin/users"     element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
           <Route path="/admin/plans"     element={<ProtectedRoute adminOnly><AdminPlans /></ProtectedRoute>} />
           <Route path="/admin/tickets"   element={<ProtectedRoute adminOnly><AdminTickets /></ProtectedRoute>} />
+          <Route path="/admin/team"      element={<ProtectedRoute adminOnly><AdminTeam /></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
