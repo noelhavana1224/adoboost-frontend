@@ -87,7 +87,7 @@ function InfoTip({ text }) {
       <Info size={13} style={{ color: 'var(--text3)', cursor: 'pointer', marginLeft: 4 }}
         onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)} />
       {show && (
-        <div style={{ position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', fontSize: 11, padding: '6px 10px', borderRadius: 8, whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: 220, whiteSpace: 'normal', lineHeight: 1.5 }}>
+        <div style={{ position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', fontSize: 11, padding: '6px 10px', borderRadius: 8, zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: 220, whiteSpace: 'normal', lineHeight: 1.5 }}>
           {text}
         </div>
       )}
@@ -431,7 +431,7 @@ export default function SendingSpeed() {
           <div style={{ fontSize: 13, color: '#0369a1', lineHeight: 1.6 }}>
             Settings are applied <strong>per email account</strong> for maximum safety. Each account has its own speed profile.
             Random delays between emails make your sending pattern look human and avoid spam filters.
-            The <strong>hard limit is 1,500 emails/day</strong> — but we strongly recommend staying under 99/day per account.
+            The <strong>hard limit is 1,500 emails/day</strong> — but we strongly recommend staying under 300/day per account.
           </div>
         </div>
       </div>
