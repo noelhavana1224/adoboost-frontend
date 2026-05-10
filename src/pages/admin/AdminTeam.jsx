@@ -33,7 +33,6 @@ function AdminMemberModal({ open, member, currentUser, onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.email) return toast.error('Email required');
-    if (!member && !form.password) return toast.error('Password required');
     setLoading(true);
     try {
       const payload = { ...form, admin_permissions: JSON.stringify(form.admin_permissions), role:'admin' };
