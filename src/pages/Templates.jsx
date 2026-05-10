@@ -19,6 +19,9 @@ const VARS = [
   { label: 'Email',       value: '{{email}}' },
   { label: 'Title/Role',  value: '{{title}}' },
   { label: 'Website',     value: '{{website}}' },
+  { label: 'Signature',   value: '{{signature}}' },
+  { label: 'From Name',   value: '{{from_name}}' },
+  { label: 'From Email',  value: '{{from_email}}' },
 ];
 
 // ── Variable Dropdown ────────────────────────────
