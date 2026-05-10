@@ -53,7 +53,14 @@ function AdminMemberModal({ open, member, currentUser, onClose, onSaved }) {
           <Input label="Full Name *" value={form.name} onChange={e=>f('name',e.target.value)} required />
           <Input label="Email *" type="email" value={form.email} onChange={e=>f('email',e.target.value)} required disabled={!!member} />
         </div>
-        <Input label={member?'New Password (blank = keep)':'Temporary Password *'} type="password" value={form.password} onChange={e=>f('password',e.target.value)} required={!member} />
+        {member && (
+          <Input label="New Password (leave blank to keep)" type="password" value={form.password} onChange={e=>f('password',e.target.value)} />
+        )}
+        {!member && (
+          <div style={{ background:'#f0fff4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#166534' }}>
+            ✅ An invitation email will be sent to this address with a secure link to set their password.
+          </div>
+        )}
 
         {/* Super Admin toggle */}
         <div style={{ background: form.is_super_admin ? '#fef3c7' : 'var(--bg3)', border:`1px solid ${form.is_super_admin?'#fcd34d':'var(--border)'}`, borderRadius:10, padding:'12px 14px' }}>
