@@ -41,6 +41,7 @@ const NAV = [
       { label: 'User Settings', to: '/settings/user' },
       { label: 'User Preferences', to: '/settings/preferences' },
       { label: 'API Key', to: '/settings/api-key' },
+      { label: 'Team Members 👥', to: '/settings/team-members' },
     ]
   },
   {
@@ -55,6 +56,7 @@ const ADMIN_NAV = [
   { label: 'Users', to: '/admin/users', icon: UserCog },
   { label: 'Plans', to: '/admin/plans', icon: CreditCard },
   { label: 'Support Tickets', to: '/admin/tickets', icon: HelpCircle },
+  { label: 'Admin Team',      to: '/admin/team',    icon: ShieldCheck },
 ];
 
 // AdoBoost Logo SVG — Concept C style
