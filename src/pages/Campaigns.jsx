@@ -496,6 +496,107 @@ function ViewCampaignModal({ campaign, onClose }) {
   );
 }
 
+// ── Inbox Rotation Dropdown Select ──────────────
+function RotationSelect({ accounts, value, onChange, disabled }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+
+  // Close on outside click
+  React.useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = (id) => {
+    if (disabled) return;
+    const next = value.includes(id) ? value.filter(v => v !== id) : [...value, id];
+    onChange(next);
+  };
+
+  const selectedAccounts = accounts.filter(a => value.includes(a.id));
+
+  return (
+    <div ref={ref} style={{ position:'relative' }}>
+      <label style={{ fontSize:13, fontWeight:600, color:'var(--text2)', display:'block', marginBottom:6 }}>
+        Email Account(s)
+        {value.length > 1 && (
+          <span style={{ marginLeft:8, fontSize:11, padding:'2px 8px', borderRadius:10, background:'#eff6ff', color:'#2563eb', fontWeight:700 }}>
+            🔄 Rotation: {value.length} accounts
+          </span>
+        )}
+      </label>
+
+      {/* Trigger button */}
+      <button type="button" onClick={() => !disabled && setOpen(p => !p)}
+        style={{ width:'100%', border:`1px solid ${open?'var(--primary)':'var(--border2)'}`, borderRadius:8, padding:'9px 12px', background:disabled?'var(--bg3)':'#fff', cursor:disabled?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, fontFamily:'inherit', textAlign:'left', transition:'border-color 0.15s' }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          {selectedAccounts.length === 0 ? (
+            <span style={{ fontSize:13, color:'var(--text3)' }}>Select account(s)…</span>
+          ) : selectedAccounts.length === 1 ? (
+            <div>
+              <span style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{selectedAccounts[0].name}</span>
+              <span style={{ fontSize:11, color:'var(--text3)', marginLeft:6 }}>{selectedAccounts[0].from_email}</span>
+            </div>
+          ) : (
+            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+              {selectedAccounts.map(a => (
+                <span key={a.id} style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'var(--primary-dim)', color:'var(--primary)', fontWeight:600, border:'1px solid #93c5fd' }}>
+                  {a.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <ChevronDown size={14} color="var(--text3)" style={{ flexShrink:0, transform: open?'rotate(180deg)':'none', transition:'transform 0.15s' }}/>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:200, background:'#fff', border:'1px solid var(--border2)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', overflow:'hidden' }}>
+          {/* Header */}
+          <div style={{ padding:'8px 12px', borderBottom:'1px solid var(--border)', background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Select accounts for rotation</span>
+            {value.length > 0 && (
+              <button type="button" onClick={() => onChange([])} style={{ fontSize:11, color:'#dc2626', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Clear all</button>
+            )}
+          </div>
+          {/* Account options */}
+          {accounts.map(a => {
+            const selected = value.includes(a.id);
+            return (
+              <label key={a.id} onClick={() => toggle(a.id)}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', cursor:'pointer', background:selected?'#eff6ff':'#fff', borderBottom:'1px solid var(--border)', transition:'background 0.1s' }}
+                onMouseEnter={e => { if (!selected) e.currentTarget.style.background='var(--bg3)'; }}
+                onMouseLeave={e => { if (!selected) e.currentTarget.style.background='#fff'; }}>
+                <div style={{ width:18, height:18, borderRadius:5, border:`2px solid ${selected?'var(--primary)':'var(--border2)'}`, background:selected?'var(--primary)':'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all 0.15s' }}>
+                  {selected && <span style={{ color:'#fff', fontSize:11, fontWeight:700, lineHeight:1 }}>✓</span>}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:selected?600:400, color:'var(--text)' }}>{a.name}</div>
+                  <div style={{ fontSize:11, color:'var(--text3)' }}>{a.from_email}</div>
+                </div>
+                {a.signature && <span style={{ fontSize:10, color:'#16a34a', fontWeight:600, flexShrink:0 }}>✍️ Sig</span>}
+                {selected && <span style={{ fontSize:10, color:'var(--primary)', fontWeight:700, flexShrink:0 }}>✓</span>}
+              </label>
+            );
+          })}
+          {accounts.length === 0 && <div style={{ padding:'14px', fontSize:13, color:'var(--text3)', textAlign:'center' }}>No accounts connected</div>}
+          {/* Footer info */}
+          {value.length > 1 && (
+            <div style={{ padding:'8px 12px', background:'#f0f9ff', borderTop:'1px solid #bae6fd', fontSize:11, color:'#0284c7' }}>
+              🔄 Sends will rotate <strong>randomly</strong> across {value.length} accounts — each using its own signature & daily limit
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Validation */}
+      {value.length === 0 && <div style={{ fontSize:11, color:'#dc2626', marginTop:4 }}>Select at least one email account</div>}
+    </div>
+  );
+}
+
 // ── Create/Edit Campaign Modal ───────────────────
 function CampaignModal({ open, campaign, onClose, onSaved }) {
   const [form, setForm] = useState({ name: '', email_account_id: '', list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
@@ -565,41 +666,8 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         <Input label="Campaign Name *" value={form.name} onChange={e => f('name', e.target.value)} required />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* ── Inbox Rotation: multi-account select ── */}
-          <div>
-            <label style={{ fontSize:13, fontWeight:600, color:'var(--text2)', display:'block', marginBottom:6 }}>
-              Email Account(s)
-              {form.rotation_ids?.length > 1 && <span style={{ marginLeft:8, fontSize:11, padding:'2px 8px', borderRadius:10, background:'#eff6ff', color:'#2563eb', fontWeight:700 }}>🔄 Rotation: {form.rotation_ids.length} accounts</span>}
-            </label>
-            <div style={{ border:'1px solid var(--border2)', borderRadius:8, overflow:'hidden', background:'#fff' }}>
-              {accounts.map(a => {
-                const selected = (form.rotation_ids||[]).includes(a.id);
-                return (
-                  <label key={a.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderBottom:'1px solid var(--border)', cursor:'pointer', background:selected?'var(--primary-dim)':'#fff', transition:'background 0.1s' }}>
-                    <input type="checkbox" checked={selected} disabled={isActive}
-                      onChange={e => {
-                        const ids = form.rotation_ids || [];
-                        f('rotation_ids', e.target.checked ? [...ids, a.id] : ids.filter(id=>id!==a.id));
-                        if (e.target.checked && !form.email_account_id) f('email_account_id', a.id);
-                      }}
-                      style={{ accentColor:'var(--primary)', width:14, height:14 }}/>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:selected?600:400 }}>{a.name}</div>
-                      <div style={{ fontSize:11, color:'var(--text3)' }}>{a.from_email}</div>
-                    </div>
-                    {selected && a.signature && <span style={{ fontSize:10, color:'#16a34a', fontWeight:600 }}>✍️ Sig</span>}
-                  </label>
-                );
-              })}
-              {accounts.length === 0 && <div style={{ padding:12, fontSize:13, color:'var(--text3)' }}>No email accounts connected</div>}
-            </div>
-            {(form.rotation_ids||[]).length > 1 && (
-              <div style={{ fontSize:11, color:'#0284c7', marginTop:5, padding:'5px 10px', background:'#f0f9ff', borderRadius:6, border:'1px solid #bae6fd' }}>
-                🔄 Sends will be distributed <strong>randomly</strong> across {form.rotation_ids.length} accounts for better deliverability
-              </div>
-            )}
-            {(form.rotation_ids||[]).length === 0 && <div style={{ fontSize:11, color:'#dc2626', marginTop:4 }}>Select at least one email account</div>}
-          </div>
+          {/* ── Inbox Rotation: dropdown multi-select ── */}
+          <RotationSelect accounts={accounts} value={form.rotation_ids||[]} onChange={ids => { f('rotation_ids', ids); if (ids.length && !form.email_account_id) f('email_account_id', ids[0]); }} disabled={isActive} />
           <Select label="Contact List" value={form.list_id} onChange={e => f('list_id', e.target.value)} disabled={isActive}>
             <option value="">Select list...</option>
             {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_contacts || 0})</option>)}
