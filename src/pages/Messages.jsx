@@ -130,7 +130,7 @@ function SyncModal({ open, onClose, onSynced }) {
 }
 
 // ── Thread Panel ────────────────────────────────
-function ThreadPanel({ thread, onClose, onUpdate }) {
+function ThreadPanel({ thread, onClose, onUpdate, onDelete }) {
   const [accounts, setAccounts]   = useState([]);
   const [accountId, setAccountId] = useState('');
   const [replyBody, setReplyBody] = useState('');
@@ -395,6 +395,12 @@ function ThreadPanel({ thread, onClose, onUpdate }) {
             </div>
           </div>
         )}
+        {/* Delete thread button */}
+        <div style={{padding:'8px 20px 12px',display:'flex',justifyContent:'flex-end',borderTop:'1px solid var(--border)',background:'#fafafa'}}>
+          <button onClick={()=>onDelete&&onDelete(thread)} style={{background:'none',border:'1px solid #fca5a5',borderRadius:8,padding:'6px 14px',cursor:'pointer',fontSize:12,color:'#dc2626',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
+            🗑 Delete Thread
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -425,6 +431,19 @@ export default function Messages({ type = 'inbox' }) {
   },[type,search,page]); // tag filter is client-side, no need to refetch
 
   useEffect(()=>{load();},[load]);
+
+  const handleDelete = useCallback(async (thread) => {
+    if (!confirm('Delete this conversation thread? This cannot be undone.')) return;
+    try {
+      const msgs = thread.msgs || [thread];
+      for (const m of msgs) {
+        try { await api.delete(`/messages/${m.id}`); } catch {}
+      }
+      setOpenThread(null);
+      toast.success('Thread deleted');
+      load();
+    } catch { toast.error('Failed to delete thread'); }
+  }, [load]);
 
   const handleUpdate = useCallback((msgId,updates)=>{
     if(!msgId&&!updates){load();return;}
@@ -523,6 +542,13 @@ export default function Messages({ type = 'inbox' }) {
                 <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
                   <span style={{fontSize:11,color:'var(--text3)',whiteSpace:'nowrap'}}>{timeAgo(latest.received_at)}</span>
                   {isAutoReplyMsg(latest)&&<span style={{fontSize:10,padding:'1px 6px',borderRadius:8,background:'#f1f5f9',color:'#64748b',border:'1px solid #e2e8f0'}}>auto</span>}
+                  <button onClick={e=>{e.stopPropagation();handleDelete({key,msgs,latest,count});}}
+                    title="Delete thread"
+                    style={{background:'none',border:'none',cursor:'pointer',color:'#fca5a5',padding:'2px',fontSize:13,lineHeight:1,display:'block'}}
+                    onMouseEnter={e=>e.currentTarget.style.color='#dc2626'}
+                    onMouseLeave={e=>e.currentTarget.style.color='#fca5a5'}>
+                    🗑
+                  </button>
                 </div>
               </div>
             );
@@ -540,7 +566,7 @@ export default function Messages({ type = 'inbox' }) {
       {openThread&&(
         <>
           <div onClick={()=>setOpenThread(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.25)',zIndex:999,backdropFilter:'blur(2px)'}}/>
-          <ThreadPanel thread={openThread} onClose={()=>setOpenThread(null)} onUpdate={handleUpdate}/>
+          <ThreadPanel thread={openThread} onClose={()=>setOpenThread(null)} onUpdate={handleUpdate} onDelete={handleDelete}/>
         </>
       )}
       <SyncModal open={showSyncModal} onClose={()=>setShowSyncModal(false)} onSynced={load}/>
