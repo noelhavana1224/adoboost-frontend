@@ -14,6 +14,7 @@ import Templates from './pages/Templates';
 import Support from './pages/Support';
 import { Billing, UserSettings, UserPreferences, ApiKey } from './pages/Settings';
 import SendingSpeed from './pages/SendingSpeed';
+import Reports from './pages/Reports';
 import Warmup from './pages/Warmup';
 import SendingCalendar from './pages/Calendar';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -77,7 +78,7 @@ export default function App() {
           <Route path="/campaigns"           element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
           <Route path="/campaigns/new"       element={<ProtectedRoute><Campaigns showCreate /></ProtectedRoute>} />
           <Route path="/campaigns/calendar"  element={<ProtectedRoute><SendingCalendar /></ProtectedRoute>} />
-          <Route path="/campaigns/reports"   element={<ProtectedRoute><ReportsPlaceholder /></ProtectedRoute>} />
+          <Route path="/campaigns/reports"   element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/email-accounts"      element={<ProtectedRoute><EmailAccounts /></ProtectedRoute>} />
           <Route path="/contacts"            element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/messages/inbox"      element={<ProtectedRoute><Messages type="inbox" /></ProtectedRoute>} />
