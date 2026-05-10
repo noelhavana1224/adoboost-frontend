@@ -87,7 +87,7 @@ function InfoTip({ text }) {
       <Info size={13} style={{ color: 'var(--text3)', cursor: 'pointer', marginLeft: 4 }}
         onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)} />
       {show && (
-        <div style={{ position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', fontSize: 11, padding: '6px 10px', borderRadius: 8, zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: 220, whiteSpace: 'normal', lineHeight: 1.5 }}>
+        <div style={{ position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', fontSize: 11, padding: '6px 10px', borderRadius: 8, zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: 220, whiteSpace: 'normal', lineHeight: 1.5
           {text}
         </div>
       )}
