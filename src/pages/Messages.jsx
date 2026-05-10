@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Spinner, Empty, Pagination, Btn, Modal } from '../components/UI';
-import { MessageSquare, Search, RefreshCw, Inbox, CheckCircle, Loader2, X, Reply, Tag, ChevronDown, Send, Forward, ChevronsRight } from 'lucide-react';
+import { MessageSquare, Search, RefreshCw, Inbox, CheckCircle, Loader2, X, Reply, Tag, ChevronDown, Send, Forward, ChevronsRight, Bold, Italic, Underline, List } from 'lucide-react';
 
 const TAGS = [
   { key: 'positive',       label: '🟢 Positive',       color: '#16a34a', bg: '#f0fff4', border: '#86efac' },
@@ -129,6 +129,146 @@ function SyncModal({ open, onClose, onSynced }) {
   );
 }
 
+
+// ── Rich Reply Editor ────────────────────────────
+function RichReplyEditor({ value, onChange, placeholder, editorKey }) {
+  const editorRef = React.useRef(null);
+  const lastSet   = React.useRef('');
+  const [init, setInit] = React.useState(false);
+
+  // Initialize on first mount
+  React.useEffect(() => {
+    if (editorRef.current && !init) {
+      const html = value ? value.replace(/\n/g, '<br>') : '';
+      editorRef.current.innerHTML = html;
+      lastSet.current = html;
+      setInit(true);
+    }
+  }, [init]);
+
+  // Sync when value changes externally (e.g. mode switch to forward)
+  React.useEffect(() => {
+    if (!editorRef.current || !init) return;
+    const html = value ? value.replace(/\n/g, '<br>') : '';
+    if (html !== lastSet.current) {
+      editorRef.current.innerHTML = html;
+      lastSet.current = html;
+    }
+  }, [value, init, editorKey]);
+
+  const exec = (cmd, val = null) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val);
+    onChange(editorRef.current?.innerHTML || '');
+  };
+
+  const insertLink = () => {
+    const url = prompt('Enter URL:');
+    if (url) exec('createLink', url.startsWith('http') ? url : 'https://' + url);
+  };
+
+  const sep = () => React.createElement('div', { style: { width:1, height:18, background:'#d1d5db', margin:'0 4px', flexShrink:0 } });
+
+  const T = ({ title, onCmd, children }) =>
+    React.createElement('button', {
+      type: 'button', title,
+      onMouseDown: e => { e.preventDefault(); onCmd(); },
+      style: { background:'none', border:'none', cursor:'pointer', padding:'4px 7px', borderRadius:5, color:'#374151', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontFamily:'inherit' },
+      onMouseEnter: e => e.currentTarget.style.background='#f3f4f6',
+      onMouseLeave: e => e.currentTarget.style.background='none',
+    }, children);
+
+  return (
+    <div style={{ border:'1.5px solid #d1d5db', borderRadius:10, overflow:'hidden', background:'#fff', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}
+      onFocusCapture={e => e.currentTarget.style.borderColor='#6366f1'}
+      onBlurCapture={e  => e.currentTarget.style.borderColor='#d1d5db'}>
+      {/* Toolbar */}
+      <div style={{ display:'flex', alignItems:'center', gap:2, padding:'5px 8px', borderBottom:'1px solid #e5e7eb', background:'#f9fafb', flexWrap:'wrap' }}>
+        <T title="Undo" onCmd={() => exec('undo')}>↩</T>
+        <T title="Redo" onCmd={() => exec('redo')}>↪</T>
+        {sep()}
+        <select onMouseDown={e=>e.stopPropagation()} onChange={e=>exec('fontName',e.target.value)}
+          style={{ border:'1px solid #e5e7eb', background:'#fff', fontSize:11, cursor:'pointer', color:'#374151', outline:'none', fontFamily:'inherit', borderRadius:5, padding:'2px 5px' }}>
+          <option value="sans-serif">Sans Serif</option>
+          <option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Verdana">Verdana</option>
+          <option value="monospace">Monospace</option>
+        </select>
+        <select onMouseDown={e=>e.stopPropagation()} onChange={e=>exec('fontSize',e.target.value)}
+          style={{ border:'1px solid #e5e7eb', background:'#fff', fontSize:11, cursor:'pointer', color:'#374151', outline:'none', fontFamily:'inherit', borderRadius:5, padding:'2px 5px', width:46 }}>
+          <option value="2">10</option>
+          <option value="3">12</option>
+          <option value="4">14</option>
+          <option value="5">18</option>
+          <option value="6">24</option>
+        </select>
+        {sep()}
+        <T title="Bold"          onCmd={() => exec('bold')}><strong>B</strong></T>
+        <T title="Italic"        onCmd={() => exec('italic')}><em>I</em></T>
+        <T title="Underline"     onCmd={() => exec('underline')}><span style={{textDecoration:'underline'}}>U</span></T>
+        <T title="Strikethrough" onCmd={() => exec('strikeThrough')}><span style={{textDecoration:'line-through'}}>S</span></T>
+        {sep()}
+        {/* Font color */}
+        <div style={{ position:'relative', display:'inline-flex' }}>
+          <button type="button" title="Font Color"
+            onMouseDown={e => { e.preventDefault(); e.currentTarget.querySelector('input').click(); }}
+            style={{ background:'none', border:'none', cursor:'pointer', padding:'4px 6px', borderRadius:5, fontSize:13, display:'flex', alignItems:'center' }}>
+            <strong>A</strong>
+            <input type="color" defaultValue="#000000" onChange={e=>exec('foreColor',e.target.value)}
+              style={{ width:0, height:0, opacity:0, position:'absolute', pointerEvents:'none' }}/>
+          </button>
+        </div>
+        {/* Highlight */}
+        <div style={{ position:'relative', display:'inline-flex' }}>
+          <button type="button" title="Highlight"
+            onMouseDown={e => { e.preventDefault(); e.currentTarget.querySelector('input').click(); }}
+            style={{ background:'none', border:'none', cursor:'pointer', padding:'4px 6px', borderRadius:5, fontSize:13, display:'flex', alignItems:'center' }}>
+            <span style={{ background:'#fef08a', padding:'0 3px', borderRadius:2, fontWeight:700 }}>A</span>
+            <input type="color" defaultValue="#fef08a" onChange={e=>exec('hiliteColor',e.target.value)}
+              style={{ width:0, height:0, opacity:0, position:'absolute', pointerEvents:'none' }}/>
+          </button>
+        </div>
+        {sep()}
+        <T title="Align Left"   onCmd={() => exec('justifyLeft')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+        </T>
+        <T title="Align Center" onCmd={() => exec('justifyCenter')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </T>
+        <T title="Align Right"  onCmd={() => exec('justifyRight')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+        </T>
+        {sep()}
+        <T title="Bullet List"   onCmd={() => exec('insertUnorderedList')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
+        </T>
+        <T title="Numbered List" onCmd={() => exec('insertOrderedList')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/></svg>
+        </T>
+        {sep()}
+        <T title="Insert Link" onCmd={insertLink}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        </T>
+        <T title="Clear Formatting" onCmd={() => exec('removeFormat')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3H7l-4 9h4l-2 9 12-12h-4l4-6z"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
+        </T>
+      </div>
+      {/* Content area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={() => { onChange(editorRef.current?.innerHTML || ''); lastSet.current = editorRef.current?.innerHTML || ''; }}
+        onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.currentTarget.closest('form')?.dispatchEvent(new Event('submit')); } }}
+        data-placeholder={placeholder}
+        style={{ minHeight:120, padding:'10px 14px', fontSize:13, lineHeight:1.7, color:'#111827', outline:'none', wordBreak:'break-word' }}
+      />
+      <style>{`[contenteditable]:empty:before{content:attr(data-placeholder);color:#9ca3af;pointer-events:none}[contenteditable] a{color:#4f46e5;text-decoration:underline}[contenteditable] ul,[contenteditable] ol{padding-left:20px}`}</style>
+    </div>
+  );
+}
+
 // ── Thread Panel ────────────────────────────────
 function ThreadPanel({ thread, onClose, onUpdate, onDelete }) {
   const [accounts, setAccounts]   = useState([]);
@@ -214,7 +354,8 @@ function ThreadPanel({ thread, onClose, onUpdate, onDelete }) {
   };
 
   const handleSend = async () => {
-    if (!replyBody.trim()) return toast.error('Write your message first');
+    const plainText = replyBody.replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').trim();
+    if (!plainText) return toast.error('Write your message first');
     if (mode === 'forward' && !forwardTo.trim()) return toast.error('Enter a recipient to forward to');
     if (!accountId) return toast.error('Select an account');
     setSending(true);
@@ -371,15 +512,13 @@ function ThreadPanel({ thread, onClose, onUpdate, onDelete }) {
                 )}
               </div>
 
-              {/* Textarea */}
-              <textarea
-                className="reply-area"
+              {/* Rich text reply editor */}
+              <RichReplyEditor
+                key={`reply-${mode}`}
+                editorKey={mode}
                 value={replyBody}
-                onChange={e=>setReplyBody(e.target.value)}
-                onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))handleSend();}}
-                placeholder={mode==='forward'?`Forward to someone...\n\n(Ctrl+Enter to send)`:`Write your reply to ${leadMsg?.from_name||'them'}...\n\n(Ctrl+Enter to send)`}
-                rows={4}
-                style={{width:'100%',border:'1.5px solid var(--border2)',borderRadius:10,padding:'10px 14px',fontSize:13,color:'var(--text)',resize:'vertical',fontFamily:'inherit',lineHeight:1.6,boxSizing:'border-box',background:'#fff',transition:'border-color 0.15s, box-shadow 0.15s'}}
+                onChange={setReplyBody}
+                placeholder={mode==='forward'?`Forward to someone... (Ctrl+Enter to send)`:`Write your reply to ${leadMsg?.from_name||'them'}... (Ctrl+Enter to send)`}
               />
 
               {/* Send row */}
@@ -387,7 +526,7 @@ function ThreadPanel({ thread, onClose, onUpdate, onDelete }) {
                 <span style={{fontSize:11,color:'var(--text3)'}}>Ctrl+Enter to send · {selectedAccount&&<span style={{color:'var(--primary)',fontWeight:600}}>{selectedAccount.from_email}</span>}</span>
                 <div style={{display:'flex',gap:8}}>
                   <button onClick={()=>{setReplyBody('');setCc('');setBcc('');setForwardTo('');}} style={{padding:'7px 14px',background:'none',border:'1px solid var(--border2)',borderRadius:8,fontSize:13,color:'var(--text2)',cursor:'pointer',fontFamily:'inherit'}}>Clear</button>
-                  <button onClick={handleSend} disabled={sending||!replyBody.trim()} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 20px',background:sending||!replyBody.trim()?'#94a3b8':'var(--primary)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:sending||!replyBody.trim()?'not-allowed':'pointer',fontFamily:'inherit',transition:'background 0.15s'}}>
+                  <button onClick={handleSend} disabled={sending||!replyBody} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 20px',background:sending||!replyBody?'#94a3b8':'var(--primary)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:sending||!replyBody?'not-allowed':'pointer',fontFamily:'inherit',transition:'background 0.15s'}}>
                     {sending?<><Loader2 size={13} style={{animation:'spin 1s linear infinite'}}/> Sending...</>:<><Send size={13}/>{mode==='forward'?'Forward':'Send Reply'}</>}
                   </button>
                 </div>
