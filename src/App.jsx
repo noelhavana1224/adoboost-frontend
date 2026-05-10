@@ -17,6 +17,8 @@ import SendingSpeed from './pages/SendingSpeed';
 import Reports from './pages/Reports';
 import TeamMembers from './pages/TeamMembers';
 import AdminTeam from './pages/admin/AdminTeam';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Warmup from './pages/Warmup';
 import SendingCalendar from './pages/Calendar';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -71,8 +73,10 @@ export default function App() {
       <BrowserRouter>
         <Toaster position="top-right" toastOptions={{ duration:4000, style:{ fontSize:13, borderRadius:10 } }} />
         <Routes>
-          <Route path="/login"    element={<Auth mode="login" />} />
-          <Route path="/register" element={<Auth mode="register" />} />
+          <Route path="/login"           element={<Auth mode="login" />} />
+          <Route path="/register"        element={<Auth mode="register" />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password"  element={<ResetPassword />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Main App */}
