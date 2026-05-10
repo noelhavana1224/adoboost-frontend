@@ -78,12 +78,28 @@ function RichBodyEditor({ value, onChange, placeholder }) {
   const editorRef = useRef(null);
   const [initialized, setInitialized] = useState(false);
 
+  // Track last value we set so we don't fight with user typing
+  const lastSetValue = useRef('');
+
   useEffect(() => {
     if (editorRef.current && !initialized) {
-      editorRef.current.innerHTML = value ? value.replace(/\n/g, '<br>') : '';
+      const html = value ? value.replace(/\n/g, '<br>') : '';
+      editorRef.current.innerHTML = html;
+      lastSetValue.current = html;
       setInitialized(true);
     }
   }, [initialized]);
+
+  // Sync when value is changed externally (e.g. loading a template)
+  useEffect(() => {
+    if (!editorRef.current || !initialized) return;
+    const html = value ? value.replace(/\n/g, '<br>') : '';
+    // Only update DOM if the value changed externally (not from user typing)
+    if (html !== lastSetValue.current) {
+      editorRef.current.innerHTML = html;
+      lastSetValue.current = html;
+    }
+  }, [value, initialized]);
 
   const exec = (cmd, val = null) => { editorRef.current?.focus(); document.execCommand(cmd, false, val); onChange(editorRef.current?.innerHTML || ''); };
   const insertVar = (v) => { editorRef.current?.focus(); document.execCommand('insertText', false, v); onChange(editorRef.current?.innerHTML || ''); };
@@ -246,10 +262,14 @@ function TemplateModal({ open, template, onClose, onSaved }) {
   const [form, setForm] = useState({ name:'', subject:'', body:'', category:'general' });
   const [loading, setLoading] = useState(false);
 
+  const [editorKey, setEditorKey] = useState(0);
+
   useEffect(() => {
     if (template) setForm({ name:template.name, subject:template.subject||'', body:template.body, category:template.category });
     else setForm({ name:'', subject:'', body:'', category:'general' });
-  }, [template, open]);
+    // Force re-mount of editor when template changes so it picks up new content
+    setEditorKey(k => k + 1);
+  }, [template?.id, open]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -283,6 +303,7 @@ function TemplateModal({ open, template, onClose, onSaved }) {
 
         {/* Rich body editor with variable dropdown */}
         <RichBodyEditor
+          key={editorKey}
           value={form.body}
           onChange={val => f('body', val)}
           placeholder={'Hi {{first_name}},\n\nI noticed {{company}} is...'}
