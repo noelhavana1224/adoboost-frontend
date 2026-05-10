@@ -499,6 +499,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
   const [sequences, setSequences] = useState([{ subject: '', body: '', delay_days: 0, delay_hours: 0 }]);
   const [accounts, setAccounts]   = useState([]);
   const [lists, setLists]         = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading]     = useState(false);
   const isActive = campaign?.status === 'active';
 
@@ -506,6 +507,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
     if (!open) return;
     api.get('/email-accounts').then(r => setAccounts(r.data));
     api.get('/contacts/lists').then(r => setLists(r.data));
+    api.get('/templates').then(r => setTemplates(r.data));
     if (campaign) {
       setForm({ name: campaign.name, email_account_id: campaign.email_account_id || '', list_id: campaign.list_id || '', daily_limit: campaign.daily_limit, track_opens: !!campaign.track_opens, track_clicks: !!campaign.track_clicks });
       api.get(`/campaigns/${campaign.id}`).then(r => { if (r.data.sequences?.length) setSequences(r.data.sequences); });
@@ -588,6 +590,24 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                       <X size={14}/>
                     </button>
                   )}
+                </div>
+
+                {/* Template selector */}
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:12, color:'var(--text3)', fontWeight:600 }}>Load from template:</span>
+                    <select onChange={e => {
+                      const tpl = templates.find(t => t.id === e.target.value);
+                      if (!tpl) return;
+                      updateSeq(i, 'subject', tpl.subject || '');
+                      updateSeq(i, 'body', tpl.body || '');
+                      e.target.value = '';
+                      toast.success(`Template "${tpl.name}" loaded!`);
+                    }} style={{ border:'1px solid var(--border2)', borderRadius:6, padding:'4px 8px', fontSize:12, background:'#fff', outline:'none', color:'var(--text2)', cursor:'pointer' }}>
+                      <option value="">— Select a template —</option>
+                      {templates.map(t => <option key={t.id} value={t.id}>{t.name} ({t.category})</option>)}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Delay for follow-ups */}
