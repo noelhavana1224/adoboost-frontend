@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Alert, Table, TR, TD } from '../components/UI';
-import { Mail, Plus, Trash2, CheckCircle, XCircle, Loader2, Edit2, Inbox } from 'lucide-react';
+import { Mail, Plus, Trash2, CheckCircle, XCircle, Loader2, Edit2, Inbox, PenLine, ChevronDown } from 'lucide-react';
+import { useRef } from 'react';
 
 const PRESETS = {
   hostinger: {
@@ -42,6 +43,7 @@ export default function EmailAccounts() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editAccount, setEditAccount] = useState(null);
+  const [sigAccount, setSigAccount] = useState(null);
   const [testStatus, setTestStatus] = useState({});
   const [syncing, setSyncing] = useState({});
 
@@ -139,6 +141,7 @@ export default function EmailAccounts() {
                           {syncing[a.id] ? <Loader2 size={12} style={{ animation:'spin 1s linear infinite' }} /> : <><Inbox size={12} /> Sync</>}
                         </Btn>
                       )}
+                      <Btn size="sm" variant="secondary" onClick={() => setSigAccount(a)} title="Edit signature"><PenLine size={12}/> Sig</Btn>
                       <Btn size="sm" variant="secondary" onClick={() => { setEditAccount(a); setShowModal(true); }}><Edit2 size={12} /></Btn>
                       <Btn size="sm" variant="danger" onClick={() => handleDelete(a.id)}><Trash2 size={12} /></Btn>
                     </div>
@@ -152,6 +155,10 @@ export default function EmailAccounts() {
       <AccountModal open={showModal} account={editAccount}
         onClose={() => { setShowModal(false); setEditAccount(null); }}
         onSaved={() => { setShowModal(false); setEditAccount(null); load(); }}
+      />
+      <SignatureModal account={sigAccount}
+        onClose={() => setSigAccount(null)}
+        onSaved={() => { setSigAccount(null); load(); }}
       />
     </div>
   );
@@ -444,5 +451,233 @@ function AccountModal({ open, account, onClose, onSaved }) {
         </div>
       </form>
     </Modal>
+  );
+}
+
+// ── Rich Signature Editor ─────────────────────────
+function RichSigEditor({ value, onChange, placeholder }) {
+  const editorRef = useRef(null);
+  const lastSet   = useRef('');
+  const [init, setInit] = useState(false);
+
+  useEffect(() => {
+    if (editorRef.current && !init) {
+      editorRef.current.innerHTML = value || '';
+      lastSet.current = value || '';
+      setInit(true);
+    }
+  }, [init]);
+
+  useEffect(() => {
+    if (!editorRef.current || !init) return;
+    if (value !== lastSet.current) {
+      editorRef.current.innerHTML = value || '';
+      lastSet.current = value || '';
+    }
+  }, [value, init]);
+
+  const exec = (cmd, val = null) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val);
+    const html = editorRef.current?.innerHTML || '';
+    lastSet.current = html;
+    onChange(html);
+  };
+
+  const insertLink = () => {
+    const url = prompt('Enter URL:');
+    if (url) exec('createLink', url.startsWith('http') ? url : 'https://' + url);
+  };
+
+  const sep = () => <div style={{ width:1, height:16, background:'#d1d5db', margin:'0 3px' }}/>;
+
+  const T = ({ title, onCmd, children }) => (
+    <button type="button" title={title}
+      onMouseDown={e => { e.preventDefault(); onCmd(); }}
+      style={{ background:'none', border:'none', cursor:'pointer', padding:'3px 6px', borderRadius:4, color:'#374151', fontSize:12, display:'flex', alignItems:'center' }}
+      onMouseEnter={e => e.currentTarget.style.background='#f3f4f6'}
+      onMouseLeave={e => e.currentTarget.style.background='none'}>
+      {children}
+    </button>
+  );
+
+  return (
+    <div style={{ border:'1.5px solid #d1d5db', borderRadius:10, overflow:'hidden', background:'#fff' }}
+      onFocusCapture={e => e.currentTarget.style.borderColor='#6366f1'}
+      onBlurCapture={e  => e.currentTarget.style.borderColor='#d1d5db'}>
+      <div style={{ display:'flex', alignItems:'center', gap:2, padding:'5px 8px', borderBottom:'1px solid #e5e7eb', background:'#f9fafb', flexWrap:'wrap' }}>
+        <T title="Bold"          onCmd={() => exec('bold')}><strong>B</strong></T>
+        <T title="Italic"        onCmd={() => exec('italic')}><em>I</em></T>
+        <T title="Underline"     onCmd={() => exec('underline')}><span style={{ textDecoration:'underline' }}>U</span></T>
+        {sep()}
+        <select onMouseDown={e=>e.stopPropagation()} onChange={e=>exec('fontSize',e.target.value)}
+          style={{ border:'1px solid #e5e7eb', background:'#fff', fontSize:11, cursor:'pointer', color:'#374151', outline:'none', borderRadius:4, padding:'2px 4px' }}>
+          <option value="2">10px</option>
+          <option value="3">12px</option>
+          <option value="4">14px</option>
+          <option value="5">18px</option>
+        </select>
+        {sep()}
+        <div style={{ position:'relative', display:'inline-flex' }}>
+          <button type="button" title="Font Color"
+            onMouseDown={e => { e.preventDefault(); e.currentTarget.querySelector('input').click(); }}
+            style={{ background:'none', border:'none', cursor:'pointer', padding:'3px 5px', borderRadius:4, fontSize:12 }}>
+            🎨
+            <input type="color" defaultValue="#000000" onChange={e=>exec('foreColor',e.target.value)}
+              style={{ width:0, height:0, opacity:0, position:'absolute', pointerEvents:'none' }}/>
+          </button>
+        </div>
+        {sep()}
+        <T title="Align Left"   onCmd={() => exec('justifyLeft')}>≡</T>
+        <T title="Align Center" onCmd={() => exec('justifyCenter')}>≡</T>
+        <T title="Align Right"  onCmd={() => exec('justifyRight')}>≡</T>
+        {sep()}
+        <T title="Insert Link"  onCmd={insertLink}>🔗</T>
+        <T title="Clear"        onCmd={() => exec('removeFormat')}>✕</T>
+      </div>
+      <div ref={editorRef} contentEditable suppressContentEditableWarning
+        onInput={() => { const h = editorRef.current?.innerHTML||''; lastSet.current=h; onChange(h); }}
+        data-placeholder={placeholder}
+        style={{ minHeight:100, padding:'10px 14px', fontSize:13, lineHeight:1.8, color:'#111827', outline:'none', wordBreak:'break-word' }}
+      />
+      <style>{`[contenteditable]:empty:before{content:attr(data-placeholder);color:#9ca3af;pointer-events:none}`}</style>
+    </div>
+  );
+}
+
+// ── Signature Modal ───────────────────────────────
+function SignatureModal({ account, onClose, onSaved }) {
+  const [mode, setMode] = useState('rich'); // 'rich' | 'plain'
+  const [richSig, setRichSig]   = useState('');
+  const [plainSig, setPlainSig] = useState('');
+  const [saving, setSaving]     = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
+
+  useEffect(() => {
+    if (!account) return;
+    try {
+      const sig = JSON.parse(account.signature || '{}');
+      setRichSig(sig.html || '');
+      setPlainSig(sig.plain || '');
+      setMode(sig.mode || 'rich');
+    } catch {
+      setRichSig(account.signature || '');
+      setPlainSig('');
+    }
+    setEditorKey(k => k + 1);
+  }, [account]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const sigData = JSON.stringify({ mode, html: richSig, plain: plainSig });
+      await api.put(`/email-accounts/${account.id}`, { signature: sigData });
+      toast.success('✅ Signature saved!');
+      onSaved();
+    } catch { toast.error('Failed to save signature'); }
+    finally { setSaving(false); }
+  };
+
+  const DEFAULT_SIGS = [
+    {
+      label: 'Professional',
+      html: `<div style="font-family:Arial,sans-serif;font-size:13px;color:#333;border-top:2px solid #4f46e5;padding-top:10px;margin-top:10px"><strong style="font-size:14px">{{from_name}}</strong><br><span style="color:#6366f1">{{from_email}}</span><br><span style="color:#666">Sent via AdoBoost</span></div>`,
+    },
+    {
+      label: 'Minimal',
+      html: `<div style="font-family:Arial,sans-serif;font-size:12px;color:#666;margin-top:12px;padding-top:8px;border-top:1px solid #eee">— {{from_name}}<br>{{from_email}}</div>`,
+    },
+    {
+      label: 'Bold',
+      html: `<div style="font-family:Georgia,serif;margin-top:14px;padding-top:10px;border-top:3px solid #000"><strong style="font-size:16px;color:#111">{{from_name}}</strong><br><a href="mailto:{{from_email}}" style="color:#4f46e5;font-size:13px">{{from_email}}</a></div>`,
+    },
+  ];
+
+  if (!account) return null;
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div onClick={onClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.4)', backdropFilter:'blur(3px)' }}/>
+      <div style={{ position:'relative', background:'#fff', borderRadius:16, width:640, maxWidth:'96vw', maxHeight:'90vh', boxShadow:'0 24px 60px rgba(0,0,0,0.2)', zIndex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', background:'#fafafa', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+          <div>
+            <div style={{ fontWeight:700, fontSize:16 }}>✍️ Email Signature</div>
+            <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{account.from_name} &lt;{account.from_email}&gt;</div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', fontSize:20, color:'var(--text3)', lineHeight:1 }}>×</button>
+        </div>
+
+        <div style={{ flex:1, overflowY:'auto', padding:'20px' }}>
+          {/* Variable hint */}
+          <div style={{ background:'#eff6ff', border:'1px solid #bae6fd', borderRadius:8, padding:'10px 14px', marginBottom:16, fontSize:12, color:'#0369a1' }}>
+            💡 Use <code style={{ background:'#fff', padding:'1px 5px', borderRadius:4 }}>{'{{signature}}'}</code> in your campaign or template body to auto-insert this signature. Also supports <code style={{ background:'#fff', padding:'1px 5px', borderRadius:4 }}>{'{{from_name}}'}</code> and <code style={{ background:'#fff', padding:'1px 5px', borderRadius:4 }}>{'{{from_email}}'}</code> inside the signature itself.
+          </div>
+
+          {/* Mode toggle */}
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:'var(--text2)', alignSelf:'center' }}>Format:</span>
+            {[{ id:'rich', label:'📝 Rich HTML' }, { id:'plain', label:'📄 Plain Text' }].map(m => (
+              <button key={m.id} type="button" onClick={() => setMode(m.id)} style={{ padding:'6px 14px', borderRadius:8, border:`2px solid ${mode===m.id?'var(--primary)':'var(--border2)'}`, background:mode===m.id?'var(--primary-dim)':'#fff', color:mode===m.id?'var(--primary)':'var(--text2)', fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:mode===m.id?700:400 }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick templates */}
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:'var(--text2)', marginBottom:8 }}>Quick Templates:</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {DEFAULT_SIGS.map(s => (
+                <button key={s.label} type="button" onClick={() => { setRichSig(s.html); setEditorKey(k=>k+1); }} style={{ padding:'5px 12px', borderRadius:8, border:'1px solid var(--border2)', background:'#fff', color:'var(--text2)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor='var(--primary)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor='var(--border2)'}>
+                  {s.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => { setRichSig(''); setPlainSig(''); setEditorKey(k=>k+1); }} style={{ padding:'5px 12px', borderRadius:8, border:'1px solid #fca5a5', background:'#fff', color:'#dc2626', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Editor */}
+          {mode === 'rich' ? (
+            <RichSigEditor key={editorKey} value={richSig} onChange={setRichSig} placeholder="Type your signature here... Use {{from_name}} and {{from_email}} as variables" />
+          ) : (
+            <div>
+              <label style={{ fontSize:13, fontWeight:600, color:'var(--text2)', display:'block', marginBottom:6 }}>Plain Text Signature</label>
+              <textarea value={plainSig} onChange={e=>setPlainSig(e.target.value)}
+                placeholder={'--\n{{from_name}}\n{{from_email}}'}
+                rows={5}
+                style={{ width:'100%', border:'1.5px solid #d1d5db', borderRadius:10, padding:'10px 14px', fontSize:13, fontFamily:'monospace', lineHeight:1.7, outline:'none', resize:'vertical', boxSizing:'border-box' }}
+              />
+            </div>
+          )}
+
+          {/* Preview */}
+          {(richSig || plainSig) && (
+            <div style={{ marginTop:16 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:'var(--text2)', marginBottom:8 }}>👁 Preview:</div>
+              <div style={{ border:'1px solid var(--border)', borderRadius:8, padding:14, background:'#fafafa', minHeight:60 }}>
+                {mode === 'rich'
+                  ? <div dangerouslySetInnerHTML={{ __html: (richSig||'').replace(/\{\{from_name\}\}/g, account.from_name||'Your Name').replace(/\{\{from_email\}\}/g, account.from_email||'you@example.com') }}/>
+                  : <pre style={{ fontFamily:'inherit', fontSize:13, color:'var(--text)', margin:0, whiteSpace:'pre-wrap' }}>{(plainSig||'').replace(/\{\{from_name\}\}/g, account.from_name||'Your Name').replace(/\{\{from_email\}\}/g, account.from_email||'you@example.com')}</pre>
+                }
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', background:'#fafafa', display:'flex', justifyContent:'flex-end', gap:8, flexShrink:0 }}>
+          <button onClick={onClose} style={{ padding:'8px 16px', background:'none', border:'1px solid var(--border2)', borderRadius:8, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding:'8px 20px', background:saving?'#94a3b8':'var(--primary)', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:saving?'not-allowed':'pointer', fontFamily:'inherit' }}>
+            {saving ? 'Saving...' : '💾 Save Signature'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
