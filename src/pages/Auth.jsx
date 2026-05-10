@@ -31,6 +31,7 @@ export default function Auth({ mode='login' }) {
     try {
       mode==='login' ? await login(form.email, form.password) : await register(form.name, form.email, form.password);
       navigate('/dashboard');
+      if (mode==='register') toast.success(`Welcome to AdoBoost, ${form.name}! 🎉`);
     } catch(err) { toast.error(err.response?.data?.error || 'Something went wrong'); }
     finally { setLoading(false); }
   };
@@ -78,6 +79,13 @@ export default function Auth({ mode='login' }) {
             {mode==='register' && <Field icon={User} label="Full Name" type="text" placeholder="John Doe" value={form.name} onChange={e=>f('name',e.target.value)} required />}
             <Field icon={Mail} label="Email Address" type="email" placeholder="you@company.com" value={form.email} onChange={e=>f('email',e.target.value)} required />
             <Field icon={Lock} label="Password" type="password" placeholder="••••••••" value={form.password} onChange={e=>f('password',e.target.value)} required />
+            {mode==='login' && (
+              <div style={{ textAlign:'right', marginTop:-8 }}>
+                <Link to="/forgot-password" style={{ fontSize:13, color:'#1565C0', fontWeight:600, textDecoration:'none' }}>
+                  Forgot password?
+                </Link>
+              </div>
+            )}
             <button type="submit" disabled={loading} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:loading?'#90cdf4':'#1565C0', color:'#fff', border:'none', borderRadius:10, padding:'12px', fontSize:15, fontWeight:700, cursor:loading?'not-allowed':'pointer', marginTop:4, transition:'background 0.2s' }}>
               {loading ? 'Please wait...' : (mode==='login' ? 'Sign In' : 'Create Account')}
               {!loading && <ArrowRight size={16} />}
