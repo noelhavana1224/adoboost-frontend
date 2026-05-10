@@ -630,6 +630,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
 
                 {/* Rich text body editor with variable dropdown */}
                 <RichBodyEditor
+                  key={`seq-body-${i}-${seq.subject}`}
                   value={seq.body}
                   onChange={val => updateSeq(i, 'body', val)}
                   placeholder={`Hi {{first_name}},\n\nI noticed {{company}} is...`}
