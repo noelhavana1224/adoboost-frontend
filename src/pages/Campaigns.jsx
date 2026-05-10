@@ -16,6 +16,9 @@ const VARS = [
   { label: 'Email',       value: '{{email}}' },
   { label: 'Title/Role',  value: '{{title}}' },
   { label: 'Website',     value: '{{website}}' },
+  { label: 'Signature',   value: '{{signature}}' },
+  { label: 'From Name',   value: '{{from_name}}' },
+  { label: 'From Email',  value: '{{from_email}}' },
 ];
 
 // ── Personalization Dropdown ─────────────────────
@@ -509,10 +512,13 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
     api.get('/contacts/lists').then(r => setLists(r.data));
     api.get('/templates').then(r => setTemplates(r.data));
     if (campaign) {
-      setForm({ name: campaign.name, email_account_id: campaign.email_account_id || '', list_id: campaign.list_id || '', daily_limit: campaign.daily_limit, track_opens: !!campaign.track_opens, track_clicks: !!campaign.track_clicks });
+      let rotationIds = [];
+      try { rotationIds = JSON.parse(campaign.rotation_account_ids || '[]'); } catch {}
+      if (!rotationIds.length && campaign.email_account_id) rotationIds = [campaign.email_account_id];
+      setForm({ name: campaign.name, email_account_id: campaign.email_account_id || '', rotation_ids: rotationIds, list_id: campaign.list_id || '', daily_limit: campaign.daily_limit, track_opens: !!campaign.track_opens, track_clicks: !!campaign.track_clicks });
       api.get(`/campaigns/${campaign.id}`).then(r => { if (r.data.sequences?.length) setSequences(r.data.sequences); });
     } else {
-      setForm({ name: '', email_account_id: '', list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
+      setForm({ name: '', email_account_id: '', rotation_ids: [], list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
       setSequences([{ subject: '', body: '', delay_days: 0, delay_hours: 0 }]);
     }
   }, [open, campaign]);
@@ -532,9 +538,15 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         // Strip HTML for plain text fallback, keep HTML for body
         body: s.body,
       }));
+      const payload = {
+        ...form,
+        email_account_id: (form.rotation_ids||[]).length > 0 ? form.rotation_ids[0] : form.email_account_id,
+        rotation_account_ids: JSON.stringify(form.rotation_ids || []),
+        sequences: isActive ? undefined : seqsToSave,
+      };
       campaign
-        ? await api.put(`/campaigns/${campaign.id}`, { ...form, sequences: isActive ? undefined : seqsToSave })
-        : await api.post('/campaigns', { ...form, sequences: seqsToSave });
+        ? await api.put(`/campaigns/${campaign.id}`, payload)
+        : await api.post('/campaigns', payload);
       toast.success(campaign ? 'Campaign updated' : 'Campaign created');
       onSaved();
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
@@ -553,10 +565,41 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         <Input label="Campaign Name *" value={form.name} onChange={e => f('name', e.target.value)} required />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Select label="Email Account" value={form.email_account_id} onChange={e => f('email_account_id', e.target.value)} disabled={isActive}>
-            <option value="">Select account...</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.from_email})</option>)}
-          </Select>
+          {/* ── Inbox Rotation: multi-account select ── */}
+          <div>
+            <label style={{ fontSize:13, fontWeight:600, color:'var(--text2)', display:'block', marginBottom:6 }}>
+              Email Account(s)
+              {form.rotation_ids?.length > 1 && <span style={{ marginLeft:8, fontSize:11, padding:'2px 8px', borderRadius:10, background:'#eff6ff', color:'#2563eb', fontWeight:700 }}>🔄 Rotation: {form.rotation_ids.length} accounts</span>}
+            </label>
+            <div style={{ border:'1px solid var(--border2)', borderRadius:8, overflow:'hidden', background:'#fff' }}>
+              {accounts.map(a => {
+                const selected = (form.rotation_ids||[]).includes(a.id);
+                return (
+                  <label key={a.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderBottom:'1px solid var(--border)', cursor:'pointer', background:selected?'var(--primary-dim)':'#fff', transition:'background 0.1s' }}>
+                    <input type="checkbox" checked={selected} disabled={isActive}
+                      onChange={e => {
+                        const ids = form.rotation_ids || [];
+                        f('rotation_ids', e.target.checked ? [...ids, a.id] : ids.filter(id=>id!==a.id));
+                        if (e.target.checked && !form.email_account_id) f('email_account_id', a.id);
+                      }}
+                      style={{ accentColor:'var(--primary)', width:14, height:14 }}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:selected?600:400 }}>{a.name}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)' }}>{a.from_email}</div>
+                    </div>
+                    {selected && a.signature && <span style={{ fontSize:10, color:'#16a34a', fontWeight:600 }}>✍️ Sig</span>}
+                  </label>
+                );
+              })}
+              {accounts.length === 0 && <div style={{ padding:12, fontSize:13, color:'var(--text3)' }}>No email accounts connected</div>}
+            </div>
+            {(form.rotation_ids||[]).length > 1 && (
+              <div style={{ fontSize:11, color:'#0284c7', marginTop:5, padding:'5px 10px', background:'#f0f9ff', borderRadius:6, border:'1px solid #bae6fd' }}>
+                🔄 Sends will be distributed <strong>randomly</strong> across {form.rotation_ids.length} accounts for better deliverability
+              </div>
+            )}
+            {(form.rotation_ids||[]).length === 0 && <div style={{ fontSize:11, color:'#dc2626', marginTop:4 }}>Select at least one email account</div>}
+          </div>
           <Select label="Contact List" value={form.list_id} onChange={e => f('list_id', e.target.value)} disabled={isActive}>
             <option value="">Select list...</option>
             {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_contacts || 0})</option>)}
