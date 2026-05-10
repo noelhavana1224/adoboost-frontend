@@ -643,6 +643,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         ...form,
         email_account_id: (form.rotation_ids||[]).length > 0 ? form.rotation_ids[0] : form.email_account_id,
         rotation_account_ids: JSON.stringify(form.rotation_ids || []),
+        // daily_limit removed — each account uses its own limit from Sending Speed settings
         sequences: isActive ? undefined : seqsToSave,
       };
       campaign
@@ -674,7 +675,28 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
           </Select>
         </div>
 
-        <Input label="Daily Limit" type="number" min={1} max={1000} value={form.daily_limit} onChange={e => f('daily_limit', +e.target.value)} />
+        {/* Auto-computed capacity from selected accounts */}
+        {(form.rotation_ids||[]).length > 0 && (() => {
+          const selected = accounts.filter(a => (form.rotation_ids||[]).includes(a.id));
+          const totalLimit = selected.reduce((sum, a) => sum + (a.daily_limit || 50), 0);
+          return (
+            <div style={{ background:'#f0fff4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13 }}>
+              <div style={{ fontWeight:700, color:'#16a34a', marginBottom:4 }}>
+                📊 Campaign Capacity: <strong>{totalLimit.toLocaleString()} emails/day</strong>
+              </div>
+              <div style={{ color:'#166534', fontSize:12, lineHeight:1.6 }}>
+                {selected.map(a => (
+                  <span key={a.id} style={{ marginRight:12 }}>
+                    {a.name}: <strong>{a.daily_limit || 50}/day</strong>
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:'#166534', marginTop:4, opacity:0.8 }}>
+                💡 Limit is set per account in <strong>Settings → Sending Speed</strong>. Rotation switches accounts when one hits its limit.
+              </div>
+            </div>
+          );
+        })()}
 
         {!isActive && (
           <div>
