@@ -100,7 +100,6 @@ function MemberModal({ open, member, onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.email) return toast.error('Email is required');
-    if (!member && !form.password) return toast.error('Password is required for new members');
     setLoading(true);
     try {
       const payload = { ...form, permissions: JSON.stringify(form.permissions) };
@@ -123,7 +122,14 @@ function MemberModal({ open, member, onClose, onSaved }) {
           <Input label="Full Name *" value={form.name} onChange={e=>f('name',e.target.value)} required />
           <Input label="Email *" type="email" value={form.email} onChange={e=>f('email',e.target.value)} required />
         </div>
-        <Input label={member ? 'New Password (leave blank to keep)' : 'Temporary Password *'} type="password" value={form.password} onChange={e=>f('password',e.target.value)} required={!member} placeholder="Min 8 characters" />
+        {member && (
+          <Input label="New Password (leave blank to keep)" type="password" value={form.password} onChange={e=>f('password',e.target.value)} placeholder="Min 8 characters" />
+        )}
+        {!member && (
+          <div style={{ background:'#f0fff4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#166534' }}>
+            ✅ An invitation email will be sent with their login credentials automatically.
+          </div>
+        )}
 
         {/* Permissions */}
         <div>
