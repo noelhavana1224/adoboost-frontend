@@ -3,6 +3,7 @@ import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Select } from '../components/UI';
 import { Users, Plus, Trash2, Edit2, Shield, ShieldCheck, Eye, EyeOff, Mail, Crown } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 // ── Permission definitions ───────────────────────
 const PERMISSIONS = [
@@ -175,6 +176,10 @@ export default function TeamMembers() {
   const [showModal, setShowModal] = useState(false);
   const [editMember, setEditMember] = useState(null);
 
+  const { user } = useAuth();
+  const isTeamMember = user?.role === 'team_member';
+  const canInvite = isTeamMember ? !!user?.permissions?.team_invite : true;
+
   const load = useCallback(() => {
     api.get('/team-members').then(r => setMembers(r.data || [])).finally(() => setLoading(false));
   }, []);
@@ -198,7 +203,7 @@ export default function TeamMembers() {
   return (
     <div>
       <PageHeader title="Team Members" subtitle="Invite team members and control what they can access"
-        action={<Btn onClick={() => { setEditMember(null); setShowModal(true); }}><Plus size={14}/> Invite Member</Btn>}
+        action={canInvite && <Btn onClick={() => { setEditMember(null); setShowModal(true); }}><Plus size={14}/> Invite Member</Btn>}
       />
 
       {/* Info banner */}
@@ -235,7 +240,11 @@ export default function TeamMembers() {
                         {(m.name||m.email||'?').charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight:600, fontSize:13 }}>{m.name || '—'}</div>
+                        <div style={{ fontWeight:600, fontSize:13 }}>
+                          {m.name || '—'}
+                          {m.is_owner && <span style={{ marginLeft:6, fontSize:10, padding:'1px 6px', borderRadius:6, background:'#fef3c7', color:'#d97706', fontWeight:700 }}>👑 Owner</span>}
+                          {user?.id === m.id && !m.is_owner && <span style={{ marginLeft:6, fontSize:10, color:'var(--primary)' }}>(You)</span>}
+                        </div>
                         <div style={{ fontSize:11, color:'var(--text3)' }}>Joined {new Date(m.created_at).toLocaleDateString()}</div>
                       </div>
                     </div>
@@ -243,8 +252,10 @@ export default function TeamMembers() {
                   <td style={{ padding:'12px 16px', fontSize:13, color:'var(--text2)' }}>{m.email}</td>
                   <td style={{ padding:'12px 16px' }}>
                     <div style={{ fontSize:12, color:'var(--text2)' }}>
-                      <span style={{ fontWeight:700, color:'var(--primary)' }}>{enabledCount(m.permissions)}</span>
-                      <span style={{ color:'var(--text3)' }}> / {PERMISSIONS.flatMap(g=>g.items).length} features</span>
+                      {m.is_owner
+                        ? <span style={{ fontWeight:700, color:'#d97706' }}>All features</span>
+                        : <><span style={{ fontWeight:700, color:'var(--primary)' }}>{enabledCount(m.permissions)}</span><span style={{ color:'var(--text3)' }}> / {PERMISSIONS.flatMap(g=>g.items).length} features</span></>
+                      }
                     </div>
                   </td>
                   <td style={{ padding:'12px 16px' }}>
@@ -252,8 +263,13 @@ export default function TeamMembers() {
                   </td>
                   <td style={{ padding:'12px 16px' }}>
                     <div style={{ display:'flex', gap:6 }}>
-                      <Btn size="sm" variant="secondary" onClick={() => { setEditMember(m); setShowModal(true); }}><Edit2 size={12}/> Edit</Btn>
-                      <Btn size="sm" variant="danger" onClick={() => handleDelete(m)}><Trash2 size={12}/></Btn>
+                      {!m.is_owner && m.id !== user?.id && canInvite && (
+                        <>
+                          <Btn size="sm" variant="secondary" onClick={() => { setEditMember(m); setShowModal(true); }}><Edit2 size={12}/> Edit</Btn>
+                          <Btn size="sm" variant="danger" onClick={() => handleDelete(m)}><Trash2 size={12}/></Btn>
+                        </>
+                      )}
+                      {(m.is_owner || m.id === user?.id) && <span style={{ fontSize:12, color:'var(--text3)', padding:'4px 8px' }}>{m.is_owner ? 'Account Owner' : 'You'}</span>}
                     </div>
                   </td>
                 </tr>
