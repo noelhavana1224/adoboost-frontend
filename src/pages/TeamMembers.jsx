@@ -107,9 +107,17 @@ function MemberModal({ open, member, onClose, onSaved }) {
       member
         ? await api.put(`/team-members/${member.id}`, payload)
         : await api.post('/team-members/invite', payload);
-      toast.success(member ? 'Team member updated!' : '✅ Team member invited!');
+      toast.success(member ? 'Team member updated!' : '✅ Invitation sent! They will receive an email with login details.');
       onSaved();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+    } catch (err) {
+      const data = err.response?.data;
+      if (data?.seats_max) {
+        // Seat limit error
+        toast.error(`${data.error} — ${data.message}`);
+      } else {
+        toast.error(data?.error || 'Failed');
+      }
+    }
     finally { setLoading(false); }
   };
 
@@ -180,8 +188,18 @@ export default function TeamMembers() {
   const isTeamMember = user?.role === 'team_member';
   const canInvite = isTeamMember ? !!user?.permissions?.team_invite : true;
 
+  const [seats, setSeats] = useState({ used: 0, max: 1, plan: 'trial' });
+
   const load = useCallback(() => {
-    api.get('/team-members').then(r => setMembers(r.data || [])).finally(() => setLoading(false));
+    api.get('/team-members').then(r => {
+      // Handle both old array format and new {members, seats} format
+      if (Array.isArray(r.data)) {
+        setMembers(r.data);
+      } else {
+        setMembers(r.data.members || []);
+        setSeats(r.data.seats || { used: 0, max: 1, plan: 'trial' });
+      }
+    }).finally(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -202,8 +220,26 @@ export default function TeamMembers() {
 
   return (
     <div>
-      <PageHeader title="Team Members" subtitle="Invite team members and control what they can access"
-        action={canInvite && <Btn onClick={() => { setEditMember(null); setShowModal(true); }}><Plus size={14}/> Invite Member</Btn>}
+      <PageHeader title="Team Members"
+        subtitle={
+          <span>
+            Invite team members and control what they can access
+            <span style={{ marginLeft:10, fontSize:12, padding:'2px 10px', borderRadius:10, background: seats.used >= seats.max ? '#fee2e2' : '#f0fff4', color: seats.used >= seats.max ? '#dc2626' : '#16a34a', fontWeight:600, border:`1px solid ${seats.used >= seats.max ? '#fca5a5' : '#86efac'}` }}>
+              👥 {seats.used}/{seats.max} seats · {seats.plan?.charAt(0).toUpperCase() + seats.plan?.slice(1)} plan
+            </span>
+          </span>
+        }
+        action={
+          canInvite && (
+            seats.used >= seats.max ? (
+              <Btn variant="secondary" onClick={() => toast.error(`Seat limit reached! Upgrade from ${seats.plan} to add more members.`)}>
+                🔒 Upgrade to Add Members
+              </Btn>
+            ) : (
+              <Btn onClick={() => { setEditMember(null); setShowModal(true); }}><Plus size={14}/> Invite Member</Btn>
+            )
+          )
+        }
       />
 
       {/* Info banner */}
