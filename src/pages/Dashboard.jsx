@@ -5,6 +5,7 @@ import { StatCard, Card, Badge, Spinner } from '../components/UI';
 import { Send, Mail, MousePointer, Reply, AlertCircle, Users, Activity, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import api from '../utils/api';
+import VAUpsellBanner from '../components/VAUpsellBanner';
 
 const STATUS_COLOR = { draft:'default', active:'green', paused:'yellow', completed:'blue' };
 const pct = (n,d) => d>0?((n/d)*100).toFixed(1)+'%':'0%';
@@ -24,6 +25,8 @@ export default function Dashboard() {
 
   return (
     <div style={{ animation:'fadeIn 0.3s ease' }}>
+      <VAUpsellBanner />
+
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
         <div>
