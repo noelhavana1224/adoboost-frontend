@@ -43,7 +43,7 @@ export default function VAUpsell() {
     if (!selected) return toast.error('Pick a VA option first');
     setSubmitting(true);
     try {
-      await axios.post(`${API}/va-interest`, {
+      await axios.post(`${API}/api/va-interest`, {
         va_type: selected,
         hours_type: hours || null,
       }, authHeader());
@@ -58,7 +58,7 @@ export default function VAUpsell() {
 
   const handleSkip = async () => {
     try {
-      await axios.post(`${API}/va-upsell/dismiss`, {}, authHeader());
+      await axios.post(`${API}/api/va-upsell/dismiss`, {}, authHeader());
     } catch (e) { /* silent */ }
     navigate('/dashboard');
   };
