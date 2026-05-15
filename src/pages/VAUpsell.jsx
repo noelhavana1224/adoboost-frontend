@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Phone, Megaphone, ArrowRight, X } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'https://api.adobosolutions.com';
 
 const VA_OPTIONS = [
   {
@@ -36,17 +35,14 @@ export default function VAUpsell() {
   const [hours, setHours] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const token = () => localStorage.getItem('token');
-  const authHeader = () => ({ headers: { Authorization: `Bearer ${token()}` } });
-
   const handleInterested = async () => {
     if (!selected) return toast.error('Pick a VA option first');
     setSubmitting(true);
     try {
-      await axios.post(`${API}/api/va-interest`, {
+  await api.post('/va-interest', {
         va_type: selected,
         hours_type: hours || null,
-      }, authHeader());
+      });
       toast.success("Got it! We'll be in touch within 24 hours.");
       navigate('/dashboard');
     } catch (e) {
@@ -58,7 +54,7 @@ export default function VAUpsell() {
 
   const handleSkip = async () => {
     try {
-      await axios.post(`${API}/api/va-upsell/dismiss`, {}, authHeader());
+     await api.post('/va-upsell/dismiss', {});
     } catch (e) { /* silent */ }
     navigate('/dashboard');
   };
