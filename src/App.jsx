@@ -85,7 +85,7 @@ export default function App() {
           <Route path="/register"        element={<Auth mode="register" />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password"  element={<ResetPassword />} />
-          <Route path="/welcome-va"      element={<RawProtectedRoute><VAUpsell /></RawProtectedRoute>} />
+          <Route path="/welcome-va"      element={<ProtectedRoute><VAUpsell /></ProtectedRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Main App */}
