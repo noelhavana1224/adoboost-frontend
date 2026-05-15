@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User, ArrowRight, Check } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Check, Sparkles } from 'lucide-react';
 
 function Logo({ size = 'large' }) {
   const isLarge = size === 'large';
@@ -82,10 +82,10 @@ export default function Auth({ mode='login' }) {
   };
 
   const features = [
-    'Multi-step email sequences',
-    'Trained Filipino VAs from $3/hr',
-    'Real-time inbox & reply tracking',
-    'Built-in email warmup network',
+    'Multi-step email sequences with smart pausing',
+    'Real-time inbox, replies & deliverability tracking',
+    'Built-in warmup network across your team',
+    'CRM-style pipeline with drag-and-drop stages',
   ];
 
   return (
@@ -93,7 +93,7 @@ export default function Auth({ mode='login' }) {
       {/* Left Panel — Marketing */}
       <div style={{
         flex:1,
-        background:'radial-gradient(circle at 20% 20%, #1565C0 0%, #0D47A1 50%, #082A6B 100%)',
+        background:'radial-gradient(circle at 20% 20%, #1565C0 0%, #0D47A1 50%, #072159 100%)',
         display:'flex',
         flexDirection:'column',
         justifyContent:'space-between',
@@ -102,13 +102,12 @@ export default function Auth({ mode='login' }) {
         position:'relative',
         overflow:'hidden',
       }}>
-        {/* Decorative glow */}
+        {/* Subtle dot grid background */}
         <div style={{
           position:'absolute',
-          top:'-10%', right:'-10%',
-          width:400, height:400,
-          background:'radial-gradient(circle, rgba(252,209,22,0.18) 0%, transparent 70%)',
-          borderRadius:'50%',
+          inset:0,
+          backgroundImage:'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)',
+          backgroundSize:'24px 24px',
           pointerEvents:'none',
         }} />
 
@@ -120,10 +119,12 @@ export default function Auth({ mode='login' }) {
         {/* Middle: Pitch */}
         <div style={{ maxWidth:480, position:'relative', zIndex:1 }}>
           <div style={{
-            display:'inline-block',
-            background:'rgba(252,209,22,0.15)',
-            border:'1px solid rgba(252,209,22,0.3)',
-            color:'#FCD116',
+            display:'inline-flex',
+            alignItems:'center',
+            gap:6,
+            background:'rgba(255,255,255,0.08)',
+            border:'1px solid rgba(255,255,255,0.16)',
+            color:'#fff',
             fontSize:12,
             fontWeight:700,
             padding:'6px 12px',
@@ -131,52 +132,68 @@ export default function Auth({ mode='login' }) {
             marginBottom:24,
             letterSpacing:'0.04em',
           }}>
-            COLD EMAIL + VAS THAT DO THE WORK
+            <Sparkles size={12} color="#FCD116" />
+            COLD EMAIL OUTREACH PLATFORM
           </div>
 
           <h1 style={{
-            fontSize:46,
+            fontSize:48,
             fontWeight:800,
-            lineHeight:1.1,
+            lineHeight:1.05,
             margin:'0 0 20px',
-            letterSpacing:'-0.02em',
+            letterSpacing:'-0.025em',
           }}>
-            Stop sending cold<br />emails alone.
+            Cold email that<br />gets replies.
           </h1>
           <p style={{
             fontSize:17,
             color:'rgba(255,255,255,0.75)',
             lineHeight:1.6,
             margin:'0 0 32px',
-            maxWidth:430,
+            maxWidth:440,
           }}>
-            AdoBoost gives you the outreach software. Our trained Filipino VAs run it for you — building campaigns, monitoring replies, and booking meetings.
+            The outreach platform built for solo founders and small teams. Send sequences, track every reply, and warm up your inbox — all in one place.
           </p>
 
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             {features.map(f => (
-              <div key={f} style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <div key={f} style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
                 <div style={{
-                  width:24, height:24,
-                  background:'rgba(252,209,22,0.18)',
-                  border:'1px solid rgba(252,209,22,0.35)',
+                  width:22, height:22,
+                  background:'rgba(255,255,255,0.1)',
+                  border:'1px solid rgba(255,255,255,0.2)',
                   borderRadius:7,
                   display:'flex', alignItems:'center', justifyContent:'center',
                   flexShrink:0,
+                  marginTop:1,
                 }}>
-                  <Check size={13} color="#FCD116" strokeWidth={3} />
+                  <Check size={12} color="#fff" strokeWidth={3} />
                 </div>
-                <span style={{ fontSize:14.5, color:'rgba(255,255,255,0.9)' }}>{f}</span>
+                <span style={{ fontSize:14.5, color:'rgba(255,255,255,0.9)', lineHeight:1.5 }}>{f}</span>
               </div>
             ))}
           </div>
+
+          {/* Soft VA mention */}
+          <div style={{
+            marginTop:28,
+            padding:'14px 16px',
+            background:'rgba(255,255,255,0.05)',
+            border:'1px solid rgba(255,255,255,0.1)',
+            borderRadius:10,
+            fontSize:13,
+            color:'rgba(255,255,255,0.7)',
+            lineHeight:1.5,
+          }}>
+            <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:600 }}>Need a hand?</span> Add a trained VA from <span style={{ color:'#fff', fontWeight:700 }}>$3/hr</span> after signup — optional, no commitment.
+          </div>
         </div>
 
-        {/* Bottom: Social proof */}
+        {/* Bottom: trust line */}
         <div style={{ position:'relative', zIndex:1 }}>
           <div style={{
             fontSize:12,
-            color:'rgba(255,255,255,0.55)',
+            color:'rgba(255,255,255,0.5)',
             fontWeight:600,
             letterSpacing:'0.06em',
           }}>
