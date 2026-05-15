@@ -26,12 +26,20 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminPlans from './pages/admin/AdminPlans';
 import AdminTickets from './pages/admin/AdminTickets';
 import Pipeline from './pages/Pipeline';
+import VAUpsell from './pages/VAUpsell';
 
 function ProtectedRoute({ children, adminOnly }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return <Layout>{children}</Layout>;
+}
+
+// Protected but without the Layout chrome (for standalone screens like onboarding)
+function RawProtectedRoute({ children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
 }
 
 function CalendarPlaceholder() {
@@ -77,6 +85,7 @@ export default function App() {
           <Route path="/register"        element={<Auth mode="register" />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password"  element={<ResetPassword />} />
+          <Route path="/welcome-va"      element={<RawProtectedRoute><VAUpsell /></RawProtectedRoute>} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Main App */}
