@@ -29,9 +29,14 @@ export default function Auth({ mode='login' }) {
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true);
     try {
-      mode==='login' ? await login(form.email, form.password) : await register(form.name, form.email, form.password);
-      navigate('/dashboard');
-      if (mode==='register') toast.success(`Welcome to AdoBoost, ${form.name}! 🎉`);
+      if (mode === 'login') {
+        await login(form.email, form.password);
+        navigate('/dashboard');
+      } else {
+        await register(form.name, form.email, form.password);
+        toast.success(`Welcome to AdoBoost, ${form.name}! 🎉`);
+        navigate('/welcome-va');
+      }
     } catch(err) { toast.error(err.response?.data?.error || 'Something went wrong'); }
     finally { setLoading(false); }
   };
