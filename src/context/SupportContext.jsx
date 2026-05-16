@@ -6,15 +6,34 @@ const SupportContext = createContext({
   target: null,
   expiresAt: null,
   exit: () => {},
+  refresh: () => {},
 });
 
+function readSupportState() {
+  try {
+    const raw = localStorage.getItem('ab_support');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export function SupportProvider({ children }) {
-  const [state, setState] = useState(() => {
-    try {
-      const raw = localStorage.getItem('ab_support');
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  });
+  const [state, setState] = useState(readSupportState);
+
+  // Allow other components (e.g. SupportEntry) to trigger a re-read
+  const refresh = useCallback(() => {
+    setState(readSupportState());
+  }, []);
+
+  // Re-read on localStorage changes from other tabs OR same-tab custom events
+  useEffect(() => {
+    const handler = () => refresh();
+    window.addEventListener('storage', handler);
+    window.addEventListener('ab_support_changed', handler);
+    return () => {
+      window.removeEventListener('storage', handler);
+      window.removeEventListener('ab_support_changed', handler);
+    };
+  }, [refresh]);
 
   const exit = useCallback(async () => {
     try {
@@ -28,13 +47,11 @@ export function SupportProvider({ children }) {
     } catch { /* silent */ }
     localStorage.removeItem('ab_support_token');
     localStorage.removeItem('ab_support');
-    window.close(); // close the support tab
-    // Fallback: if window.close() is blocked (e.g. tab wasn't opened by script),
-    // redirect to the login page so the support context is unmistakably exited.
+    setState(null);
+    window.close();
     setTimeout(() => { window.location.href = 'https://app.adobosolutions.com/admin/users'; }, 200);
   }, []);
 
-  // Auto-expire countdown
   useEffect(() => {
     if (!state?.expiresAt) return;
     const check = () => {
@@ -54,6 +71,7 @@ export function SupportProvider({ children }) {
       target: state?.target || null,
       expiresAt: state?.expiresAt || null,
       exit,
+      refresh,
     }}>
       {children}
     </SupportContext.Provider>
