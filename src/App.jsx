@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SupportProvider } from './context/SupportContext';
 import Layout from './components/Layout';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -27,6 +28,7 @@ import AdminPlans from './pages/admin/AdminPlans';
 import AdminTickets from './pages/admin/AdminTickets';
 import Pipeline from './pages/Pipeline';
 import VAUpsell from './pages/VAUpsell';
+import SupportEntry from './pages/SupportEntry';
 
 function ProtectedRoute({ children, adminOnly }) {
   const { user } = useAuth();
@@ -78,6 +80,7 @@ function SubAccountsPlaceholder() {
 export default function App() {
   return (
     <AuthProvider>
+      <SupportProvider>
       <BrowserRouter>
         <Toaster position="top-right" toastOptions={{ duration:4000, style:{ fontSize:13, borderRadius:10 } }} />
         <Routes>
@@ -86,6 +89,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password"  element={<ResetPassword />} />
           <Route path="/welcome-va"      element={<ProtectedRoute><VAUpsell /></ProtectedRoute>} />
+          <Route path="/support/entry" element={<SupportEntry />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Main App */}
@@ -121,6 +125,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
+      </SupportProvider>
     </AuthProvider>
   );
 }
