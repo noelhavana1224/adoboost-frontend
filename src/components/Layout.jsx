@@ -171,7 +171,67 @@ function NavItem({ item, collapsed }) {
     </NavLink>
   );
 }
+function SupportBanner() {
+  const { isSupport, target, expiresAt, exit } = useSupport();
+  const [now, setNow] = React.useState(Date.now());
 
+  React.useEffect(() => {
+    if (!isSupport) return;
+    const i = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(i);
+  }, [isSupport]);
+
+  if (!isSupport) return null;
+
+  const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+
+  return (
+    <div style={{
+      background:'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)',
+      color:'#fff',
+      padding:'10px 20px',
+      display:'flex',
+      alignItems:'center',
+      justifyContent:'space-between',
+      gap:16,
+      borderBottom:'2px solid #991b1b',
+      fontSize:13,
+      fontWeight:600,
+    }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <ShieldAlert size={18} />
+        <span>
+          <strong>Read-only support session</strong> as {target?.name || 'user'} &lt;{target?.email}&gt;
+        </span>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <span style={{ background:'rgba(0,0,0,0.18)', padding:'4px 10px', borderRadius:6, fontFamily:'monospace', fontSize:13 }}>
+          ⏱ {mins}:{secs.toString().padStart(2, '0')}
+        </span>
+        <button
+          onClick={exit}
+          style={{
+            background:'#fff',
+            color:'#b91c1c',
+            border:'none',
+            borderRadius:6,
+            padding:'6px 14px',
+            fontWeight:700,
+            fontSize:12,
+            cursor:'pointer',
+            display:'flex',
+            alignItems:'center',
+            gap:5,
+          }}
+        >
+          Exit support <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -281,8 +341,9 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      {/* Main content */}
+     {/* Main content */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <SupportBanner />
         {/* Top bar */}
         <header style={{
           height:56, background:'#fff', borderBottom:'1px solid #e2e8f0',
