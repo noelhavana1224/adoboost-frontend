@@ -40,7 +40,7 @@ export default function VAUpsellBanner() {
           Want a Filipino VA to run this for you?
         </div>
         <div style={{ fontSize:13, color:'rgba(255,255,255,0.85)' }}>
-          From $3/hr. Trained VAs who build and monitor your campaigns — or call your leads.
+          From $4/hr. Trained VAs who build and monitor your campaigns — or call your leads.
         </div>
       </div>
       <button
