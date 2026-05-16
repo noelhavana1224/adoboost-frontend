@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useSupport } from '../context/SupportContext';
 
 export default function SupportEntry() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { refresh } = useSupport();
 
   useEffect(() => {
     const token = params.get('token');
@@ -25,9 +27,13 @@ export default function SupportEntry() {
       expiresAt: Date.now() + expiresIn * 1000,
     }));
 
-    // Tiny delay so localStorage commits, then go to dashboard
+    // Tell SupportProvider to re-read localStorage immediately
+    refresh();
+    window.dispatchEvent(new Event('ab_support_changed'));
+
     setTimeout(() => navigate('/dashboard', { replace: true }), 50);
   }, []); // eslint-disable-line
+  // refresh intentionally omitted from deps to avoid re-running
 
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'-apple-system, sans-serif', color:'#64748b' }}>
