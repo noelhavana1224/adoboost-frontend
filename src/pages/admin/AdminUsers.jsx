@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Card, Btn, Badge, Spinner, Empty, Input, Select, Table, TR, TD, Pagination, Modal } from '../../components/UI';
-import { Users, Search, UserX, UserCheck, Trash2, Eye, Key } from 'lucide-react';
+import { Users, Search, UserX, UserCheck, Trash2, Eye, Key, ShieldAlert } from 'lucide-react';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -14,7 +14,7 @@ export default function AdminUsers() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [changePlan, setChangePlan] = useState(null);
-  const [resetPw, setResetPw] = useState(null);
+  const [supportLoading, setSupportLoading] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,10 +31,31 @@ export default function AdminUsers() {
       toast.success(isSusp?'User unsuspended':'User suspended'); load();
     } catch { toast.error('Failed'); }
   };
+
   const handleDelete = async (id) => {
     if (!confirm('Permanently delete this user and ALL their data?')) return;
     try { await api.delete(`/admin/users/${id}`); toast.success('User deleted'); load(); }
     catch { toast.error('Failed'); }
+  };
+
+  const handleSupportView = async (user) => {
+    if (!confirm(`Open a 30-minute READ-ONLY support session as ${user.name} <${user.email}>?\n\nThis will be logged. You will not be able to make changes.`)) return;
+    setSupportLoading(user.id);
+    try {
+      const { data } = await api.post('/admin/support/start', { target_user_id: user.id });
+      const params = new URLSearchParams({
+        token: data.token,
+        userId: data.target.id,
+        name: data.target.name || '',
+        email: data.target.email || '',
+        expiresIn: String(data.expires_in),
+      });
+      window.open(`/support/entry?${params.toString()}`, '_blank');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to start support session');
+    } finally {
+      setSupportLoading(null);
+    }
   };
 
   return (
@@ -73,6 +94,9 @@ export default function AdminUsers() {
                 <TD><Badge color={u.is_suspended?'red':'green'}>{u.is_suspended?'Suspended':'Active'}</Badge></TD>
                 <TD>
                   <div style={{ display:'flex', gap:4 }}>
+                    <Btn size="sm" variant="secondary" onClick={()=>handleSupportView(u)} loading={supportLoading===u.id} title="Open Support View (read-only)">
+                      <ShieldAlert size={11}/>
+                    </Btn>
                     <Btn size="sm" variant="secondary" onClick={()=>setChangePlan(u)} title="Change Plan"><Key size={11}/></Btn>
                     <Btn size="sm" variant={u.is_suspended?'success':'secondary'} onClick={()=>handleSuspend(u.id,u.is_suspended)} title={u.is_suspended?'Unsuspend':'Suspend'}>
                       {u.is_suspended?<UserCheck size={11}/>:<UserX size={11}/>}
