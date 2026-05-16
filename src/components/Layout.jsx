@@ -171,6 +171,7 @@ function NavItem({ item, collapsed }) {
     </NavLink>
   );
 }
+
 function SupportBanner() {
   const { isSupport, target, expiresAt, exit } = useSupport();
   const [now, setNow] = React.useState(Date.now());
@@ -232,6 +233,47 @@ function SupportBanner() {
     </div>
   );
 }
+
+function SidebarUserFooter({ user, isAdmin }) {
+  const support = useSupport();
+  const displayName = support.isSupport ? support.target?.name : user?.name;
+  const displayEmail = support.isSupport ? support.target?.email : user?.email;
+  return (
+    <div style={{ padding:'6px 10px', marginBottom:4 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <div style={{ fontSize:13, fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{displayName}</div>
+        {support.isSupport
+          ? <span style={{ fontSize:9, fontWeight:700, background:'#dc2626', color:'#fff', padding:'2px 6px', borderRadius:8, letterSpacing:'0.05em' }}>VIEWING</span>
+          : (isAdmin && <Star size={12} color="#FCD116" fill="#FCD116" />)}
+      </div>
+      <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{displayEmail}</div>
+    </div>
+  );
+}
+
+function HeaderUserChip({ user }) {
+  const support = useSupport();
+  const displayName = support.isSupport ? support.target?.name : user?.name;
+  const displayEmail = support.isSupport ? support.target?.email : user?.email;
+  const initial = (displayName?.[0] || 'U').toUpperCase();
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+      <div style={{
+        width:34, height:34,
+        background: support.isSupport ? '#dc2626' : '#0D47A1',
+        borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        color:'#fff', fontWeight:700, fontSize:14
+      }}>
+        {initial}
+      </div>
+      <div>
+        <div style={{ fontSize:13, fontWeight:600, color:'#1a202c' }}>{displayName}</div>
+        <div style={{ fontSize:11, color:'#718096' }}>{displayEmail}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -315,24 +357,9 @@ export default function Layout({ children }) {
           )}
         </nav>
 
-       {/* User Footer */}
+        {/* User Footer */}
         <div style={{ borderTop:'1px solid rgba(255,255,255,0.12)', padding:'10px 8px' }}>
-          {!collapsed && (() => {
-            const support = useSupport();
-            const displayName = support.isSupport ? support.target?.name : user?.name;
-            const displayEmail = support.isSupport ? support.target?.email : user?.email;
-            return (
-              <div style={{ padding:'6px 10px', marginBottom:4 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{displayName}</div>
-                  {support.isSupport
-                    ? <span style={{ fontSize:9, fontWeight:700, background:'#dc2626', color:'#fff', padding:'2px 6px', borderRadius:8, letterSpacing:'0.05em' }}>VIEWING</span>
-                    : (isAdmin && <Star size={12} color="#FCD116" fill="#FCD116" />)}
-                </div>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{displayEmail}</div>
-              </div>
-            );
-          })()}
+          {!collapsed && <SidebarUserFooter user={user} isAdmin={isAdmin} />}
           <button onClick={() => { logout(); navigate('/login'); }} style={{
             display:'flex', alignItems:'center', gap:8,
             padding: collapsed ? '9px 0' : '9px 10px',
@@ -348,9 +375,10 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-     {/* Main content */}
+      {/* Main content */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <SupportBanner />
+
         {/* Top bar */}
         <header style={{
           height:56, background:'#fff', borderBottom:'1px solid #e2e8f0',
@@ -366,15 +394,7 @@ export default function Layout({ children }) {
               <span style={{ position:'absolute', top:0, right:0, width:8, height:8, background:'#e53e3e', borderRadius:'50%', border:'2px solid #fff' }} />
             </button>
             <HelpCircle size={18} color="#718096" style={{ cursor:'pointer' }} />
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <div style={{ width:34, height:34, background:'#0D47A1', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700, fontSize:14 }}>
-                {user?.name?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <div>
-                <div style={{ fontSize:13, fontWeight:600, color:'#1a202c' }}>{user?.name}</div>
-                <div style={{ fontSize:11, color:'#718096' }}>{user?.email}</div>
-              </div>
-            </div>
+            <HeaderUserChip user={user} />
           </div>
         </header>
 
