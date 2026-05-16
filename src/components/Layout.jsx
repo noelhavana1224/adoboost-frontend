@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSupport } from '../context/SupportContext';
 import {
   LayoutDashboard, Send, Mail, Users, MessageSquare,
   Ban, FileText, Settings, HelpCircle, LogOut,
   ChevronDown, ChevronRight, Bell, Star, UserCog,
-  CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare
+  CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare,
+  ShieldAlert
 } from 'lucide-react';
 
 const NAV = [
