@@ -185,7 +185,7 @@ export default function Auth({ mode='login' }) {
             color:'rgba(255,255,255,0.7)',
             lineHeight:1.5,
           }}>
-            <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:600 }}>Need a hand?</span> Add a trained VA from <span style={{ color:'#fff', fontWeight:700 }}>$3/hr</span> after signup — optional, no commitment.
+            <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:600 }}>Need a hand?</span> Add a trained VA from <span style={{ color:'#fff', fontWeight:700 }}>$4/hr</span> after signup — optional, no commitment.
           </div>
         </div>
 
