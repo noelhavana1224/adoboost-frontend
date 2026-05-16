@@ -315,17 +315,24 @@ export default function Layout({ children }) {
           )}
         </nav>
 
-        {/* User Footer */}
+       {/* User Footer */}
         <div style={{ borderTop:'1px solid rgba(255,255,255,0.12)', padding:'10px 8px' }}>
-          {!collapsed && (
-            <div style={{ padding:'6px 10px', marginBottom:4 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <div style={{ fontSize:13, fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{user?.name}</div>
-                {isAdmin && <Star size={12} color="#FCD116" fill="#FCD116" />}
+          {!collapsed && (() => {
+            const support = useSupport();
+            const displayName = support.isSupport ? support.target?.name : user?.name;
+            const displayEmail = support.isSupport ? support.target?.email : user?.email;
+            return (
+              <div style={{ padding:'6px 10px', marginBottom:4 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{displayName}</div>
+                  {support.isSupport
+                    ? <span style={{ fontSize:9, fontWeight:700, background:'#dc2626', color:'#fff', padding:'2px 6px', borderRadius:8, letterSpacing:'0.05em' }}>VIEWING</span>
+                    : (isAdmin && <Star size={12} color="#FCD116" fill="#FCD116" />)}
+                </div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{displayEmail}</div>
               </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user?.email}</div>
-            </div>
-          )}
+            );
+          })()}
           <button onClick={() => { logout(); navigate('/login'); }} style={{
             display:'flex', alignItems:'center', gap:8,
             padding: collapsed ? '9px 0' : '9px 10px',
