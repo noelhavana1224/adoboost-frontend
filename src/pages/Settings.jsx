@@ -12,8 +12,24 @@ const PLANS = [
   { id:'plan_unlimited', name:'Unlimited', price:199, features:['Unlimited everything','White-label','API access'] },
 ];
 
+// Hook: fetch the *current scoped user* from API.
+// During a support session, this returns the target user.
+// Otherwise, returns the logged-in user.
+function useScopedUser() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.get('/auth/me')
+      .then(r => setData(r.data))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+  return { user: data, loading };
+}
+
 export function Billing() {
-  const { user } = useAuth();
+  const { user, loading } = useScopedUser();
+  if (loading) return null;
   return (
     <div>
       <PageHeader title="Billing Information" />
@@ -73,16 +89,19 @@ export function SendingSpeed() {
 }
 
 export function UserSettings() {
-  const { user } = useAuth();
+  const { user, loading } = useScopedUser();
   const [form, setForm] = useState({ name:'', company:'', country:'', city:'', timezone:'UTC', password:'' });
-  const [loading, setLoading] = useState(false);
-  useEffect(() => { if (user) setForm({ name:user.name||'', company:user.company||'', country:user.country||'', city:user.city||'', timezone:user.timezone||'UTC', password:'' }); }, [user]);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (user) setForm({ name:user.name||'', company:user.company||'', country:user.country||'', city:user.city||'', timezone:user.timezone||'UTC', password:'' });
+  }, [user]);
   const f=(k,v)=>setForm(p=>({...p,[k]:v}));
   const handleSubmit = async (e) => {
-    e.preventDefault(); setLoading(true);
+    e.preventDefault(); setSaving(true);
     try { await api.put('/auth/settings', form); toast.success('Settings updated'); }
-    catch { toast.error('Failed'); } finally { setLoading(false); }
+    catch { toast.error('Failed'); } finally { setSaving(false); }
   };
+  if (loading) return null;
   return (
     <div>
       <PageHeader title="User Settings" />
@@ -101,7 +120,7 @@ export function UserSettings() {
             <Input label="Change Password" type="password" placeholder="Leave blank to keep current" value={form.password} onChange={e=>f('password',e.target.value)} />
           </div>
           <div style={{ display:'flex', justifyContent:'flex-end', marginTop:4 }}>
-            <Btn type="submit" loading={loading}>Update Settings</Btn>
+            <Btn type="submit" loading={saving}>Update Settings</Btn>
           </div>
         </form>
       </Card>
@@ -110,15 +129,18 @@ export function UserSettings() {
 }
 
 export function UserPreferences() {
-  const { user } = useAuth();
+  const { user, loading } = useScopedUser();
   const [form, setForm] = useState({ notify_replies:true, can_spam_footer:true, notify_email:'' });
-  const [loading, setLoading] = useState(false);
-  useEffect(() => { if (user) setForm({ notify_replies:user.notify_replies!==0, can_spam_footer:user.can_spam_footer!==0, notify_email:user.notify_email||user.email||'' }); }, [user]);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (user) setForm({ notify_replies:user.notify_replies!==0, can_spam_footer:user.can_spam_footer!==0, notify_email:user.notify_email||user.email||'' });
+  }, [user]);
   const handleSubmit = async (e) => {
-    e.preventDefault(); setLoading(true);
+    e.preventDefault(); setSaving(true);
     try { await api.put('/auth/settings', form); toast.success('Preferences saved'); }
-    catch { toast.error('Failed'); } finally { setLoading(false); }
+    catch { toast.error('Failed'); } finally { setSaving(false); }
   };
+  if (loading) return null;
   return (
     <div>
       <PageHeader title="User Preferences" />
@@ -137,7 +159,7 @@ export function UserPreferences() {
             </label>
           ))}
           {form.notify_replies && <Input label="Notification Email" type="email" value={form.notify_email} onChange={e=>setForm(f=>({...f,notify_email:e.target.value}))} />}
-          <Btn type="submit" loading={loading} style={{ alignSelf:'flex-start' }}>Update Settings</Btn>
+          <Btn type="submit" loading={saving} style={{ alignSelf:'flex-start' }}>Update Settings</Btn>
         </form>
       </Card>
     </div>
@@ -145,7 +167,6 @@ export function UserPreferences() {
 }
 
 export function ApiKey() {
-  const { user } = useAuth();
   const [userData, setUserData] = useState(null);
   const [copied, setCopied] = useState(false);
   useEffect(() => { api.get('/auth/me').then(r=>setUserData(r.data)); }, []);
