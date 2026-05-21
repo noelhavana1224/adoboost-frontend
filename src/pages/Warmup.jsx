@@ -150,12 +150,17 @@ function WarmupCard({ account, poolSize, onUpdate }) {
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>📅 Day <strong>{warmupDays}</strong></span>
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>
-              📨 Today: <strong style={{ color: account.sent_today > 0 ? '#2563eb' : undefined }}>
+              📨 Today: <strong style={{ color: account.sent_today > 0 ? '#16a34a' : account.failed_today > 0 ? '#dc2626' : undefined }}>
                 {account.sent_today}/{todayTarget}
               </strong> sent
+              {account.failed_today > 0 && (
+                <span style={{ marginLeft: 4, fontSize: 11, color: '#dc2626', fontWeight: 600 }}>⚠️ {account.failed_today} failed</span>
+              )}
             </span>
+            {account.last_warmup_at && (
+              <span style={{ fontSize: 12, color: 'var(--text3)' }}>🕐 Last run: <strong>{new Date(account.last_warmup_at).toLocaleDateString()}</strong></span>
+            )}
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>🎯 Max: <strong>{form.warmup_max_count}/day</strong></span>
-            <span style={{ fontSize: 12, color: 'var(--text2)' }}>⏱ Full warmup in <strong>~{daysToFull} days</strong></span>
           </div>
         </div>
 
