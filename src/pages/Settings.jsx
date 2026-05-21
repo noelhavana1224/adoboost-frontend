@@ -95,7 +95,7 @@ export function Billing() {
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Account</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
-              {user?.role === 'admin' ? 'Account Owner' : 'Managed by admin'}
+              {user?.role !== 'team_member' ? 'Account Owner' : 'Managed by admin'}
             </div>
           </div>
         </div>
@@ -196,9 +196,9 @@ export function Billing() {
         </div>
       </div>
 
-      {user?.role === 'admin'
-        ? <Alert type="info">To change your subscription plan, contact <strong>AdoBoost support</strong> and we'll upgrade your account.</Alert>
-        : <Alert type="info">To upgrade your plan, contact your administrator or reach out to support.</Alert>
+      {user?.role === 'team_member'
+        ? <Alert type="info">To upgrade the plan, ask your account owner to contact AdoBoost support.</Alert>
+        : <Alert type="info">To change your subscription plan, contact <strong>AdoBoost support</strong> and we'll upgrade your account.</Alert>
       }
     </div>
   );
@@ -310,7 +310,7 @@ export function ApiKey() {
 
   useEffect(() => { api.get('/auth/me').then(r => setUserData(r.data)); }, []);
 
-  const canAccess = userData?.role === 'admin' || ['professional', 'unlimited'].includes(userData?.plan?.toLowerCase());
+  const canAccess = ['professional', 'unlimited'].includes(userData?.plan?.toLowerCase());
   const copy = () => {
     navigator.clipboard.writeText(userData?.api_key || '');
     setCopied(true);
