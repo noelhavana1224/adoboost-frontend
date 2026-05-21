@@ -556,6 +556,8 @@ export default function Messages({ type = 'inbox' }) {
   const [filterTag,setFilterTag]   = useState('');
   const [openThread,setOpenThread] = useState(null);
   const [showSyncModal,setShowSyncModal] = useState(false);
+  const [selectedKeys,setSelectedKeys]   = useState(new Set());
+  const [bulkDeleting,setBulkDeleting]   = useState(false);
 
   const load = useCallback(async()=>{
     setLoading(true);
@@ -594,6 +596,35 @@ export default function Messages({ type = 'inbox' }) {
     });
     if(updates?.status==='read')setUnread(u=>Math.max(0,u-1));
   },[load]);
+
+  const toggleSelect = (e, key) => {
+    e.stopPropagation();
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (threads) => {
+    if (selectedKeys.size === threads.length) setSelectedKeys(new Set());
+    else setSelectedKeys(new Set(threads.map(t => t.key)));
+  };
+
+  const handleBulkDelete = async (threads) => {
+    const toDelete = threads.filter(t => selectedKeys.has(t.key));
+    if (!confirm(`Delete ${toDelete.length} conversation${toDelete.length !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    for (const thread of toDelete) {
+      for (const m of thread.msgs) {
+        try { await api.delete(`/messages/${m.id}`); } catch {}
+      }
+    }
+    setSelectedKeys(new Set());
+    setBulkDeleting(false);
+    toast.success(`${toDelete.length} thread${toDelete.length !== 1 ? 's' : ''} deleted`);
+    load();
+  };
 
   // Client-side tag filtering at THREAD level:
   // A thread is included if ANY message in it has the tag.
@@ -636,6 +667,33 @@ export default function Messages({ type = 'inbox' }) {
           <button onClick={()=>setShowSyncModal(true)} style={{background:'none',border:'none',color:'var(--primary)',cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>Sync now</button>
         </div>
       )}
+      {/* Bulk action bar */}
+      {threads.length > 0 && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8, padding:'8px 12px', background:'#fff', border:'1px solid var(--border)', borderRadius:10 }}>
+          <input type="checkbox"
+            checked={selectedKeys.size > 0 && selectedKeys.size === threads.length}
+            ref={el => { if (el) el.indeterminate = selectedKeys.size > 0 && selectedKeys.size < threads.length; }}
+            onChange={() => handleSelectAll(threads)}
+            style={{ width:16, height:16, cursor:'pointer', accentColor:'var(--primary)' }}
+          />
+          <span style={{ fontSize:12, color:'var(--text3)', flex:1 }}>
+            {selectedKeys.size > 0 ? `${selectedKeys.size} selected` : 'Select conversations'}
+          </span>
+          {selectedKeys.size > 0 && (
+            <button onClick={() => handleBulkDelete(threads)} disabled={bulkDeleting}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', background:'#fee2e2', color:'#dc2626', border:'1px solid #fca5a5', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+              {bulkDeleting ? '🗑 Deleting...' : `🗑 Delete ${selectedKeys.size}`}
+            </button>
+          )}
+          {selectedKeys.size > 0 && (
+            <button onClick={() => setSelectedKeys(new Set())}
+              style={{ padding:'6px 10px', background:'none', border:'1px solid var(--border2)', borderRadius:8, fontSize:12, color:'var(--text3)', cursor:'pointer', fontFamily:'inherit' }}>
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+
       {loading?<Spinner/>:threads.length===0?(
         <Empty icon={MessageSquare}
           title={filterTag ? `No conversations tagged ${TAG_MAP[filterTag]?.label}` : type==='inbox' ? 'No messages yet' : 'No auto-replies yet'}
@@ -651,12 +709,17 @@ export default function Messages({ type = 'inbox' }) {
             const isOpen=openThread?.key===key;
             const preview=extractNew(latest.body);
             const latestIsSent=latest.status==='sent';
+            const isSelected = selectedKeys.has(key);
             return(
               <div key={key} onClick={()=>setOpenThread({key,msgs,latest,count})}
-                style={{display:'grid',gridTemplateColumns:'44px 1fr auto',gap:12,padding:'13px 16px',borderBottom:i<threads.length-1?'1px solid var(--border)':'none',background:isOpen?'#eff6ff':hasUnread?'#f8faff':'#fff',borderLeft:isOpen?'3px solid var(--primary)':hasUnread?'3px solid var(--primary)':'3px solid transparent',cursor:'pointer',transition:'background 0.1s'}}
-                onMouseEnter={e=>{if(!isOpen)e.currentTarget.style.background='#f8faff';}}
-                onMouseLeave={e=>{if(!isOpen)e.currentTarget.style.background=hasUnread?'#f8faff':'#fff';}}
+                style={{display:'grid',gridTemplateColumns:'36px 44px 1fr auto',gap:10,padding:'13px 16px',borderBottom:i<threads.length-1?'1px solid var(--border)':'none',background:isSelected?'#eff6ff':isOpen?'#eff6ff':hasUnread?'#f8faff':'#fff',borderLeft:isOpen?'3px solid var(--primary)':hasUnread?'3px solid var(--primary)':'3px solid transparent',cursor:'pointer',transition:'background 0.1s'}}
+                onMouseEnter={e=>{if(!isOpen&&!isSelected)e.currentTarget.style.background='#f8faff';}}
+                onMouseLeave={e=>{if(!isOpen&&!isSelected)e.currentTarget.style.background=hasUnread?'#f8faff':'#fff';}}
               >
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>toggleSelect(e,key)}>
+                  <input type="checkbox" checked={isSelected} onChange={e=>toggleSelect(e,key)}
+                    style={{width:15,height:15,cursor:'pointer',accentColor:'var(--primary)',flexShrink:0}}/>
+                </div>
                 <div style={{display:'flex',alignItems:'center'}}>
                   <div style={{width:38,height:38,borderRadius:'50%',background:avatarColor(leadMsg?.from_email),display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:15,flexShrink:0,position:'relative'}}>
                     {initials(leadMsg?.from_name,leadMsg?.from_email)}

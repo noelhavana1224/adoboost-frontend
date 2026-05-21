@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, Link } from 'react-router-dom';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useSupport } from '../context/SupportContext';
 import {
@@ -112,7 +113,7 @@ function PlanBadge({ plan, role }) {
   );
 }
 
-function NavItem({ item, collapsed }) {
+function NavItem({ item, collapsed, badge = 0 }) {
   const [open, setOpen] = useState(false);
   const hasChildren = item.children?.length > 0;
 
@@ -128,9 +129,19 @@ function NavItem({ item, collapsed }) {
         }}
           onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.12)'}
           onMouseLeave={e => e.currentTarget.style.background='none'}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, justifyContent: collapsed?'center':'flex-start', width:'100%' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, justifyContent: collapsed?'center':'flex-start', width:'100%', position:'relative' }}>
             <item.icon size={18} style={{ flexShrink:0 }} />
             {!collapsed && <span>{item.label}</span>}
+            {badge > 0 && !collapsed && (
+              <span style={{ marginLeft:'auto', background:'#e53e3e', color:'#fff', borderRadius:10, fontSize:10, fontWeight:700, padding:'1px 6px', minWidth:18, textAlign:'center', lineHeight:'16px' }}>
+                {badge > 99 ? '99+' : badge}
+              </span>
+            )}
+            {badge > 0 && collapsed && (
+              <span style={{ position:'absolute', top:-4, right:-4, background:'#e53e3e', color:'#fff', borderRadius:'50%', fontSize:9, fontWeight:700, width:14, height:14, display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid #0D47A1' }}>
+                {badge > 9 ? '9+' : badge}
+              </span>
+            )}
           </div>
           {!collapsed && (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
         </button>
@@ -278,7 +289,19 @@ export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    const fetchUnread = () => {
+      api.get('/messages/inbox', { params: { limit: 1 } })
+        .then(r => setUnreadCount(r.data?.unread || 0))
+        .catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden' }}>
@@ -327,7 +350,11 @@ export default function Layout({ children }) {
             </Link>
           )}
 
-          {NAV.map(item => <NavItem key={item.label} item={item} collapsed={collapsed} />)}
+          {NAV.map(item => (
+            <NavItem key={item.label} item={item} collapsed={collapsed}
+              badge={item.label === 'Messages' ? unreadCount : 0}
+            />
+          ))}
 
           {/* Admin Section */}
           {isAdmin && (
