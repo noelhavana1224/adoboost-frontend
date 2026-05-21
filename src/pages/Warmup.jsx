@@ -181,6 +181,38 @@ function WarmupCard({ account, poolSize, onUpdate }) {
         </div>
       </div>
 
+      {/* SMTP failure warning — visible without expanding */}
+      {form.warmup_enabled && account.failed_today > 0 && account.sent_today === 0 && (
+        <div style={{ background: '#fef2f2', borderTop: '1px solid #fecaca', borderBottom: expanded ? '1px solid #fecaca' : 'none', padding: '10px 18px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>🔴</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#991b1b', marginBottom: 2 }}>
+              SMTP Authentication Failed — Warmup Stopped
+            </div>
+            <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5 }}>
+              All {account.failed_today} warmup email attempt{account.failed_today !== 1 ? 's' : ''} failed for <strong>{account.from_email}</strong>.
+              This is usually caused by a wrong password, changed credentials, or blocked port.
+              <br/>
+              <strong>Fix:</strong> Go to <em>Email Accounts</em> → edit this account → update the SMTP password → click <em>Test Connection</em>.
+            </div>
+          </div>
+        </div>
+      )}
+      {form.warmup_enabled && account.failed_today > 0 && account.sent_today > 0 && (
+        <div style={{ background: '#fffbeb', borderTop: '1px solid #fcd34d', borderBottom: expanded ? '1px solid #fcd34d' : 'none', padding: '10px 18px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 2 }}>
+              Some Warmup Emails Failed Today
+            </div>
+            <div style={{ fontSize: 12, color: '#b45309', lineHeight: 1.5 }}>
+              {account.sent_today} sent successfully, {account.failed_today} failed. This may be caused by intermittent SMTP issues or daily sending limits.
+              If this keeps happening, go to <em>Email Accounts</em> and verify the SMTP credentials.
+            </div>
+          </div>
+        </div>
+      )}
+
       {expanded && (
         <div style={{ padding: '20px 18px' }}>
 
