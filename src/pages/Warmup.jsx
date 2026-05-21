@@ -149,7 +149,11 @@ function WarmupCard({ account, poolSize, onUpdate }) {
           {/* Progress stats */}
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>📅 Day <strong>{warmupDays}</strong></span>
-            <span style={{ fontSize: 12, color: 'var(--text2)' }}>📨 Today's target: <strong>{todayTarget}/day</strong></span>
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              📨 Today: <strong style={{ color: account.sent_today > 0 ? '#2563eb' : undefined }}>
+                {account.sent_today}/{todayTarget}
+              </strong> sent
+            </span>
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>🎯 Max: <strong>{form.warmup_max_count}/day</strong></span>
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>⏱ Full warmup in <strong>~{daysToFull} days</strong></span>
           </div>
@@ -310,13 +314,19 @@ export default function Warmup() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/email-accounts');
-      setAccounts(data || []);
-      const active = data.filter(a => a.warmup_enabled === 1);
+      const [{ data: accounts }, { data: stats }] = await Promise.all([
+        api.get('/email-accounts'),
+        api.get('/warmup/stats'),
+      ]);
+      const statsMap = {};
+      (stats || []).forEach(s => { statsMap[s.id] = s; });
+      const enriched = (accounts || []).map(a => ({ ...a, sent_today: statsMap[a.id]?.sent_today || 0 }));
+      setAccounts(enriched);
+      const active = enriched.filter(a => a.warmup_enabled === 1);
       const avgHealth = active.length
         ? Math.round(active.reduce((s, a) => s + (a.warmup_health || 0), 0) / active.length)
         : 0;
-      setNetworkStats({ total: data.length, active: active.length, avgHealth });
+      setNetworkStats({ total: enriched.length, active: active.length, avgHealth });
     } catch { toast.error('Failed to load accounts'); }
     finally { setLoading(false); }
   }, []);
