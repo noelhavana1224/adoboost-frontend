@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Select } from '../components/UI';
-import { Users, Plus, Trash2, Edit2, Shield, ShieldCheck, Eye, EyeOff, Mail, Crown } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, Shield, ShieldCheck, Eye, EyeOff, Mail, Crown, Check, Copy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 // ── Permission definitions ───────────────────────
@@ -104,11 +104,15 @@ function MemberModal({ open, member, onClose, onSaved }) {
     setLoading(true);
     try {
       const payload = { ...form, permissions: JSON.stringify(form.permissions) };
-      member
-        ? await api.put(`/team-members/${member.id}`, payload)
-        : await api.post('/team-members/invite', payload);
-      toast.success(member ? 'Team member updated!' : '✅ Invitation sent! They will receive an email with login details.');
-      onSaved();
+      if (member) {
+        await api.put(`/team-members/${member.id}`, payload);
+        toast.success('Team member updated!');
+        onSaved();
+      } else {
+        const result = await api.post('/team-members/invite', payload);
+        toast.success('✅ Invitation sent!');
+        onSaved(result.data?.tempPassword ? result.data : null);
+      }
     } catch (err) {
       const data = err.response?.data;
       if (data?.seats_max) {
@@ -177,12 +181,74 @@ function MemberModal({ open, member, onClose, onSaved }) {
   );
 }
 
+// ── Credentials Modal (shown after invite) ───────
+function CredentialsModal({ open, credentials, onClose }) {
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedPass,  setCopiedPass]  = useState(false);
+  const copy = (text, which) => {
+    navigator.clipboard.writeText(text);
+    if (which === 'email') { setCopiedEmail(true); setTimeout(() => setCopiedEmail(false), 2000); }
+    else                   { setCopiedPass(true);  setTimeout(() => setCopiedPass(false),  2000); }
+  };
+  if (!open || !credentials) return null;
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.65)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1100, padding:20, backdropFilter:'blur(4px)' }}
+      onClick={onClose}>
+      <div style={{ background:'#fff', borderRadius:16, width:'100%', maxWidth:460, boxShadow:'0 24px 60px rgba(0,0,0,0.2)', animation:'slideUp 0.22s ease' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ padding:'22px 24px', borderBottom:'1px solid var(--border)', background:'var(--bg3)', borderRadius:'16px 16px 0 0', display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:36, height:36, background:'linear-gradient(135deg,#16a34a,#22c55e)', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Check size={18} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>Invitation Sent!</div>
+            <div style={{ fontSize:12, color:'var(--text3)' }}>Share these credentials with {credentials.name}</div>
+          </div>
+        </div>
+        <div style={{ padding:'20px 24px' }}>
+          <div style={{ background:'#f0fdf4', border:'1px solid #86efac', borderRadius:10, padding:'16px', marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#15803d', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.04em' }}>Login Credentials</div>
+            {[
+              { label:'Email', value: credentials.email, which: 'email', copied: copiedEmail },
+              { label:'Password', value: credentials.tempPassword, which: 'pass', copied: copiedPass },
+            ].map(row => (
+              <div key={row.label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <div>
+                  <div style={{ fontSize:11, color:'#15803d', fontWeight:600, marginBottom:2 }}>{row.label}</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'#0f172a', fontFamily:'monospace', letterSpacing:'0.04em' }}>{row.value}</div>
+                </div>
+                <button onClick={() => copy(row.value, row.which)} style={{
+                  display:'flex', alignItems:'center', gap:5, padding:'5px 12px',
+                  background: row.copied ? '#16a34a' : '#fff', color: row.copied ? '#fff' : '#15803d',
+                  border:'1px solid #86efac', borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer',
+                  transition:'all 0.18s',
+                }}>
+                  {row.copied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+                </button>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:'#fefce8', border:'1px solid #fde047', borderRadius:8, padding:'10px 14px', fontSize:12, color:'#a16207', marginBottom:16, lineHeight:1.55 }}>
+            ⚠ Share the password via a secure channel (WhatsApp, Slack, etc.). An invite email was also sent as backup.
+          </div>
+          <button onClick={onClose} style={{
+            width:'100%', padding:'10px', borderRadius:9, border:'none',
+            background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff',
+            fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
+          }}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main TeamMembers Page ────────────────────────
 export default function TeamMembers() {
   const [members, setMembers]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editMember, setEditMember] = useState(null);
+  const [credentials, setCredentials] = useState(null);
 
   const { user } = useAuth();
   const isTeamMember = user?.role === 'team_member';
@@ -319,7 +385,16 @@ export default function TeamMembers() {
         open={showModal || !!editMember}
         member={editMember}
         onClose={() => { setShowModal(false); setEditMember(null); }}
-        onSaved={() => { setShowModal(false); setEditMember(null); load(); }}
+        onSaved={(creds) => {
+          setShowModal(false); setEditMember(null); load();
+          if (creds?.tempPassword) setCredentials(creds);
+        }}
+      />
+
+      <CredentialsModal
+        open={!!credentials}
+        credentials={credentials}
+        onClose={() => setCredentials(null)}
       />
     </div>
   );
