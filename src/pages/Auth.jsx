@@ -2,54 +2,121 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User, ArrowRight, Check, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Check, Zap, BarChart2, Shield, Users } from 'lucide-react';
 
-function Logo({ size = 'large' }) {
-  const isLarge = size === 'large';
-  return (
-    <div style={{ display:'inline-flex', flexDirection:'column', alignItems:'flex-start', lineHeight:1 }}>
-      <div style={{
-        fontFamily:'Georgia, "Times New Roman", serif',
-        fontSize: isLarge ? 38 : 28,
-        fontWeight:800,
-        letterSpacing:'-0.02em',
-        color:'#fff',
-      }}>
-        ado<span style={{ color:'#FCD116' }}>boost</span>
-      </div>
-      <div style={{
-        fontSize: isLarge ? 10 : 9,
-        fontWeight:600,
-        color:'rgba(255,255,255,0.55)',
-        letterSpacing: isLarge ? '3px' : '2.5px',
-        marginTop: isLarge ? 6 : 4,
-      }}>
-        BY ADOBO SOLUTIONS
-      </div>
-    </div>
-  );
-}
+const CSS = `
+  @keyframes gradientShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes floatOrb1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%       { transform: translate(30px, -40px) scale(1.08); }
+  }
+  @keyframes floatOrb2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%       { transform: translate(-20px, 30px) scale(0.95); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  .auth-input {
+    width: 100%;
+    background: #f8faff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    color: #0f172a;
+    padding: 14px 14px 14px 44px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  .auth-input:focus {
+    border-color: #3b82f6;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.1);
+  }
+  .auth-input::placeholder { color: #94a3b8; }
+  .submit-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #7c3aed 100%);
+    background-size: 200% auto;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.1s;
+    box-shadow: 0 4px 20px rgba(37,99,235,0.4);
+    letter-spacing: 0.01em;
+    font-family: inherit;
+  }
+  .submit-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 28px rgba(37,99,235,0.55);
+    animation: shimmer 1.5s linear infinite;
+    background-size: 200% auto;
+  }
+  .submit-btn:active:not(:disabled) { transform: scale(0.985); }
+  .submit-btn:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; }
+  .alt-link {
+    display: block;
+    text-align: center;
+    padding: 13px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.18s;
+    background: #fff;
+    font-family: inherit;
+  }
+  .alt-link:hover {
+    border-color: #3b82f6;
+    background: #f0f7ff;
+    color: #2563eb;
+  }
+  .feature-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    animation: fadeUp 0.6s ease both;
+  }
+  @media (max-width: 768px) {
+    .auth-left { display: none !important; }
+    .auth-right { width: 100% !important; }
+  }
+`;
 
 function Field({ icon: Icon, label, ...props }) {
   const [focused, setFocused] = useState(false);
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-      <label style={{ fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.08em' }}>{label}</label>
-      <div style={{ position:'relative' }}>
-        <Icon size={16} style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color: focused ? '#0D47A1' : '#94a3b8', transition:'color 0.15s' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
+        {label}
+      </label>
+      <div style={{ position: 'relative' }}>
+        <Icon size={16} style={{
+          position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+          color: focused ? '#3b82f6' : '#94a3b8', transition: 'color 0.2s', pointerEvents: 'none',
+        }} />
         <input
-          style={{
-            width:'100%',
-            background:'#fff',
-            border: focused ? '1.5px solid #0D47A1' : '1.5px solid #e2e8f0',
-            borderRadius:10,
-            color:'#0f172a',
-            padding:'13px 14px 13px 40px',
-            fontSize:14,
-            outline:'none',
-            transition:'border-color 0.15s, box-shadow 0.15s',
-            boxShadow: focused ? '0 0 0 4px rgba(13,71,161,0.08)' : 'none',
-          }}
+          className="auth-input"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           {...props}
@@ -59,12 +126,25 @@ function Field({ icon: Icon, label, ...props }) {
   );
 }
 
-export default function Auth({ mode='login' }) {
+const FEATURES = [
+  { icon: Zap,       text: 'Multi-step email sequences with smart pausing' },
+  { icon: BarChart2, text: 'Real-time inbox, replies & deliverability tracking' },
+  { icon: Shield,    text: 'Built-in warmup network across your team' },
+  { icon: Users,     text: 'CRM-style pipeline with drag-and-drop stages' },
+];
+
+const STATS = [
+  { value: '2,400+', label: 'Active Users' },
+  { value: '98%',    label: 'Deliverability' },
+  { value: '4.9★',   label: 'User Rating' },
+];
+
+export default function Auth({ mode = 'login' }) {
   const { login, register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name:'', email:'', password:'' });
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const f = (k,v) => setForm(p => ({...p,[k]:v}));
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true);
@@ -77,240 +157,263 @@ export default function Auth({ mode='login' }) {
         toast.success(`Welcome to AdoBoost, ${form.name}! 🎉`);
         navigate('/welcome-va');
       }
-    } catch(err) { toast.error(err.response?.data?.error || 'Something went wrong'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'Something went wrong'); }
     finally { setLoading(false); }
   };
 
-  const features = [
-    'Multi-step email sequences with smart pausing',
-    'Real-time inbox, replies & deliverability tracking',
-    'Built-in warmup network across your team',
-    'CRM-style pipeline with drag-and-drop stages',
-  ];
-
   return (
-    <div style={{ minHeight:'100vh', display:'flex', background:'#f8fafc', fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      {/* Left Panel — Marketing */}
-      <div style={{
-        flex:1,
-        background:'radial-gradient(circle at 20% 20%, #1565C0 0%, #0D47A1 50%, #072159 100%)',
-        display:'flex',
-        flexDirection:'column',
-        justifyContent:'space-between',
-        padding:'56px 64px',
-        color:'#fff',
-        position:'relative',
-        overflow:'hidden',
-      }}>
-        {/* Subtle dot grid background */}
-        <div style={{
-          position:'absolute',
-          inset:0,
-          backgroundImage:'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)',
-          backgroundSize:'24px 24px',
-          pointerEvents:'none',
-        }} />
+    <>
+      <style>{CSS}</style>
+      <div style={{ minHeight: '100vh', display: 'flex', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
 
-        {/* Top: Logo */}
-        <div style={{ position:'relative', zIndex:1 }}>
-          <Logo size="large" />
-        </div>
-
-        {/* Middle: Pitch */}
-        <div style={{ maxWidth:480, position:'relative', zIndex:1 }}>
+        {/* ── LEFT PANEL ───────────────────────────── */}
+        <div className="auth-left" style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          background: 'linear-gradient(160deg, #020817 0%, #0a1628 40%, #0f0c29 70%, #1a0533 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '56px 64px',
+          color: '#fff',
+        }}>
+          {/* Animated grid */}
           <div style={{
-            display:'inline-flex',
-            alignItems:'center',
-            gap:6,
-            background:'rgba(255,255,255,0.08)',
-            border:'1px solid rgba(255,255,255,0.16)',
-            color:'#fff',
-            fontSize:12,
-            fontWeight:700,
-            padding:'6px 12px',
-            borderRadius:99,
-            marginBottom:24,
-            letterSpacing:'0.04em',
-          }}>
-            <Sparkles size={12} color="#FCD116" />
-            COLD EMAIL OUTREACH PLATFORM
-          </div>
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            backgroundImage: `
+              linear-gradient(rgba(59,130,246,0.07) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(59,130,246,0.07) 1px, transparent 1px)
+            `,
+            backgroundSize: '48px 48px',
+          }} />
 
-          <h1 style={{
-            fontSize:48,
-            fontWeight:800,
-            lineHeight:1.05,
-            margin:'0 0 20px',
-            letterSpacing:'-0.025em',
-          }}>
-            Cold email that<br />gets replies.
-          </h1>
-          <p style={{
-            fontSize:17,
-            color:'rgba(255,255,255,0.75)',
-            lineHeight:1.6,
-            margin:'0 0 32px',
-            maxWidth:440,
-          }}>
-            The outreach platform built for solo founders and small teams. Send sequences, track every reply, and warm up your inbox — all in one place.
-          </p>
+          {/* Glowing orbs */}
+          <div style={{
+            position: 'absolute', top: '-80px', left: '-80px',
+            width: 400, height: 400, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
+            animation: 'floatOrb1 8s ease-in-out infinite',
+            pointerEvents: 'none',
+          }} />
+          <div style={{
+            position: 'absolute', bottom: '10%', right: '-60px',
+            width: 340, height: 340, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(124,58,237,0.25) 0%, transparent 70%)',
+            animation: 'floatOrb2 10s ease-in-out infinite',
+            pointerEvents: 'none',
+          }} />
+          <div style={{
+            position: 'absolute', top: '45%', right: '20%',
+            width: 180, height: 180, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(6,182,212,0.15) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
 
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {features.map(f => (
-              <div key={f} style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+          {/* Logo */}
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Icon */}
                 <div style={{
-                  width:22, height:22,
-                  background:'rgba(255,255,255,0.1)',
-                  border:'1px solid rgba(255,255,255,0.2)',
-                  borderRadius:7,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  flexShrink:0,
-                  marginTop:1,
+                  width: 42, height: 42, borderRadius: 12,
+                  background: 'linear-gradient(135deg, #1d4ed8, #7c3aed)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 0 20px rgba(99,102,241,0.5)',
                 }}>
-                  <Check size={12} color="#fff" strokeWidth={3} />
+                  <svg width="22" height="22" viewBox="0 0 38 38" fill="none">
+                    <path d="M8 21 L22 14 L18 24 Z" fill="white"/>
+                    <path d="M18 24 L14 20 L22 14" fill="none" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
+                    <line x1="14" y1="20" x2="12" y2="26" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
                 </div>
-                <span style={{ fontSize:14.5, color:'rgba(255,255,255,0.9)', lineHeight:1.5 }}>{f}</span>
+                <div>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                    ado<span style={{ color: '#FCD116' }}>boost</span>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', letterSpacing: '3px', marginTop: 3, textTransform: 'uppercase' }}>
+                    by Adobo Solutions
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
 
-          {/* Soft VA mention */}
-          <div style={{
-            marginTop:28,
-            padding:'14px 16px',
-            background:'rgba(255,255,255,0.05)',
-            border:'1px solid rgba(255,255,255,0.1)',
-            borderRadius:10,
-            fontSize:13,
-            color:'rgba(255,255,255,0.7)',
-            lineHeight:1.5,
-          }}>
-            <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:600 }}>Need a hand?</span> Add a trained VA from <span style={{ color:'#fff', fontWeight:700 }}>$4/hr</span> after signup — optional, no commitment.
-          </div>
-        </div>
-
-        {/* Bottom: trust line */}
-        <div style={{ position:'relative', zIndex:1 }}>
-          <div style={{
-            fontSize:12,
-            color:'rgba(255,255,255,0.5)',
-            fontWeight:600,
-            letterSpacing:'0.06em',
-          }}>
-            BUILT FOR SOLO FOUNDERS AND SMALL TEAMS
-          </div>
-        </div>
-      </div>
-
-      {/* Right Panel — Form */}
-      <div style={{
-        width:520,
-        display:'flex',
-        alignItems:'center',
-        justifyContent:'center',
-        padding:'40px 56px',
-        background:'#fff',
-      }}>
-        <div style={{ width:'100%', maxWidth:380 }}>
-          <div style={{ marginBottom:36 }}>
-            <h2 style={{
-              fontSize:28,
-              fontWeight:800,
-              color:'#0f172a',
-              margin:'0 0 8px',
-              letterSpacing:'-0.02em',
+          {/* Main copy */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 2, maxWidth: 500, paddingTop: 32, paddingBottom: 32 }}>
+            {/* Badge */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              border: '1px solid rgba(99,102,241,0.5)',
+              background: 'rgba(99,102,241,0.1)',
+              borderRadius: 99, padding: '6px 14px',
+              marginBottom: 28, width: 'fit-content',
             }}>
-              {mode==='login' ? 'Welcome back' : 'Create your account'}
-            </h2>
-            <p style={{ color:'#64748b', fontSize:14.5, margin:0 }}>
-              {mode==='login'
-                ? 'Sign in to your AdoBoost account'
-                : 'Start your 14-day free trial — no card required'}
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 8px #3b82f6' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                Cold Email Outreach Platform
+              </span>
+            </div>
+
+            <h1 style={{
+              fontSize: 52,
+              fontWeight: 800,
+              lineHeight: 1.05,
+              margin: '0 0 22px',
+              letterSpacing: '-0.03em',
+              background: 'linear-gradient(135deg, #fff 30%, rgba(147,197,253,0.9) 70%, rgba(196,181,253,0.8) 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>
+              Cold email that<br />gets replies.
+            </h1>
+
+            <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, margin: '0 0 36px', maxWidth: 420 }}>
+              The outreach platform built for solo founders and small teams.
+              Send sequences, track every reply, and warm up your inbox — all in one place.
             </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {FEATURES.map(({ icon: Icon, text }, i) => (
+                <div key={text} className="feature-row" style={{ animationDelay: `${i * 0.08}s` }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(124,58,237,0.2))',
+                    border: '1px solid rgba(99,102,241,0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    boxShadow: '0 0 12px rgba(99,102,241,0.15)',
+                  }}>
+                    <Icon size={13} color="#93c5fd" />
+                  </div>
+                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, paddingTop: 4 }}>{text}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* VA mention */}
+            <div style={{
+              marginTop: 32,
+              padding: '14px 18px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 12,
+              fontSize: 13,
+              color: 'rgba(255,255,255,0.55)',
+              lineHeight: 1.6,
+              backdropFilter: 'blur(8px)',
+            }}>
+              <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Need a hand?</span>{' '}
+              Add a trained VA from <span style={{ color: '#FCD116', fontWeight: 700 }}>$4/hr</span> after signup — optional, no commitment.
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:18 }}>
-            {mode==='register' && (
-              <Field icon={User} label="Full Name" type="text" placeholder="John Doe" value={form.name} onChange={e=>f('name',e.target.value)} required />
-            )}
-            <Field icon={Mail} label="Email Address" type="email" placeholder="you@company.com" value={form.email} onChange={e=>f('email',e.target.value)} required />
-            <Field icon={Lock} label="Password" type="password" placeholder="••••••••" value={form.password} onChange={e=>f('password',e.target.value)} required />
-
-            {mode==='login' && (
-              <div style={{ textAlign:'right', marginTop:-4 }}>
-                <Link to="/forgot-password" style={{ fontSize:13, color:'#0D47A1', fontWeight:600, textDecoration:'none' }}>
-                  Forgot password?
-                </Link>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                display:'flex',
-                alignItems:'center',
-                justifyContent:'center',
-                gap:8,
-                background: loading
-                  ? '#94a3b8'
-                  : 'linear-gradient(135deg, #0D47A1 0%, #1565C0 100%)',
-                color:'#fff',
-                border:'none',
-                borderRadius:10,
-                padding:'14px',
-                fontSize:15,
-                fontWeight:700,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                marginTop:6,
-                transition:'transform 0.1s, box-shadow 0.15s',
-                boxShadow: loading ? 'none' : '0 4px 14px rgba(13,71,161,0.25)',
-                letterSpacing:'0.01em',
-              }}
-              onMouseDown={e => !loading && (e.currentTarget.style.transform = 'scale(0.99)')}
-              onMouseUp={e => !loading && (e.currentTarget.style.transform = 'scale(1)')}
-              onMouseLeave={e => !loading && (e.currentTarget.style.transform = 'scale(1)')}
-            >
-              {loading ? 'Please wait...' : (mode==='login' ? 'Sign In' : 'Create Account')}
-              {!loading && <ArrowRight size={16} />}
-            </button>
-          </form>
-
-          <div style={{ position:'relative', textAlign:'center', margin:'28px 0 20px' }}>
-            <div style={{ position:'absolute', top:'50%', left:0, right:0, height:1, background:'#e2e8f0' }} />
-            <span style={{ position:'relative', background:'#fff', padding:'0 14px', fontSize:12, color:'#94a3b8', fontWeight:600, letterSpacing:'0.06em' }}>
-              {mode==='login' ? 'NEW TO ADOBOOST?' : 'ALREADY HAVE AN ACCOUNT?'}
-            </span>
+          {/* Stats row */}
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            <div style={{
+              display: 'flex', gap: 0,
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 14,
+              background: 'rgba(255,255,255,0.03)',
+              overflow: 'hidden',
+              backdropFilter: 'blur(8px)',
+            }}>
+              {STATS.map(({ value, label }, i) => (
+                <div key={label} style={{
+                  flex: 1, padding: '18px 20px', textAlign: 'center',
+                  borderRight: i < STATS.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 5, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
+                </div>
+              ))}
+            </div>
           </div>
-
-          <Link
-            to={mode==='login' ? '/register' : '/login'}
-            style={{
-              display:'block',
-              textAlign:'center',
-              padding:'12px',
-              border:'1.5px solid #e2e8f0',
-              borderRadius:10,
-              color:'#0f172a',
-              fontSize:14,
-              fontWeight:700,
-              textDecoration:'none',
-              transition:'border-color 0.15s, background 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#0D47A1'; e.currentTarget.style.background = '#f8fafc'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
-          >
-            {mode==='login' ? 'Create a free account' : 'Sign in instead'}
-          </Link>
-
-          {mode==='register' && (
-            <p style={{ textAlign:'center', marginTop:18, fontSize:12, color:'#94a3b8', lineHeight:1.5 }}>
-              By creating an account you agree to our<br />
-              <a href="#" style={{ color:'#64748b', textDecoration:'underline' }}>Terms</a> · <a href="#" style={{ color:'#64748b', textDecoration:'underline' }}>Privacy Policy</a>
-            </p>
-          )}
         </div>
+
+        {/* ── RIGHT PANEL ──────────────────────────── */}
+        <div className="auth-right" style={{
+          width: 540,
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '60px 56px',
+          flexShrink: 0,
+        }}>
+          <div style={{ width: '100%', maxWidth: 400, animation: 'fadeUp 0.5s ease both' }}>
+
+            {/* Header */}
+            <div style={{ marginBottom: 40 }}>
+              <h2 style={{ fontSize: 30, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', letterSpacing: '-0.025em' }}>
+                {mode === 'login' ? 'Welcome back' : 'Create your account'}
+              </h2>
+              <p style={{ color: '#64748b', fontSize: 15, margin: 0, lineHeight: 1.5 }}>
+                {mode === 'login'
+                  ? 'Sign in to your AdoBoost account'
+                  : 'Start your 14-day free trial — no card required'}
+              </p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {mode === 'register' && (
+                <Field icon={User} label="Full Name" type="text" placeholder="John Doe"
+                  value={form.name} onChange={e => f('name', e.target.value)} required />
+              )}
+              <Field icon={Mail} label="Email Address" type="email" placeholder="you@company.com"
+                value={form.email} onChange={e => f('email', e.target.value)} required />
+              <Field icon={Lock} label="Password" type="password" placeholder="••••••••"
+                value={form.password} onChange={e => f('password', e.target.value)} required />
+
+              {mode === 'login' && (
+                <div style={{ textAlign: 'right', marginTop: -6 }}>
+                  <Link to="/forgot-password" style={{ fontSize: 13, color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}>
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
+
+              <button type="submit" disabled={loading} className="submit-btn" style={{ marginTop: 4 }}>
+                {loading ? 'Please wait...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
+                {!loading && <ArrowRight size={16} />}
+              </button>
+            </form>
+
+            {/* Divider */}
+            <div style={{ position: 'relative', textAlign: 'center', margin: '32px 0 24px' }}>
+              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: '#f1f5f9' }} />
+              <span style={{ position: 'relative', background: '#fff', padding: '0 16px', fontSize: 11, color: '#94a3b8', fontWeight: 700, letterSpacing: '0.08em' }}>
+                {mode === 'login' ? 'NEW TO ADOBOOST?' : 'ALREADY HAVE AN ACCOUNT?'}
+              </span>
+            </div>
+
+            <Link to={mode === 'login' ? '/register' : '/login'} className="alt-link">
+              {mode === 'login' ? 'Create a free account' : 'Sign in instead'}
+            </Link>
+
+            {mode === 'register' && (
+              <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
+                By creating an account you agree to our{' '}
+                <a href="#" style={{ color: '#64748b', textDecoration: 'underline' }}>Terms</a>
+                {' '}·{' '}
+                <a href="#" style={{ color: '#64748b', textDecoration: 'underline' }}>Privacy Policy</a>
+              </p>
+            )}
+
+            {/* Trust badge */}
+            <div style={{ marginTop: 36, padding: '14px 18px', background: '#f8faff', border: '1px solid #e0e7ff', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #1d4ed8, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Check size={14} color="#fff" strokeWidth={3} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Trusted by 2,400+ users</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>No credit card required · Cancel anytime</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
-    </div>
+    </>
   );
 }
