@@ -6,7 +6,7 @@ import { Spinner, Pagination, Modal } from '../components/UI';
 import {
   MessageSquare, Search, RefreshCw, Inbox as InboxIcon, CheckCircle,
   Loader2, X, Reply, Tag as TagIcon, ChevronDown, Send, ChevronsRight,
-  Archive, Briefcase, Mail,
+  Archive, Briefcase, Mail, ChevronUp, CornerUpLeft,
 } from 'lucide-react';
 
 // ── Tags ────────────────────────────────────────────────
@@ -40,7 +40,10 @@ function timeAgo(d) {
 }
 function timeAgoFull(d) {
   if (!d) return '';
-  return new Date(d).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  return new Date(d).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
 }
 function extractNew(body) {
   if (!body) return '';
@@ -242,7 +245,121 @@ function RichReplyEditor({ value, onChange, placeholder, editorKey }) {
   );
 }
 
-// ── Thread Reader (inline right-panel) ──────────────────
+// ── Single Email Card (Outlook-style) ────────────────────
+function EmailCard({ msg, isLast, selAcc, accountsMap }) {
+  const [collapsed, setCollapsed] = useState(!isLast); // latest is expanded, older collapsed
+  const [showQuoted, setShowQuoted] = useState(false);
+  const isSent = msg.status === 'sent';
+  const newContent = extractNew(msg.body);
+  const hasQuoted = msg.body && newContent.length < msg.body.trim().length - 20;
+  const senderName = isSent
+    ? (selAcc ? `${selAcc.from_name || ''} <${selAcc.from_email}>` : 'You (sent)')
+    : (msg.from_name ? `${msg.from_name} <${msg.from_email}>` : msg.from_email);
+  const senderShort = isSent
+    ? (selAcc ? (selAcc.from_name || selAcc.from_email) : 'You')
+    : (msg.from_name || msg.from_email || '?');
+
+  return (
+    <div style={{
+      borderBottom: '1px solid #e8edf2',
+      background: isLast ? '#fff' : '#fafbfc',
+      animation: isLast ? 'fadeInEmail 0.2s ease' : 'none',
+    }}>
+      {/* ── Card header (always visible) ── */}
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 20px',
+          cursor: 'pointer',
+          borderLeft: `3px solid ${isSent ? '#2563eb' : isLast ? '#10b981' : 'transparent'}`,
+          background: isLast ? '#fff' : 'transparent',
+          userSelect: 'none',
+        }}
+        onMouseEnter={e => { if (!isLast) e.currentTarget.style.background = '#f1f5f9'; }}
+        onMouseLeave={e => { if (!isLast) e.currentTarget.style.background = 'transparent'; }}
+      >
+        {/* Avatar */}
+        <div style={{
+          width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+          background: isSent ? '#1d4ed8' : avatarColor(msg.from_email),
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontWeight: 700, fontSize: 14,
+          boxShadow: isLast ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
+        }}>
+          {isSent ? <Send size={14}/> : initials(msg.from_name, msg.from_email)}
+        </div>
+
+        {/* Sender info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <span style={{ fontWeight: isLast ? 700 : 500, fontSize: 13, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>
+              {senderShort}
+            </span>
+            {isSent && (
+              <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: '#dbeafe', color: '#1d4ed8', fontWeight: 600, flexShrink: 0 }}>Sent</span>
+            )}
+            {collapsed && (
+              <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                — {(newContent || msg.body || '').substring(0, 60)}
+              </span>
+            )}
+          </div>
+          {!collapsed && (
+            <div style={{ fontSize: 11, color: '#64748b' }}>
+              <span style={{ color: '#94a3b8' }}>From:</span> {senderName}
+            </div>
+          )}
+        </div>
+
+        {/* Date + collapse toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>{timeAgoFull(msg.received_at)}</span>
+          <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+            {collapsed ? <ChevronDown size={14}/> : <ChevronUp size={14}/>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Email body (when expanded) ── */}
+      {!collapsed && (
+        <div style={{ padding: '0 20px 18px 72px' }}>
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid #e8edf2', marginBottom: 14 }}/>
+
+          {/* Body */}
+          <div
+            style={{ fontSize: 14, lineHeight: 1.8, color: '#1e293b', wordBreak: 'break-word' }}
+            dangerouslySetInnerHTML={{
+              __html: (newContent || msg.body || '(no content)')
+                .replace(/\n/g, '<br>')
+                .replace(/https?:\/\/[^\s<]+/g, url => `<a href="${url}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline">${url}</a>`)
+            }}
+          />
+
+          {/* Quoted text toggle */}
+          {hasQuoted && (
+            <div style={{ marginTop: 12 }}>
+              <button
+                onClick={e => { e.stopPropagation(); setShowQuoted(q => !q); }}
+                style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#64748b', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ letterSpacing: '0.08em', fontSize: 10 }}>•••</span>
+                {showQuoted ? 'Hide quoted' : 'Show quoted text'}
+              </button>
+              {showQuoted && (
+                <div style={{ marginTop: 8, padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#64748b', lineHeight: 1.7, borderLeft: '3px solid #cbd5e1', whiteSpace: 'pre-wrap' }}>
+                  {msg.body}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Thread Reader (Outlook-style inline right panel) ─────
 function ThreadReader({ thread, onClose, onUpdate, onDelete, onArchive, isArchived }) {
   const [accounts, setAccounts]   = useState([]);
   const [accountId, setAccountId] = useState('');
@@ -255,6 +372,7 @@ function ThreadReader({ thread, onClose, onUpdate, onDelete, onArchive, isArchiv
   const [sending, setSending]     = useState(false);
   const [tagging, setTagging]     = useState(false);
   const [showTagDrop, setShowTagDrop] = useState(false);
+  const [showCompose, setShowCompose] = useState(true);
   const bottomRef = useRef(null);
 
   const leadMsg    = thread.msgs.find(m => m.status !== 'sent') || thread.msgs[0];
@@ -292,7 +410,7 @@ function ThreadReader({ thread, onClose, onUpdate, onDelete, onArchive, isArchiv
   }, [thread.key]);
 
   useEffect(() => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 120);
   }, [thread.key]);
 
   useEffect(() => {
@@ -336,169 +454,173 @@ function ThreadReader({ thread, onClose, onUpdate, onDelete, onArchive, isArchiv
   };
 
   const selAcc = accounts.find(a => a.id === accountId);
+  const accountsMap = Object.fromEntries(accounts.map(a => [a.id, a]));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff', animation: 'fadeInPane 0.18s ease' }}>
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes fadeInPane{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes fadeInPane{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes fadeInEmail{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
         .field-inp{width:100%;border:none;outline:none;font-size:13px;color:#0f172a;font-family:inherit;background:transparent;}
       `}</style>
 
-      {/* ── Header: dark navy ── */}
-      <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '14px 20px', flexShrink: 0 }}>
+      {/* ══ Subject banner (dark navy) ══ */}
+      <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '12px 20px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <button onClick={onClose} title="Close" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', padding: 5, borderRadius: 6, display: 'flex', alignItems: 'center', flexShrink: 0, marginTop: 1 }}>
-            <X size={16}/>
+          <button onClick={onClose} title="Close" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', padding: '5px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <X size={15}/>
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1.3, marginBottom: 5, letterSpacing: '-0.02em' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1.3, marginBottom: 4, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {(thread.latest.subject || '(no subject)').replace(/^(Re:\s*|Fwd:\s*)+/i, '')}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {thread.latest.campaign_name && (
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: 10 }}>📢 {thread.latest.campaign_name}</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.1)', padding: '2px 7px', borderRadius: 10 }}>📢 {thread.latest.campaign_name}</span>
               )}
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{thread.count} message{thread.count !== 1 ? 's' : ''}</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{thread.count} message{thread.count !== 1 ? 's' : ''}</span>
               {leadMsg?.replied === 1 && (
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(22,163,74,0.2)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', fontWeight: 600 }}>✅ Replied</span>
+                <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'rgba(22,163,74,0.2)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', fontWeight: 600 }}>✅ Replied</span>
               )}
             </div>
           </div>
-          {/* Tag dropdown */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button onClick={() => setShowTagDrop(p => !p)} disabled={tagging} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600, border: `1px solid ${currentTag ? currentTag.border : 'rgba(255,255,255,0.2)'}`, background: currentTag ? currentTag.bg : 'rgba(255,255,255,0.1)', color: currentTag ? currentTag.color : 'rgba(255,255,255,0.75)', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-              <TagIcon size={10}/>{tagging ? 'Saving…' : currentTag ? currentTag.label : 'Tag'}<ChevronDown size={9}/>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {/* Tag dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setShowTagDrop(p => !p)} disabled={tagging} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, border: `1px solid ${currentTag ? currentTag.border : 'rgba(255,255,255,0.2)'}`, background: currentTag ? currentTag.bg : 'rgba(255,255,255,0.1)', color: currentTag ? currentTag.color : 'rgba(255,255,255,0.75)', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                <TagIcon size={10}/>{tagging ? 'Saving…' : currentTag ? currentTag.label : 'Tag'}<ChevronDown size={9}/>
+              </button>
+              {showTagDrop && (
+                <>
+                  <div onClick={() => setShowTagDrop(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }}/>
+                  <div style={{ position: 'absolute', right: 0, top: '110%', background: '#fff', border: '1px solid var(--border2)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 11, minWidth: 200, overflow: 'hidden' }}>
+                    {currentTag && <button onClick={() => handleTag(null)} style={{ width: '100%', padding: '8px 14px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--border)' }}><X size={10}/> Remove tag</button>}
+                    {TAGS.map(t => (
+                      <button key={t.key} onClick={() => handleTag(t.key)} style={{ width: '100%', padding: '9px 14px', border: 'none', background: leadMsg?.tag === t.key ? t.bg : 'transparent', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: t.color, fontWeight: leadMsg?.tag === t.key ? 700 : 500, display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit' }}>{t.label}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Archive / Restore */}
+            <button onClick={onArchive} title={isArchived ? 'Restore to Inbox' : 'Archive Thread'} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              {isArchived ? '📥 Restore' : '📁 Archive'}
             </button>
-            {showTagDrop && (
-              <>
-                <div onClick={() => setShowTagDrop(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }}/>
-                <div style={{ position: 'absolute', right: 0, top: '110%', background: '#fff', border: '1px solid var(--border2)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 11, minWidth: 200, overflow: 'hidden' }}>
-                  {currentTag && <button onClick={() => handleTag(null)} style={{ width: '100%', padding: '8px 14px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--border)' }}><X size={10}/> Remove tag</button>}
-                  {TAGS.map(t => (
-                    <button key={t.key} onClick={() => handleTag(t.key)} style={{ width: '100%', padding: '9px 14px', border: 'none', background: leadMsg?.tag === t.key ? t.bg : 'transparent', textAlign: 'left', cursor: 'pointer', fontSize: 13, color: t.color, fontWeight: leadMsg?.tag === t.key ? 700 : 500, display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit' }}>{t.label}</button>
-                  ))}
-                </div>
-              </>
-            )}
+
+            {/* Delete */}
+            <button onClick={() => onDelete && onDelete(thread)} title="Delete thread" style={{ display: 'flex', alignItems: 'center', padding: '5px 8px', borderRadius: 7, fontSize: 11, border: '1px solid rgba(252,165,165,0.3)', background: 'rgba(239,68,68,0.12)', color: '#fca5a5', cursor: 'pointer', fontFamily: 'inherit' }}>
+              🗑
+            </button>
           </div>
         </div>
       </div>
 
-      {/* ── Thread messages (scrollable) ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20, background: '#f8fafc' }}>
-        {thread.msgs.map((m, mi) => {
-          const isSent = m.status === 'sent';
-          const newContent = extractNew(m.body);
-          const hasQuoted = m.body && newContent.length < m.body.trim().length - 20;
-          const isFirst = mi === 0;
-          return (
-            <div key={m.id}>
-              {/* Sender info row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexDirection: isSent ? 'row-reverse' : 'row' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isSent ? '#2563eb' : avatarColor(m.from_email), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}>
-                  {isSent ? <Send size={14}/> : initials(m.from_name, m.from_email)}
-                </div>
-                <div style={{ flex: 1, textAlign: isSent ? 'right' : 'left' }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: isSent ? '#2563eb' : '#1e293b' }}>
-                    {isSent ? (selAcc ? `${selAcc.from_name || ''} <${selAcc.from_email}>` : 'You') : (m.from_name ? `${m.from_name} <${m.from_email}>` : m.from_email)}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgoFull(m.received_at)}</div>
-                </div>
+      {/* ══ Email conversation cards (scrollable) ══ */}
+      <div style={{ flex: 1, overflowY: 'auto', background: '#f1f5f9' }}>
+        {/* Thread messages */}
+        <div style={{ margin: '12px 16px', borderRadius: 10, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          {thread.msgs.map((m, mi) => (
+            <EmailCard
+              key={m.id}
+              msg={m}
+              isLast={mi === thread.msgs.length - 1}
+              selAcc={selAcc}
+              accountsMap={accountsMap}
+            />
+          ))}
+        </div>
+
+        {/* ══ Reply / Forward compose ══ */}
+        {!canAutoReply ? (
+          <div style={{ margin: '0 16px 16px', borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            {/* Compose header */}
+            <div
+              onClick={() => setShowCompose(c => !c)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: showCompose ? '1px solid #e8edf2' : 'none', cursor: 'pointer', userSelect: 'none', background: '#fff' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            >
+              <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <CornerUpLeft size={13} color="#2563eb"/>
               </div>
-              {/* Message bubble */}
-              <div style={{ maxWidth: '80%', marginLeft: isSent ? 'auto' : 0, background: isSent ? '#2563eb' : '#fff', color: isSent ? '#fff' : '#1e293b', borderRadius: isSent ? '16px 4px 16px 16px' : '4px 16px 16px 16px', padding: '14px 18px', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', wordBreak: 'break-word', boxShadow: isSent ? '0 4px 12px rgba(37,99,235,0.25)' : '0 2px 8px rgba(0,0,0,0.06)', border: isSent ? 'none' : '1px solid #e2e8f0' }}>
-                {newContent || m.body || '(no content)'}
-              </div>
-              {hasQuoted && !isSent && (
-                <details style={{ maxWidth: '80%', marginTop: 4 }}>
-                  <summary style={{ fontSize: 11, color: '#94a3b8', cursor: 'pointer', userSelect: 'none', padding: '4px 0' }}>··· Show quoted text</summary>
-                  <div style={{ marginTop: 6, padding: '10px 14px', background: '#f1f5f9', borderRadius: 8, fontSize: 12, color: '#64748b', whiteSpace: 'pre-wrap', lineHeight: 1.6, borderLeft: '3px solid #e2e8f0' }}>{m.body}</div>
-                </details>
-              )}
-            </div>
-          );
-        })}
-        <div ref={bottomRef}/>
-      </div>
-
-      {/* ── Compose area ── */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid var(--border)', background: '#fff' }}>
-        {canAutoReply ? (
-          <div style={{ padding: '14px 20px', fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>⚙️ This is an auto-reply — no response needed</div>
-        ) : (
-          <div>
-            {/* Reply / Forward tabs */}
-            <div style={{ display: 'flex', paddingLeft: 16, borderBottom: '1px solid var(--border)' }}>
-              {[{id:'reply',icon:<Reply size={12}/>,label:'Reply'},{id:'forward',icon:<ChevronsRight size={12}/>,label:'Forward'}].map(tab => (
-                <button key={tab.id} onClick={() => setMode(tab.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '9px 14px', border: 'none', borderBottom: `2px solid ${mode===tab.id?'#2563eb':'transparent'}`, background: 'none', cursor: 'pointer', fontSize: 13, fontWeight: mode===tab.id?600:400, color: mode===tab.id?'#2563eb':'#94a3b8', fontFamily: 'inherit', marginBottom: -1 }}>
-                  {tab.icon}{tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* Address fields */}
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 28, flexShrink: 0 }}>From</span>
-                  <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: 13, color: '#2563eb', fontWeight: 600, fontFamily: 'inherit', background: 'transparent', cursor: 'pointer' }}>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.from_name} &lt;{a.from_email}&gt;</option>)}
-                  </select>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: showCcBcc ? '1px solid #f1f5f9' : 'none' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 28, flexShrink: 0 }}>To</span>
-                  {mode === 'reply' ? (
-                    <span style={{ fontSize: 13, color: '#1e293b', flex: 1 }}>{leadMsg?.from_name ? `${leadMsg.from_name} <${leadMsg.from_email}>` : leadMsg?.from_email}</span>
-                  ) : (
-                    <input className="field-inp" placeholder="recipient@email.com" value={forwardTo} onChange={e => setForwardTo(e.target.value)}/>
-                  )}
-                  <button onClick={() => setShowCcBcc(p => !p)} style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>{showCcBcc ? 'Hide' : 'CC / BCC'}</button>
-                </div>
-                {showCcBcc && <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: '1px solid #f1f5f9' }}>
-                    <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 28 }}>CC</span>
-                    <input className="field-inp" placeholder="cc@email.com" value={cc} onChange={e => setCc(e.target.value)}/>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px' }}>
-                    <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 28 }}>BCC</span>
-                    <input className="field-inp" placeholder="bcc@email.com" value={bcc} onChange={e => setBcc(e.target.value)}/>
-                  </div>
-                </>}
-              </div>
-
-              <RichReplyEditor
-                key={`reply-${mode}-${thread.key}`}
-                editorKey={mode}
-                value={replyBody}
-                onChange={setReplyBody}
-                placeholder={mode === 'forward' ? 'Forward to someone… (Ctrl+Enter to send)' : `Write your reply to ${leadMsg?.from_name || 'them'}… (Ctrl+Enter to send)`}
-              />
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                  Ctrl+Enter to send{selAcc && <> · <span style={{ color: '#2563eb', fontWeight: 600 }}>{selAcc.from_email}</span></>}
-                </span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => { setReplyBody(''); setCc(''); setBcc(''); setForwardTo(''); }} style={{ padding: '6px 14px', background: 'none', border: '1px solid #e2e8f0', borderRadius: 7, fontSize: 13, color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>Clear</button>
-                  <button onClick={handleSend} disabled={sending || !replyBody} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 20px', background: sending || !replyBody ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: sending || !replyBody ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-                    {sending ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }}/> Sending…</> : <><Send size={13}/>{mode === 'forward' ? 'Forward' : 'Send Reply'}</>}
+              {/* Reply/Forward tab pills */}
+              <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+                {[{id:'reply',label:'↩ Reply'},{id:'forward',label:'» Forward'}].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={e => { e.stopPropagation(); setMode(tab.id); setShowCompose(true); }}
+                    style={{ padding: '3px 10px', borderRadius: 5, border: 'none', fontSize: 12, fontWeight: mode===tab.id ? 700 : 400, background: mode===tab.id ? '#eff6ff' : 'transparent', color: mode===tab.id ? '#2563eb' : '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {tab.label}
                   </button>
+                ))}
+              </div>
+              <div style={{ color: '#94a3b8' }}>{showCompose ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
+            </div>
+
+            {showCompose && (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Address fields */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 32, flexShrink: 0 }}>From</span>
+                    <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: 13, color: '#2563eb', fontWeight: 600, fontFamily: 'inherit', background: 'transparent', cursor: 'pointer' }}>
+                      {accounts.map(a => <option key={a.id} value={a.id}>{a.from_name} &lt;{a.from_email}&gt;</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: showCcBcc ? '1px solid #f1f5f9' : 'none' }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 32, flexShrink: 0 }}>To</span>
+                    {mode === 'reply' ? (
+                      <span style={{ fontSize: 13, color: '#1e293b', flex: 1 }}>{leadMsg?.from_name ? `${leadMsg.from_name} <${leadMsg.from_email}>` : leadMsg?.from_email}</span>
+                    ) : (
+                      <input className="field-inp" placeholder="recipient@email.com" value={forwardTo} onChange={e => setForwardTo(e.target.value)}/>
+                    )}
+                    <button onClick={e => { e.stopPropagation(); setShowCcBcc(p => !p); }} style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>{showCcBcc ? 'Hide' : 'CC / BCC'}</button>
+                  </div>
+                  {showCcBcc && <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 32 }}>CC</span>
+                      <input className="field-inp" placeholder="cc@email.com" value={cc} onChange={e => setCc(e.target.value)}/>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px' }}>
+                      <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, width: 32 }}>BCC</span>
+                      <input className="field-inp" placeholder="bcc@email.com" value={bcc} onChange={e => setBcc(e.target.value)}/>
+                    </div>
+                  </>}
+                </div>
+
+                <RichReplyEditor
+                  key={`reply-${mode}-${thread.key}`}
+                  editorKey={mode}
+                  value={replyBody}
+                  onChange={setReplyBody}
+                  placeholder={mode === 'forward' ? 'Add a message… (Ctrl+Enter to send)' : `Write your reply to ${leadMsg?.from_name || 'them'}… (Ctrl+Enter to send)`}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                    Ctrl+Enter to send{selAcc && <> · <span style={{ color: '#2563eb', fontWeight: 600 }}>{selAcc.from_email}</span></>}
+                  </span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setReplyBody(''); setCc(''); setBcc(''); setForwardTo(''); }} style={{ padding: '6px 14px', background: 'none', border: '1px solid #e2e8f0', borderRadius: 7, fontSize: 13, color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>Clear</button>
+                    <button onClick={handleSend} disabled={sending || !replyBody} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 20px', background: sending || !replyBody ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: sending || !replyBody ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                      {sending ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }}/> Sending…</> : <><Send size={13}/>{mode === 'forward' ? 'Forward' : 'Send Reply'}</>}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ margin: '0 16px 16px', padding: '14px 18px', borderRadius: 10, background: '#fff', border: '1px solid #e2e8f0', fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>
+            ⚙️ This is an auto-reply — no response needed
           </div>
         )}
 
-        {/* Archive / Delete */}
-        <div style={{ padding: '8px 16px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', background: '#fafafa' }}>
-          <button onClick={onArchive} style={{ background: 'none', border: `1px solid ${isArchived ? '#93c5fd' : '#e2e8f0'}`, borderRadius: 7, padding: '5px 13px', cursor: 'pointer', fontSize: 12, color: isArchived ? '#3b82f6' : '#64748b', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
-            {isArchived ? '📥 Restore to Inbox' : '📁 Archive Thread'}
-          </button>
-          <button onClick={() => onDelete && onDelete(thread)} style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 7, padding: '5px 13px', cursor: 'pointer', fontSize: 12, color: '#dc2626', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
-            🗑 Delete Thread
-          </button>
-        </div>
+        <div ref={bottomRef}/>
       </div>
     </div>
   );
@@ -637,7 +759,7 @@ export default function Messages({ type = 'inbox' }) {
             <div>
               <h1 style={{ fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1, margin: 0 }}>Messages</h1>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
-                {type === 'inbox' && unread > 0 ? `${unread} unread` : type === 'archive' ? 'Archived' : 'Campaign replies'}
+                {type === 'inbox' && unread > 0 ? `${unread} unread` : type === 'archive' ? 'Archived threads' : 'Campaign auto-replies'}
               </div>
             </div>
             {type === 'inbox' && unread > 0 && (
@@ -650,6 +772,7 @@ export default function Messages({ type = 'inbox' }) {
             </button>
           )}
         </div>
+
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 2 }}>
           {[
@@ -835,7 +958,7 @@ export default function Messages({ type = 'inbox' }) {
                     </div>
                   );
                 })}
-                {/* Pagination at bottom of list */}
+                {/* Pagination */}
                 {total > 100 && (
                   <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: '#fafafa' }}>
                     <Pagination page={page} total={total} limit={100} onChange={setPage}/>
@@ -847,7 +970,7 @@ export default function Messages({ type = 'inbox' }) {
         </div>
 
         {/* ── RIGHT: Thread Reader ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8fafc' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f1f5f9' }}>
           {openThread ? (
             <ThreadReader
               thread={openThread}
@@ -871,7 +994,7 @@ export default function Messages({ type = 'inbox' }) {
                 <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>
                   {type === 'inbox' ? 'Choose a message from the left to read and reply'
                    : type === 'auto-replies' ? 'Select an auto-reply to view it'
-                   : 'Choose an archived conversation'}
+                   : 'Choose an archived conversation to view it'}
                 </div>
               </div>
               {type === 'inbox' && threads.length === 0 && !loading && (
