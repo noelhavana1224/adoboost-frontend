@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, Link } from 'react-router-dom';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -9,7 +9,8 @@ import {
   Ban, FileText, Settings, HelpCircle, LogOut,
   ChevronDown, ChevronRight, Bell, Star, UserCog,
   CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare,
-  ShieldAlert, Eye, EyeOff, Lock, CheckCircle2
+  ShieldAlert, Eye, EyeOff, Lock, CheckCircle2,
+  Zap, Database, BarChart, TrendingUp,
 } from 'lucide-react';
 
 const NAV = [
@@ -257,28 +258,219 @@ function SidebarUserFooter({ user, isAdmin }) {
   );
 }
 
-function HeaderUserChip({ user }) {
+// ── Plan Usage Progress Bar ──────────────────────
+function UsageBar({ label, icon, used, limit, color }) {
+  const isUnlimited = limit >= 99999;
+  const pct = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
+  const barColor = isUnlimited ? '#10b981' : pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : color || '#2563eb';
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#475569', fontWeight: 500 }}>
+          {icon}
+          {label}
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: isUnlimited ? '#10b981' : barColor }}>
+          {isUnlimited ? `${used.toLocaleString()} / ∞` : `${used.toLocaleString()} / ${limit.toLocaleString()}`}
+        </span>
+      </div>
+      <div style={{ height: 5, borderRadius: 3, background: '#e2e8f0', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', borderRadius: 3,
+          width: isUnlimited ? '12%' : `${pct}%`,
+          background: isUnlimited
+            ? 'linear-gradient(90deg,#10b981,#34d399)'
+            : pct >= 90
+              ? 'linear-gradient(90deg,#ef4444,#f87171)'
+              : pct >= 70
+                ? 'linear-gradient(90deg,#f59e0b,#fbbf24)'
+                : `linear-gradient(90deg,${barColor},${barColor}cc)`,
+          transition: 'width 0.4s ease',
+        }}/>
+      </div>
+      {!isUnlimited && pct >= 90 && (
+        <div style={{ fontSize: 10, color: '#ef4444', marginTop: 3, fontWeight: 600 }}>
+          ⚠️ Almost at limit — consider upgrading
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Header User Dropdown ─────────────────────────
+function UserDropdown({ user, onLogout }) {
   const support = useSupport();
-  const displayName = support.isSupport ? support.target?.name : user?.name;
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [usage, setUsage] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef(null);
+
+  const displayName  = support.isSupport ? support.target?.name  : user?.name;
   const displayEmail = support.isSupport ? support.target?.email : user?.email;
   const initial = (displayName?.[0] || 'U').toUpperCase();
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Fetch usage when opened
+  useEffect(() => {
+    if (!open || usage) return;
+    setLoading(true);
+    api.get('/usage').then(r => setUsage(r.data)).catch(() => {}).finally(() => setLoading(false));
+  }, [open]);
+
+  const planStyles = {
+    trial:        { bg: 'rgba(100,116,139,0.15)', text: '#64748b',  label: 'Trial' },
+    starter:      { bg: 'rgba(34,197,94,0.12)',   text: '#16a34a',  label: 'Starter' },
+    professional: { bg: 'rgba(37,99,235,0.12)',   text: '#2563eb',  label: 'Pro' },
+    unlimited:    { bg: 'rgba(251,191,36,0.15)',  text: '#d97706',  label: 'Unlimited' },
+  };
+  const ps = planStyles[usage?.plan?.toLowerCase()] || planStyles.trial;
+
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-      <div style={{
-        width:34, height:34, borderRadius:'50%',
-        background: support.isSupport
-          ? 'linear-gradient(135deg,#dc2626,#b91c1c)'
-          : 'linear-gradient(135deg,#2563eb,#7c3aed)',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        color:'#fff', fontWeight:700, fontSize:14,
-        boxShadow: support.isSupport ? '0 2px 8px rgba(220,38,38,0.3)' : '0 2px 8px rgba(37,99,235,0.3)',
-      }}>
-        {initial}
-      </div>
-      <div>
-        <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', letterSpacing:'-0.01em' }}>{displayName}</div>
-        <div style={{ fontSize:11, color:'var(--text3)' }}>{displayEmail}</div>
-      </div>
+    <div ref={ref} style={{ position: 'relative' }}>
+      {/* Chip button */}
+      <button
+        onClick={() => setOpen(p => !p)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px 4px 4px',
+          background: open ? 'var(--bg3)' : 'transparent',
+          border: `1px solid ${open ? 'var(--border2)' : 'transparent'}`,
+          borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+          transition: 'all 0.15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.borderColor = 'var(--border2)'; }}
+        onMouseLeave={e => { if (!open) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
+      >
+        <div style={{
+          width: 34, height: 34, borderRadius: '50%',
+          background: support.isSupport
+            ? 'linear-gradient(135deg,#dc2626,#b91c1c)'
+            : 'linear-gradient(135deg,#2563eb,#7c3aed)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontWeight: 700, fontSize: 14, flexShrink: 0,
+          boxShadow: support.isSupport ? '0 2px 8px rgba(220,38,38,0.3)' : '0 2px 8px rgba(37,99,235,0.3)',
+        }}>
+          {initial}
+        </div>
+        <div style={{ textAlign: 'left' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em', lineHeight: 1.2 }}>{displayName}</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.2 }}>{displayEmail}</div>
+        </div>
+        <ChevronDown size={13} color="var(--text3)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}/>
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+          width: 300,
+          background: '#fff', borderRadius: 14,
+          border: '1px solid var(--border2)',
+          boxShadow: '0 16px 48px rgba(0,0,0,0.13), 0 4px 12px rgba(0,0,0,0.06)',
+          zIndex: 100, overflow: 'hidden',
+          animation: 'dropIn 0.18s cubic-bezier(0.16,1,0.3,1)',
+        }}>
+          <style>{`@keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+
+          {/* User info header */}
+          <div style={{ padding: '14px 16px 12px', background: 'linear-gradient(135deg,#0f172a,#1e293b)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+              background: support.isSupport ? 'linear-gradient(135deg,#dc2626,#b91c1c)' : 'linear-gradient(135deg,#2563eb,#7c3aed)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontWeight: 700, fontSize: 15,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}>{initial}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayEmail}</div>
+            </div>
+            {usage && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, background: ps.bg, color: ps.text, flexShrink: 0, border: `1px solid ${ps.text}33` }}>
+                {ps.label}
+              </span>
+            )}
+          </div>
+
+          {/* Usage bars */}
+          <div style={{ padding: '14px 16px 6px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Plan Usage
+            </div>
+
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+                <div style={{ width: 20, height: 20, border: '2px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              </div>
+            ) : usage ? (
+              <>
+                <UsageBar
+                  label="Contacts"
+                  icon={<Users size={11}/>}
+                  used={usage.usage.contacts}
+                  limit={usage.limits.max_contacts}
+                  color="#6366f1"
+                />
+                <UsageBar
+                  label="Campaigns"
+                  icon={<Send size={11}/>}
+                  used={usage.usage.campaigns}
+                  limit={usage.limits.max_campaigns}
+                  color="#8b5cf6"
+                />
+                <UsageBar
+                  label="Email Accounts"
+                  icon={<Mail size={11}/>}
+                  used={usage.usage.email_accounts}
+                  limit={usage.limits.max_email_accounts}
+                  color="#0ea5e9"
+                />
+                <UsageBar
+                  label="Emails Sent Today"
+                  icon={<Zap size={11}/>}
+                  used={usage.usage.emails_sent_today}
+                  limit={usage.limits.max_emails_per_day}
+                  color="#10b981"
+                />
+              </>
+            ) : null}
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }}/>
+
+          {/* Action links */}
+          <div style={{ padding: '8px 8px 6px' }}>
+            {[
+              { label: 'Settings', icon: <Settings size={13}/>, to: '/settings/user' },
+              { label: 'Billing & Plan', icon: <CreditCard size={13}/>, to: '/settings/billing' },
+            ].map(item => (
+              <button key={item.label} onClick={() => { setOpen(false); navigate(item.to); }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#374151', fontFamily: 'inherit', textAlign: 'left' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ color: '#64748b' }}>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <div style={{ height: 1, background: 'var(--border)', margin: '6px 2px' }}/>
+            <button onClick={() => { setOpen(false); onLogout(); }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#dc2626', fontFamily: 'inherit', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <LogOut size={13}/> Log out
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -619,7 +811,7 @@ export default function Layout({ children }) {
               <HelpCircle size={17} />
             </button>
             <div style={{ width:1, height:24, background:'var(--border)' }} />
-            <HeaderUserChip user={user} />
+            <UserDropdown user={user} onLogout={() => { logout(); navigate('/login'); }} />
           </div>
         </header>
 
