@@ -253,7 +253,74 @@ export function UserSettings() {
             <Input label="Country" value={form.country} onChange={e => f('country', e.target.value)} />
             <Input label="City" value={form.city} onChange={e => f('city', e.target.value)} />
             <Select label="Timezone" value={form.timezone} onChange={e => f('timezone', e.target.value)}>
-              {['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Manila', 'Asia/Tokyo', 'Australia/Sydney'].map(t => <option key={t} value={t}>{t}</option>)}
+              {[
+                { v: 'UTC',                      l: 'UTC — Coordinated Universal Time' },
+                // ── Americas ──
+                { v: 'America/New_York',          l: 'New York (ET, UTC-5/-4)' },
+                { v: 'America/Chicago',           l: 'Chicago (CT, UTC-6/-5)' },
+                { v: 'America/Denver',            l: 'Denver (MT, UTC-7/-6)' },
+                { v: 'America/Phoenix',           l: 'Phoenix (MT, UTC-7, no DST)' },
+                { v: 'America/Los_Angeles',       l: 'Los Angeles (PT, UTC-8/-7)' },
+                { v: 'America/Anchorage',         l: 'Anchorage (AKT, UTC-9/-8)' },
+                { v: 'Pacific/Honolulu',          l: 'Honolulu (HT, UTC-10)' },
+                { v: 'America/Toronto',           l: 'Toronto (ET, UTC-5/-4)' },
+                { v: 'America/Vancouver',         l: 'Vancouver (PT, UTC-8/-7)' },
+                { v: 'America/Mexico_City',       l: 'Mexico City (CT, UTC-6/-5)' },
+                { v: 'America/Bogota',            l: 'Bogotá (COT, UTC-5)' },
+                { v: 'America/Lima',              l: 'Lima (PET, UTC-5)' },
+                { v: 'America/Sao_Paulo',         l: 'São Paulo (BRT, UTC-3)' },
+                { v: 'America/Argentina/Buenos_Aires', l: 'Buenos Aires (ART, UTC-3)' },
+                // ── Europe ──
+                { v: 'Europe/London',             l: 'London (GMT/BST, UTC+0/+1)' },
+                { v: 'Europe/Dublin',             l: 'Dublin (IST, UTC+0/+1)' },
+                { v: 'Europe/Lisbon',             l: 'Lisbon (WET/WEST, UTC+0/+1)' },
+                { v: 'Europe/Paris',              l: 'Paris (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Berlin',             l: 'Berlin (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Amsterdam',          l: 'Amsterdam (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Brussels',           l: 'Brussels (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Madrid',             l: 'Madrid (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Rome',               l: 'Rome (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Stockholm',          l: 'Stockholm (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Warsaw',             l: 'Warsaw (CET/CEST, UTC+1/+2)' },
+                { v: 'Europe/Athens',             l: 'Athens (EET/EEST, UTC+2/+3)' },
+                { v: 'Europe/Helsinki',           l: 'Helsinki (EET/EEST, UTC+2/+3)' },
+                { v: 'Europe/Bucharest',          l: 'Bucharest (EET/EEST, UTC+2/+3)' },
+                { v: 'Europe/Kiev',               l: 'Kyiv (EET/EEST, UTC+2/+3)' },
+                { v: 'Europe/Moscow',             l: 'Moscow (MSK, UTC+3)' },
+                { v: 'Europe/Istanbul',           l: 'Istanbul (TRT, UTC+3)' },
+                // ── Africa ──
+                { v: 'Africa/Cairo',              l: 'Cairo (EET, UTC+2)' },
+                { v: 'Africa/Johannesburg',       l: 'Johannesburg (SAST, UTC+2)' },
+                { v: 'Africa/Lagos',              l: 'Lagos (WAT, UTC+1)' },
+                { v: 'Africa/Nairobi',            l: 'Nairobi (EAT, UTC+3)' },
+                { v: 'Africa/Casablanca',         l: 'Casablanca (WET, UTC+0/+1)' },
+                // ── Asia ──
+                { v: 'Asia/Dubai',                l: 'Dubai (GST, UTC+4)' },
+                { v: 'Asia/Riyadh',               l: 'Riyadh (AST, UTC+3)' },
+                { v: 'Asia/Tehran',               l: 'Tehran (IRST, UTC+3:30)' },
+                { v: 'Asia/Karachi',              l: 'Karachi (PKT, UTC+5)' },
+                { v: 'Asia/Kolkata',              l: 'Kolkata / Mumbai (IST, UTC+5:30)' },
+                { v: 'Asia/Colombo',              l: 'Colombo (IST, UTC+5:30)' },
+                { v: 'Asia/Dhaka',                l: 'Dhaka (BST, UTC+6)' },
+                { v: 'Asia/Rangoon',              l: 'Yangon (MMT, UTC+6:30)' },
+                { v: 'Asia/Bangkok',              l: 'Bangkok (ICT, UTC+7)' },
+                { v: 'Asia/Jakarta',              l: 'Jakarta (WIB, UTC+7)' },
+                { v: 'Asia/Singapore',            l: 'Singapore (SGT, UTC+8)' },
+                { v: 'Asia/Manila',               l: 'Manila (PST, UTC+8)' },
+                { v: 'Asia/Hong_Kong',            l: 'Hong Kong (HKT, UTC+8)' },
+                { v: 'Asia/Shanghai',             l: 'Shanghai / Beijing (CST, UTC+8)' },
+                { v: 'Asia/Taipei',               l: 'Taipei (CST, UTC+8)' },
+                { v: 'Asia/Tokyo',                l: 'Tokyo (JST, UTC+9)' },
+                { v: 'Asia/Seoul',                l: 'Seoul (KST, UTC+9)' },
+                // ── Australia / Pacific ──
+                { v: 'Australia/Perth',           l: 'Perth (AWST, UTC+8)' },
+                { v: 'Australia/Darwin',          l: 'Darwin (ACST, UTC+9:30)' },
+                { v: 'Australia/Adelaide',        l: 'Adelaide (ACST/ACDT, UTC+9:30/+10:30)' },
+                { v: 'Australia/Brisbane',        l: 'Brisbane (AEST, UTC+10)' },
+                { v: 'Australia/Sydney',          l: 'Sydney / Melbourne (AEST/AEDT, UTC+10/+11)' },
+                { v: 'Pacific/Auckland',          l: 'Auckland (NZST/NZDT, UTC+12/+13)' },
+                { v: 'Pacific/Fiji',              l: 'Fiji (FJT, UTC+12)' },
+              ].map(({ v, l }) => <option key={v} value={v}>{l}</option>)}
             </Select>
             <Input label="Change Password" type="password" placeholder="Leave blank to keep current" value={form.password} onChange={e => f('password', e.target.value)} />
           </div>
