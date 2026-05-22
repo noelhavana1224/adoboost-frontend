@@ -919,8 +919,18 @@ export default function Messages({ type = 'inbox' }) {
                     >
                       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                         {/* Checkbox */}
-                        <div style={{ paddingTop: 3, flexShrink: 0 }} onClick={e => toggleSelect(e, key)}>
-                          <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(e, key)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2563eb' }}/>
+                        <div style={{ paddingTop: 3, flexShrink: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onClick={e => e.stopPropagation()}
+                            onChange={() => setSelectedKeys(prev => {
+                              const next = new Set(prev);
+                              next.has(key) ? next.delete(key) : next.add(key);
+                              return next;
+                            })}
+                            style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2563eb' }}
+                          />
                         </div>
                         {/* Avatar */}
                         <div style={{ width: 36, height: 36, borderRadius: '50%', background: avatarColor(leadMsg?.from_email), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0, position: 'relative', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
