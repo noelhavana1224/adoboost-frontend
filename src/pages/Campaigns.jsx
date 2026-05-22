@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Select, Table, TR, TD } from '../components/UI';
-import { Send, Plus, Play, Pause, Trash2, Edit2, Eye, X, Copy, Bold, Italic, Underline, List, ChevronDown } from 'lucide-react';
+import { Send, Plus, Play, Pause, Trash2, Edit2, Eye, X, Copy, ChevronDown, Sparkles, Shield } from 'lucide-react';
 
 const STATUS_COLOR = { draft:'default', active:'green', paused:'yellow', completed:'blue' };
 const pct = (n,d) => d>0?((n/d)*100).toFixed(1)+'%':'—';
@@ -63,15 +63,50 @@ function VarsDropdown({ onInsert, label = 'Insert Variable' }) {
   );
 }
 
-// ── Subject Line Input with Variable Dropdown ────
-function SubjectInput({ value, onChange }) {
-  const inputRef = useRef(null);
+// ── AI Credits Bar ───────────────────────────────
+function AICreditsBar({ refreshKey }) {
+  const [credits, setCredits] = useState(null);
+  useEffect(() => {
+    api.get('/ai/credits').then(r => setCredits(r.data)).catch(() => {});
+  }, [refreshKey]);
+  if (!credits) return null;
+  const remaining = credits.remaining ?? 0;
+  const limit     = credits.limit ?? 1;
+  const pctLeft   = Math.round((remaining / limit) * 100);
+  const barColor  = pctLeft > 40 ? '#16a34a' : pctLeft > 15 ? '#d97706' : '#dc2626';
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:8, fontSize:12, marginBottom:10 }}>
+      <Sparkles size={13} color="#6366f1"/>
+      <div style={{ flex:1 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+          <span style={{ fontWeight:600, color:'#374151' }}>AI Credits</span>
+          <span style={{ color: barColor }}>
+            <strong>{remaining}</strong> / {limit} remaining
+          </span>
+        </div>
+        <div style={{ height:4, background:'#e5e7eb', borderRadius:2, overflow:'hidden' }}>
+          <div style={{ height:'100%', width:`${pctLeft}%`, background: barColor, borderRadius:2, transition:'width 0.3s' }}/>
+        </div>
+      </div>
+      <span style={{ fontSize:10, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.05em', fontWeight:600, whiteSpace:'nowrap' }}>
+        {credits.plan}
+      </span>
+    </div>
+  );
+}
+
+// ── Subject Line Input with AI + Variable Dropdown ─
+function SubjectInput({ value, onChange, emailBody = '', onCreditUsed }) {
+  const inputRef     = useRef(null);
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const [aiLines,    setAiLines]    = useState([]);
+  const [showPicker, setShowPicker] = useState(false);
 
   const insertVar = (variable) => {
     const el = inputRef.current;
     if (!el) { onChange(value + variable); return; }
     const start = el.selectionStart;
-    const end = el.selectionEnd;
+    const end   = el.selectionEnd;
     const newVal = value.substring(0, start) + variable + value.substring(end);
     onChange(newVal);
     setTimeout(() => {
@@ -80,11 +115,36 @@ function SubjectInput({ value, onChange }) {
     }, 0);
   };
 
+  const generateSubjects = async () => {
+    const cleanBody = (emailBody || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!cleanBody) { toast.error('Write your email body first, then generate subject lines.'); return; }
+    setAiLoading(true);
+    try {
+      const { data } = await api.post('/ai/subject-lines', { body: cleanBody });
+      setAiLines(data.lines || []);
+      setShowPicker(true);
+      onCreditUsed?.();
+    } catch (e) {
+      if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted. Upgrade your plan.');
+      else toast.error('AI unavailable — check OPENAI_API_KEY in backend .env');
+    } finally { setAiLoading(false); }
+  };
+
   return (
-    <div>
+    <div style={{ position:'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>Subject Line *</label>
-        <VarsDropdown onInsert={insertVar} label="Add Variable" />
+        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+          <button type="button" onClick={generateSubjects} disabled={aiLoading} style={{
+            display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            background: aiLoading ? '#f1f5f9' : '#f5f3ff', border:'1px solid #c4b5fd',
+            borderRadius:6, fontSize:12, color:'#7c3aed', cursor: aiLoading ? 'not-allowed' : 'pointer',
+            fontFamily:'inherit', fontWeight:600, opacity: aiLoading ? 0.7 : 1,
+          }}>
+            <Sparkles size={11}/>{aiLoading ? 'Generating…' : 'AI Subjects'}
+          </button>
+          <VarsDropdown onInsert={insertVar} label="Add Variable" />
+        </div>
       </div>
       <input
         ref={inputRef}
@@ -94,14 +154,45 @@ function SubjectInput({ value, onChange }) {
         required
         style={{ width: '100%', border: '1px solid var(--border2)', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', color: 'var(--text)', boxSizing: 'border-box' }}
       />
+      {/* AI Subject Picker popover */}
+      {showPicker && aiLines.length > 0 && (
+        <>
+          <div onClick={() => setShowPicker(false)} style={{ position:'fixed', inset:0, zIndex:199 }}/>
+          <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:200, background:'#fff', border:'1px solid #c4b5fd', borderRadius:10, boxShadow:'0 8px 28px rgba(0,0,0,0.15)', overflow:'hidden' }}>
+            <div style={{ padding:'8px 12px', borderBottom:'1px solid var(--border)', background:'#f5f3ff', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span style={{ fontSize:11, fontWeight:700, color:'#7c3aed', display:'flex', alignItems:'center', gap:5 }}>
+                <Sparkles size={11}/>AI-Generated Subject Lines — click to use
+              </span>
+              <button type="button" onClick={() => setShowPicker(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', lineHeight:1 }}><X size={13}/></button>
+            </div>
+            {aiLines.map((line, idx) => (
+              <button key={idx} type="button" onClick={() => { onChange(line); setShowPicker(false); }}
+                style={{ width:'100%', padding:'9px 14px', border:'none', borderBottom:'1px solid var(--border)', background:'#fff', textAlign:'left', cursor:'pointer', fontSize:13, fontFamily:'inherit', color:'var(--text)' }}
+                onMouseEnter={e => e.currentTarget.style.background='#f5f3ff'}
+                onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                {line}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 // ── Rich Text Editor for Email Body ─────────────
-function RichBodyEditor({ value, onChange, placeholder }) {
-  const editorRef = useRef(null);
+function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUsed }) {
+  const editorRef    = useRef(null);
   const [initialized, setInitialized] = useState(false);
+
+  // ── AI Rewrite state ──
+  const [rewriteOpen,    setRewriteOpen]    = useState(false);
+  const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [rewritePreview, setRewritePreview] = useState(null); // { tone, text }
+
+  // ── AI Spam Score state ──
+  const [spamLoading, setSpamLoading] = useState(false);
+  const [spamResult,  setSpamResult]  = useState(null);
 
   useEffect(() => {
     if (editorRef.current && !initialized) {
@@ -127,17 +218,60 @@ function RichBodyEditor({ value, onChange, placeholder }) {
     if (url) exec('createLink', url.startsWith('http') ? url : 'https://' + url);
   };
 
+  // Apply AI rewrite to editor
+  const applyRewrite = (text) => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = text.replace(/\n/g, '<br>');
+    }
+    onChange(text);
+    setRewritePreview(null);
+    setRewriteOpen(false);
+  };
+
+  const handleRewrite = async (tone) => {
+    const cleanBody = editorRef.current?.innerText?.trim() || '';
+    if (!cleanBody) { toast.error('Email body is empty — write your email first.'); return; }
+    setRewriteLoading(true);
+    setRewriteOpen(false);
+    try {
+      const { data } = await api.post('/ai/rewrite', { body: cleanBody, tone });
+      setRewritePreview({ tone, text: data.rewritten });
+      onCreditUsed?.();
+    } catch (e) {
+      if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted.');
+      else toast.error('AI rewrite failed — check OPENAI_API_KEY');
+    } finally { setRewriteLoading(false); }
+  };
+
+  const handleSpamScore = async () => {
+    const cleanBody = editorRef.current?.innerHTML || '';
+    if (!cleanBody.replace(/<[^>]*>/g,'').trim()) { toast.error('Email body is empty.'); return; }
+    setSpamLoading(true);
+    setSpamResult(null);
+    try {
+      const { data } = await api.post('/ai/spam-score', { subject, body: cleanBody });
+      setSpamResult(data);
+      onCreditUsed?.();
+    } catch (e) {
+      if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted.');
+      else toast.error('Spam check failed — check OPENAI_API_KEY');
+    } finally { setSpamLoading(false); }
+  };
+
+  const GRADES = { A:'#16a34a', B:'#2563eb', C:'#d97706', D:'#ea580c', F:'#dc2626' };
+  const TONES  = [
+    { key:'human',        label:'More Human',        desc:'Remove corporate language' },
+    { key:'shorter',      label:'Make Shorter',      desc:'2-3 sentences max' },
+    { key:'professional', label:'More Professional', desc:'Polished, not stiff' },
+    { key:'softer_cta',   label:'Softer CTA',        desc:'Less pushy ask' },
+  ];
+
   const sep = () => <div style={{ width: 1, height: 18, background: '#d1d5db', margin: '0 4px', flexShrink: 0 }}/>;
 
   const T = ({ title, onCmd, children, active }) => (
     <button type="button" title={title}
       onMouseDown={e => { e.preventDefault(); onCmd(); }}
-      style={{
-        background: active ? '#e0e7ff' : 'none', border: 'none', cursor: 'pointer',
-        padding: '4px 7px', borderRadius: 5, color: active ? '#4f46e5' : '#374151',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, fontFamily: 'inherit', transition: 'background 0.1s',
-      }}
+      style={{ background: active ? '#e0e7ff' : 'none', border: 'none', cursor: 'pointer', padding: '4px 7px', borderRadius: 5, color: active ? '#4f46e5' : '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontFamily: 'inherit', transition: 'background 0.1s' }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6'; }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'none'; }}>
       {children}
@@ -150,12 +284,12 @@ function RichBodyEditor({ value, onChange, placeholder }) {
         <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>Email Body</label>
         <VarsDropdown onInsert={insertVar} label="Add Variable" />
       </div>
-      <div style={{ border: '1.5px solid #d1d5db', borderRadius: 10, overflow: 'hidden', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
-        onFocusCapture={e => e.currentTarget.style.borderColor = '#6366f1'}
-        onBlurCapture={e => e.currentTarget.style.borderColor = '#d1d5db'}>
+      <div style={{ border: '1.5px solid #d1d5db', borderRadius: 10, overflow: 'visible', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+        onFocusCapture={e => { const el = e.currentTarget.querySelector('[contenteditable]'); if (el && e.target === el) e.currentTarget.style.borderColor = '#6366f1'; }}
+        onBlurCapture={e => { e.currentTarget.style.borderColor = '#d1d5db'; }}>
 
         {/* ── Toolbar ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '6px 10px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '6px 10px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', flexWrap: 'wrap', borderRadius: '10px 10px 0 0' }}>
 
           {/* Undo / Redo */}
           <T title="Undo" onCmd={() => exec('undo')}>↩</T>
@@ -179,7 +313,7 @@ function RichBodyEditor({ value, onChange, placeholder }) {
             style={{ border: '1px solid #e5e7eb', background: '#fff', fontSize: 12, cursor: 'pointer', color: '#374151', outline: 'none', fontFamily: 'inherit', borderRadius: 5, padding: '3px 6px', width: 52 }}>
             <option value="1">8</option>
             <option value="2">10</option>
-            <option value="3" selected>12</option>
+            <option value="3" defaultValue>12</option>
             <option value="4">14</option>
             <option value="5">18</option>
             <option value="6">24</option>
@@ -258,7 +392,73 @@ function RichBodyEditor({ value, onChange, placeholder }) {
           <T title="Clear Formatting" onCmd={() => exec('removeFormat')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3H7l-4 9h4l-2 9 12-12h-4l4-6z"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
           </T>
+
+          {sep()}
+
+          {/* ── AI: Rewrite button ── */}
+          <div style={{ position:'relative' }}>
+            <button type="button"
+              onMouseDown={e => { e.preventDefault(); if (!rewriteLoading) setRewriteOpen(p => !p); }}
+              disabled={rewriteLoading}
+              style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 8px', background: rewriteOpen?'#f5f3ff':'none', border:`1px solid ${rewriteOpen?'#c4b5fd':'transparent'}`, borderRadius:6, cursor: rewriteLoading?'not-allowed':'pointer', color:'#7c3aed', fontSize:12, fontFamily:'inherit', fontWeight:600, opacity: rewriteLoading?0.6:1 }}
+              title="AI Rewrite">
+              <Sparkles size={11}/>{rewriteLoading ? 'Rewriting…' : 'Rewrite'}
+            </button>
+            {rewriteOpen && (
+              <>
+                <div onMouseDown={() => setRewriteOpen(false)} style={{ position:'fixed', inset:0, zIndex:299 }}/>
+                <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:300, background:'#fff', border:'1px solid #c4b5fd', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.14)', width:210, overflow:'hidden' }}>
+                  <div style={{ padding:'7px 11px', borderBottom:'1px solid var(--border)', background:'#f5f3ff' }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#7c3aed' }}>Choose rewrite style</span>
+                  </div>
+                  {TONES.map(t => (
+                    <button key={t.key} type="button"
+                      onMouseDown={e => { e.preventDefault(); handleRewrite(t.key); }}
+                      style={{ width:'100%', padding:'8px 12px', border:'none', borderBottom:'1px solid var(--border)', background:'#fff', textAlign:'left', cursor:'pointer', fontFamily:'inherit' }}
+                      onMouseEnter={e => e.currentTarget.style.background='#f5f3ff'}
+                      onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                      <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{t.label}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)' }}>{t.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ── AI: Spam Score button ── */}
+          <button type="button"
+            onMouseDown={e => { e.preventDefault(); handleSpamScore(); }}
+            disabled={spamLoading}
+            style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 8px', background:'none', border:'1px solid transparent', borderRadius:6, cursor: spamLoading?'not-allowed':'pointer', color:'#059669', fontSize:12, fontFamily:'inherit', fontWeight:600, opacity: spamLoading?0.6:1 }}
+            title="Check spam score">
+            <Shield size={11}/>{spamLoading ? 'Checking…' : 'Spam Score'}
+          </button>
         </div>
+
+        {/* ── AI Rewrite Preview ── */}
+        {rewritePreview && (
+          <div style={{ padding:'12px 14px', borderBottom:'1px solid #c4b5fd', background:'#f5f3ff' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:'#7c3aed', display:'flex', alignItems:'center', gap:5 }}>
+                <Sparkles size={12}/>AI Rewrite Preview
+              </span>
+              <div style={{ display:'flex', gap:6 }}>
+                <button type="button" onClick={() => applyRewrite(rewritePreview.text)}
+                  style={{ padding:'4px 10px', background:'#7c3aed', border:'none', borderRadius:5, color:'#fff', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+                  ✓ Accept
+                </button>
+                <button type="button" onClick={() => setRewritePreview(null)}
+                  style={{ padding:'4px 10px', background:'#fff', border:'1px solid #c4b5fd', borderRadius:5, color:'#7c3aed', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                  ✗ Discard
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize:13, color:'#374151', lineHeight:1.7, whiteSpace:'pre-wrap', maxHeight:180, overflowY:'auto', background:'#fff', padding:'10px 12px', borderRadius:6, border:'1px solid #e9d5ff' }}>
+              {rewritePreview.text}
+            </div>
+          </div>
+        )}
 
         {/* Editable content area */}
         <div
@@ -270,6 +470,56 @@ function RichBodyEditor({ value, onChange, placeholder }) {
           style={{ minHeight: 160, padding: '12px 16px', fontSize: 13, lineHeight: 1.8, color: '#111827', outline: 'none', wordBreak: 'break-word' }}
         />
       </div>
+
+      {/* ── Spam Score Panel ── */}
+      {spamResult && (() => {
+        const gradeColor = GRADES[spamResult.grade] || '#374151';
+        const verdictIcon = spamResult.verdict === 'inbox' ? '✅' : spamResult.verdict === 'promotions' ? '📁' : '🚫';
+        return (
+          <div style={{ marginTop:8, border:'1px solid #d1fae5', borderRadius:10, overflow:'hidden', fontSize:13 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'#f0fdf4', borderBottom:'1px solid #d1fae5' }}>
+              <div style={{ width:36, height:36, borderRadius:'50%', border:`2.5px solid ${gradeColor}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, fontSize:18, color:gradeColor, flexShrink:0 }}>
+                {spamResult.grade}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, color:'#111827' }}>
+                  Spam Score: {spamResult.score}/100 &nbsp;{verdictIcon} <span style={{ fontWeight:400, color:'#6b7280', textTransform:'capitalize' }}>{spamResult.verdict}</span>
+                </div>
+                <div style={{ fontSize:12, color:'#374151', marginTop:1 }}>{spamResult.summary}</div>
+              </div>
+              <button type="button" onClick={() => setSpamResult(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#9ca3af' }}><X size={14}/></button>
+            </div>
+            {spamResult.issues?.length > 0 && (
+              <div style={{ padding:'10px 14px', background:'#fff' }}>
+                <div style={{ fontWeight:700, fontSize:12, color:'#374151', marginBottom:8 }}>Issues Found:</div>
+                {spamResult.issues.map((issue, idx) => (
+                  <div key={idx} style={{ marginBottom:8, paddingBottom:8, borderBottom: idx < spamResult.issues.length-1 ? '1px solid #f3f4f6' : 'none' }}>
+                    <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                      <span style={{ fontSize:11, padding:'2px 7px', borderRadius:10, background:'#fee2e2', color:'#dc2626', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 }}>
+                        {(issue.type||'').replace(/_/g,' ')}
+                      </span>
+                      <div>
+                        <div style={{ fontSize:12, color:'#374151' }}>
+                          <strong>"{issue.text}"</strong>
+                        </div>
+                        <div style={{ fontSize:11, color:'#059669', marginTop:2 }}>
+                          💡 {issue.suggestion}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {spamResult.issues?.length === 0 && (
+              <div style={{ padding:'10px 14px', background:'#fff', fontSize:13, color:'#059669', fontWeight:600 }}>
+                🎉 No spam issues detected — looks clean!
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       <style>{`
         [contenteditable]:empty:before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; white-space: pre; }
         [contenteditable] a { color: #4f46e5; text-decoration: underline; }
@@ -319,9 +569,7 @@ export default function Campaigns() {
   // ── Clone campaign ──
   const handleClone = async (campaign) => {
     try {
-      // Fetch full campaign with sequences
       const { data: full } = await api.get(`/campaigns/${campaign.id}`);
-      // Create new campaign with "(Copy)" suffix
       const newCamp = {
         name: `${full.name} (Copy)`,
         email_account_id: full.email_account_id || '',
@@ -374,7 +622,6 @@ export default function Campaigns() {
                     {(c.status === 'draft' || c.status === 'paused') && (
                       <Btn size="sm" variant="ghost" onClick={() => setEditCampaign(c)} title="Edit"><Edit2 size={12}/></Btn>
                     )}
-                    {/* Clone button — always available */}
                     <Btn size="sm" variant="ghost" onClick={() => handleClone(c)} title="Clone Campaign">
                       <Copy size={12}/>
                     </Btn>
@@ -408,7 +655,7 @@ export default function Campaigns() {
   );
 }
 
-// ── View Campaign Modal (unchanged) ─────────────
+// ── View Campaign Modal ──────────────────────────
 function ViewCampaignModal({ campaign, onClose }) {
   const [data, setData]   = useState(null);
   const [sends, setSends] = useState([]);
@@ -501,7 +748,6 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
 
-  // Close on outside click
   React.useEffect(() => {
     const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', handler);
@@ -527,7 +773,6 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
         )}
       </label>
 
-      {/* Trigger button */}
       <button type="button" onClick={() => !disabled && setOpen(p => !p)}
         style={{ width:'100%', border:`1px solid ${open?'var(--primary)':'var(--border2)'}`, borderRadius:8, padding:'9px 12px', background:disabled?'var(--bg3)':'#fff', cursor:disabled?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, fontFamily:'inherit', textAlign:'left', transition:'border-color 0.15s' }}>
         <div style={{ flex:1, minWidth:0 }}>
@@ -551,17 +796,14 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
         <ChevronDown size={14} color="var(--text3)" style={{ flexShrink:0, transform: open?'rotate(180deg)':'none', transition:'transform 0.15s' }}/>
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:200, background:'#fff', border:'1px solid var(--border2)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', overflow:'hidden' }}>
-          {/* Header */}
           <div style={{ padding:'8px 12px', borderBottom:'1px solid var(--border)', background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <span style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Select accounts for rotation</span>
             {value.length > 0 && (
               <button type="button" onClick={() => onChange([])} style={{ fontSize:11, color:'#dc2626', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Clear all</button>
             )}
           </div>
-          {/* Account options */}
           {accounts.map(a => {
             const selected = value.includes(a.id);
             return (
@@ -582,7 +824,6 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
             );
           })}
           {accounts.length === 0 && <div style={{ padding:'14px', fontSize:13, color:'var(--text3)', textAlign:'center' }}>No accounts connected</div>}
-          {/* Footer info */}
           {value.length > 1 && (
             <div style={{ padding:'8px 12px', background:'#f0f9ff', borderTop:'1px solid #bae6fd', fontSize:11, color:'#0284c7' }}>
               🔄 Sends will rotate <strong>randomly</strong> across {value.length} accounts — each using its own signature & daily limit
@@ -591,7 +832,6 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
         </div>
       )}
 
-      {/* Validation */}
       {value.length === 0 && <div style={{ fontSize:11, color:'#dc2626', marginTop:4 }}>Select at least one email account</div>}
     </div>
   );
@@ -599,12 +839,14 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
 
 // ── Create/Edit Campaign Modal ───────────────────
 function CampaignModal({ open, campaign, onClose, onSaved }) {
-  const [form, setForm] = useState({ name: '', email_account_id: '', list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
+  const [form, setForm]       = useState({ name: '', email_account_id: '', list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
   const [sequences, setSequences] = useState([{ subject: '', body: '', delay_days: 0, delay_hours: 0 }]);
   const [accounts, setAccounts]   = useState([]);
   const [lists, setLists]         = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading]     = useState(false);
+  const [showAISeq, setShowAISeq] = useState(false);
+  const [creditsKey, setCreditsKey] = useState(0); // bump to refresh credits bar
   const isActive = campaign?.status === 'active';
 
   useEffect(() => {
@@ -625,7 +867,6 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
   }, [open, campaign]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
-
   const updateSeq = (i, key, val) => setSequences(s => s.map((sq, idx) => idx === i ? { ...sq, [key]: val } : sq));
 
   const handleSubmit = async (e) => {
@@ -633,18 +874,11 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
     if (!isActive && sequences.some(s => !s.subject)) return toast.error('All steps need a subject');
     setLoading(true);
     try {
-      // Convert HTML body to include for sending
-      const seqsToSave = sequences.map(s => ({
-        ...s,
-        // Strip HTML for plain text fallback, keep HTML for body
-        body: s.body,
-      }));
       const payload = {
         ...form,
         email_account_id: (form.rotation_ids||[]).length > 0 ? form.rotation_ids[0] : form.email_account_id,
         rotation_account_ids: JSON.stringify(form.rotation_ids || []),
-        // daily_limit removed — each account uses its own limit from Sending Speed settings
-        sequences: isActive ? undefined : seqsToSave,
+        sequences: isActive ? undefined : sequences,
       };
       campaign
         ? await api.put(`/campaigns/${campaign.id}`, payload)
@@ -654,6 +888,9 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
     finally { setLoading(false); }
   };
+
+  // Called by AI sub-components after a credit is consumed
+  const onCreditUsed = () => setCreditsKey(k => k + 1);
 
   return (
     <Modal open={open} onClose={onClose} title={campaign ? `Edit Campaign — ${campaign?.name}` : 'Create New Campaign'} width={720}>
@@ -667,7 +904,6 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         <Input label="Campaign Name *" value={form.name} onChange={e => f('name', e.target.value)} required />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* ── Inbox Rotation: dropdown multi-select ── */}
           <RotationSelect accounts={accounts} value={form.rotation_ids||[]} onChange={ids => { f('rotation_ids', ids); if (ids.length && !form.email_account_id) f('email_account_id', ids[0]); }} disabled={isActive} />
           <Select label="Contact List" value={form.list_id} onChange={e => f('list_id', e.target.value)} disabled={isActive}>
             <option value="">Select list...</option>
@@ -700,15 +936,25 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
 
         {!isActive && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            {/* ── Sequences header with AI controls ── */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <label style={{ fontSize: 13, fontWeight: 700 }}>
                 Email Sequences ({sequences.length} step{sequences.length !== 1 ? 's' : ''})
               </label>
-              <Btn type="button" size="sm" variant="secondary"
-                onClick={() => setSequences(s => [...s, { subject: '', body: '', delay_days: s.length > 0 ? 3 : 0, delay_hours: 0 }])}>
-                <Plus size={12}/> Add Follow-up
-              </Btn>
+              <div style={{ display:'flex', gap:6 }}>
+                <button type="button" onClick={() => setShowAISeq(true)}
+                  style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none', borderRadius:7, fontSize:12, color:'#fff', cursor:'pointer', fontFamily:'inherit', fontWeight:700, boxShadow:'0 2px 6px rgba(124,58,237,0.35)' }}>
+                  <Sparkles size={12}/>AI Write Sequence
+                </button>
+                <Btn type="button" size="sm" variant="secondary"
+                  onClick={() => setSequences(s => [...s, { subject: '', body: '', delay_days: s.length > 0 ? 3 : 0, delay_hours: 0 }])}>
+                  <Plus size={12}/> Add Follow-up
+                </Btn>
+              </div>
             </div>
+
+            {/* AI Credits bar */}
+            <AICreditsBar refreshKey={creditsKey}/>
 
             {sequences.map((seq, i) => (
               <div key={i} style={{ border: '1px solid var(--border2)', borderRadius: 10, padding: 16, marginBottom: 12, background: 'var(--bg3)' }}>
@@ -753,19 +999,23 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                   </div>
                 )}
 
-                {/* Subject with variable dropdown */}
+                {/* Subject with AI + variable dropdown */}
                 <div style={{ marginBottom: 12 }}>
                   <SubjectInput
                     value={seq.subject}
                     onChange={val => updateSeq(i, 'subject', val)}
+                    emailBody={seq.body}
+                    onCreditUsed={onCreditUsed}
                   />
                 </div>
 
-                {/* Rich text body editor with variable dropdown */}
+                {/* Rich text body editor with AI rewrite + spam score */}
                 <RichBodyEditor
                   key={`seq-body-${i}-${seq.subject}`}
                   value={seq.body}
                   onChange={val => updateSeq(i, 'body', val)}
+                  subject={seq.subject}
+                  onCreditUsed={onCreditUsed}
                   placeholder={`Hi {{first_name}},\n\nI noticed {{company}} is...`}
                 />
               </div>
@@ -778,6 +1028,108 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
           <Btn type="submit" loading={loading}>{campaign ? 'Save Changes' : 'Create Campaign'}</Btn>
         </div>
       </form>
+
+      {/* AI Sequence Generator modal */}
+      <AISequenceModal
+        open={showAISeq}
+        onClose={() => setShowAISeq(false)}
+        onApply={(steps) => {
+          setSequences(steps.map((s, i) => ({
+            subject:     s.subject,
+            body:        s.body,
+            delay_days:  s.delay_days  ?? (i === 0 ? 0 : i * 3),
+            delay_hours: s.delay_hours ?? 0,
+          })));
+          setShowAISeq(false);
+          onCreditUsed();
+          toast.success('✨ AI sequence applied!');
+        }}
+      />
+    </Modal>
+  );
+}
+
+// ── AI Sequence Generator Modal ──────────────────
+function AISequenceModal({ open, onClose, onApply }) {
+  const [audience, setAudience] = useState('');
+  const [offer,    setOffer]    = useState('');
+  const [niche,    setNiche]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [preview,  setPreview]  = useState(null); // array of steps
+
+  const reset = () => { setAudience(''); setOffer(''); setNiche(''); setPreview(null); };
+  const handleClose = () => { reset(); onClose(); };
+
+  const generate = async () => {
+    if (!audience.trim() || !offer.trim() || !niche.trim()) {
+      toast.error('Fill in all three fields'); return;
+    }
+    setLoading(true);
+    setPreview(null);
+    try {
+      const { data } = await api.post('/ai/sequence', { audience, offer, niche });
+      if (!data.steps?.length) throw new Error('Empty response');
+      setPreview(data.steps);
+    } catch (e) {
+      if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted.');
+      else toast.error('Sequence generation failed — check OPENAI_API_KEY');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={handleClose} title="✨ AI Sequence Generator" width={640}>
+      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
+        {/* Input form */}
+        {!preview && (
+          <>
+            <div style={{ background:'linear-gradient(135deg,#f5f3ff,#ede9fe)', border:'1px solid #c4b5fd', borderRadius:10, padding:'12px 14px', fontSize:13, color:'#5b21b6', lineHeight:1.6 }}>
+              <strong><Sparkles size={13} style={{ display:'inline', marginRight:4 }}/>How it works:</strong> Describe your audience, what you offer, and your industry. AI writes a humanized 3-step cold email sequence (intro → follow-up → breakup) optimised for inbox delivery.
+            </div>
+            <Input label="Target Audience *" placeholder="e.g. Marketing Directors at SaaS companies" value={audience} onChange={e => setAudience(e.target.value)} />
+            <Input label="Your Offer / Product *" placeholder="e.g. AI-powered email automation tool that saves 5 hrs/week" value={offer} onChange={e => setOffer(e.target.value)} />
+            <Input label="Niche / Industry *" placeholder="e.g. B2B SaaS, eCommerce, Real Estate" value={niche} onChange={e => setNiche(e.target.value)} />
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <Btn type="button" variant="secondary" onClick={handleClose}>Cancel</Btn>
+              <Btn type="button" onClick={generate} loading={loading}
+                style={{ background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none' }}>
+                <Sparkles size={13}/> {loading ? 'Writing…' : 'Generate Sequence (5 credits)'}
+              </Btn>
+            </div>
+          </>
+        )}
+
+        {/* Preview */}
+        {preview && (
+          <>
+            <div style={{ background:'#f0fdf4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#166534', fontWeight:600 }}>
+              ✅ 3-step sequence generated! Review below, then click "Use This Sequence" to apply.
+            </div>
+            <div style={{ maxHeight:420, overflowY:'auto', display:'flex', flexDirection:'column', gap:12 }}>
+              {preview.map((step, i) => (
+                <div key={i} style={{ border:'1px solid var(--border2)', borderRadius:10, overflow:'hidden' }}>
+                  <div style={{ padding:'8px 12px', background: i===0?'#eff6ff': i===1?'#fff7ed':'#fdf4ff', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'1px solid var(--border)' }}>
+                    <span style={{ fontWeight:700, fontSize:12, color: i===0?'#2563eb': i===1?'#c2410c':'#7c3aed' }}>
+                      {i===0 ? '📧 Step 1 — Day 0' : i===1 ? `🔄 Step 2 — Day ${step.delay_days}` : `💔 Step 3 — Day ${step.delay_days}`}
+                    </span>
+                    <span style={{ fontSize:11, color:'var(--text3)' }}>Subject: <strong>{step.subject}</strong></span>
+                  </div>
+                  <div style={{ padding:'10px 14px', fontSize:13, color:'#374151', lineHeight:1.7, whiteSpace:'pre-wrap', background:'#fff' }}>
+                    {step.body}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <Btn type="button" variant="secondary" onClick={() => setPreview(null)}>← Regenerate</Btn>
+              <Btn type="button" onClick={() => onApply(preview)}
+                style={{ background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none' }}>
+                <Sparkles size={13}/> Use This Sequence
+              </Btn>
+            </div>
+          </>
+        )}
+      </div>
     </Modal>
   );
 }
