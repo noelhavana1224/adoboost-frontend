@@ -26,7 +26,8 @@ const NAV = [
   {
     label: 'Messages', icon: MessageSquare, children: [
       { label: 'Inbox', to: '/messages/inbox' },
-      { label: 'Auto-replies', to: '/messages/auto-replies' },
+      { label: 'Auto Response', to: '/messages/auto-replies' },
+      { label: 'Archive', to: '/messages/archive' },
     ]
   },
   { label: 'Pipeline', to: '/pipeline', icon: KanbanSquare },

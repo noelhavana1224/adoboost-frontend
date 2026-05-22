@@ -102,6 +102,7 @@ export default function App() {
           <Route path="/contacts"            element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/messages/inbox"      element={<ProtectedRoute><Messages type="inbox" /></ProtectedRoute>} />
           <Route path="/messages/auto-replies" element={<ProtectedRoute><Messages type="auto-replies" /></ProtectedRoute>} />
+          <Route path="/messages/archive"    element={<ProtectedRoute><Messages type="archive" /></ProtectedRoute>} />
           <Route path="/pipeline"            element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
           <Route path="/exclusions"          element={<ProtectedRoute><Exclusions type="exclusions" /></ProtectedRoute>} />
           <Route path="/exclusions/unsubscribes" element={<ProtectedRoute><Exclusions type="unsubscribes" /></ProtectedRoute>} />
