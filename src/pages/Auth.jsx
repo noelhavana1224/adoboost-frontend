@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User, ArrowRight, Check, Zap, BarChart2, Shield, Users } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Check, Zap, BarChart2, Shield, Users, Eye, EyeOff } from 'lucide-react';
 
 const CSS = `
   @keyframes gradientShift {
@@ -144,6 +144,7 @@ export default function Auth({ mode = 'login' }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e) => {
@@ -362,8 +363,34 @@ export default function Auth({ mode = 'login' }) {
               )}
               <Field icon={Mail} label="Email Address" type="email" placeholder="you@company.com"
                 value={form.email} onChange={e => f('email', e.target.value)} required />
-              <Field icon={Lock} label="Password" type="password" placeholder="••••••••"
-                value={form.password} onChange={e => f('password', e.target.value)} required />
+              {/* Password with show/hide toggle — prevents silent autocorrect mangling on mobile */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
+                  Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+                  <input
+                    className="auth-input"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={form.password}
+                    onChange={e => f('password', e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                  />
+                  <button type="button" onClick={() => setShowPassword(p => !p)} style={{
+                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
+                    padding: 4, display: 'flex', alignItems: 'center',
+                  }}>
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
 
               {mode === 'login' && (
                 <div style={{ textAlign: 'right', marginTop: -6 }}>

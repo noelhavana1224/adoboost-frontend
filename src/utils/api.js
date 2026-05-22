@@ -38,10 +38,15 @@ api.interceptors.response.use(
     }
 
     // Normal user token failed — log out
+    // BUT don't redirect if this IS the login/register call (wrong password → show toast, not redirect)
     if (status === 401) {
-      localStorage.removeItem('ab_token');
-      localStorage.removeItem('ab_user');
-      window.location.href = '/login';
+      const url = e.config?.url || '';
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('ab_token');
+        localStorage.removeItem('ab_user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(e);
   }
