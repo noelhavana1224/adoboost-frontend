@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('ab_token');
     if (token && user) {
       api.get('/auth/me').then(r => {
-        const fresh = { ...user, plan: r.data.plan, role: r.data.role, name: r.data.name };
+        const fresh = { ...user, plan: r.data.plan, role: r.data.role, name: r.data.name, mustChangePassword: r.data.mustChangePassword || false };
         localStorage.setItem('ab_user', JSON.stringify(fresh));
         setUser(fresh);
       }).catch(() => {});
@@ -19,20 +19,33 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.setItem('ab_token', data.token);
-    const profile = await api.get('/auth/me', { headers: { Authorization: `Bearer ${data.token}` } });
-    const user = { ...data.user, plan: profile.data.plan, role: profile.data.role };
+    const profile = await api.get('/auth/me');
+    const user = {
+      ...data.user,
+      plan: profile.data.plan,
+      role: profile.data.role,
+      mustChangePassword: data.mustChangePassword || profile.data.mustChangePassword || false,
+    };
     localStorage.setItem('ab_user', JSON.stringify(user));
     setUser(user); return data;
   };
   const register = async (name, email, password) => {
     const { data } = await api.post('/auth/register', { name, email, password });
     localStorage.setItem('ab_token', data.token);
-    const profile = await api.get('/auth/me', { headers: { Authorization: `Bearer ${data.token}` } });
+    const profile = await api.get('/auth/me');
     const user = { ...data.user, plan: profile.data.plan, role: profile.data.role };
     localStorage.setItem('ab_user', JSON.stringify(user));
     setUser(user); return data;
   };
+  // Update user state + localStorage (used after password change, plan updates, etc.)
+  const updateUser = (updates) => {
+    setUser(prev => {
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('ab_user', JSON.stringify(updated));
+      return updated;
+    });
+  };
   const logout = () => { localStorage.removeItem('ab_token'); localStorage.removeItem('ab_user'); setUser(null); };
-  return <AuthContext.Provider value={{ user, login, register, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, login, register, logout, updateUser }}>{children}</AuthContext.Provider>;
 }
 export const useAuth = () => useContext(AuthContext);
