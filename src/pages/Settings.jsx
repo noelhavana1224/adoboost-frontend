@@ -6,32 +6,34 @@ import toast from 'react-hot-toast';
 import { Card, Btn, Input, Select, PageHeader, Alert, Badge } from '../components/UI';
 import { User, CreditCard, Zap, Settings2, Key, Copy, Check, Lock, Star, Crown, Rocket, Shield } from 'lucide-react';
 
-const PLANS = [
-  {
-    id: 'trial', name: 'Trial', price: 0,
-    color: '#64748b', gradA: '#475569', gradB: '#64748b', glow: 'rgba(100,116,139,0.15)',
-    icon: Zap,
-    features: ['2 campaigns', '200 contacts', '50 emails/day'],
-  },
-  {
-    id: 'starter', name: 'Starter', price: 29,
-    color: '#16a34a', gradA: '#16a34a', gradB: '#22c55e', glow: 'rgba(22,163,74,0.15)',
-    icon: Rocket,
-    features: ['10 campaigns', '2,000 contacts', '500 emails/day', '3 email accounts'],
-  },
-  {
-    id: 'professional', name: 'Professional', price: 79, popular: true,
-    color: '#2563eb', gradA: '#2563eb', gradB: '#7c3aed', glow: 'rgba(37,99,235,0.18)',
-    icon: Star,
-    features: ['50 campaigns', '10,000 contacts', '2,000 emails/day', '6 accounts', 'API access'],
-  },
-  {
-    id: 'unlimited', name: 'Unlimited', price: 199,
-    color: '#7c3aed', gradA: '#7c3aed', gradB: '#a855f7', glow: 'rgba(124,58,237,0.18)',
-    icon: Crown,
-    features: ['Unlimited everything', 'White-label', 'API access'],
-  },
+// Visual styles keyed by position (index 0–3) so they survive plan renames
+const PLAN_STYLES = [
+  { color: '#64748b', gradA: '#475569', gradB: '#64748b', glow: 'rgba(100,116,139,0.15)', icon: Zap },
+  { color: '#16a34a', gradA: '#16a34a', gradB: '#22c55e', glow: 'rgba(22,163,74,0.15)',   icon: Rocket },
+  { color: '#2563eb', gradA: '#2563eb', gradB: '#7c3aed', glow: 'rgba(37,99,235,0.18)',   icon: Star, popular: true },
+  { color: '#7c3aed', gradA: '#7c3aed', gradB: '#a855f7', glow: 'rgba(124,58,237,0.18)', icon: Crown },
 ];
+
+// Auto-generate feature bullets from DB plan limits
+function buildBullets(p) {
+  const bullets = [];
+  if (p.max_campaigns >= 999)   bullets.push('Unlimited campaigns');
+  else                          bullets.push(`${p.max_campaigns} campaign${p.max_campaigns !== 1 ? 's' : ''}`);
+
+  if (p.max_contacts >= 999999) bullets.push('Unlimited contacts');
+  else                          bullets.push(`${Number(p.max_contacts).toLocaleString()} contacts`);
+
+  bullets.push(`${Number(p.max_emails_per_day).toLocaleString()} emails/day`);
+
+  if (p.max_email_accounts >= 999) bullets.push('Unlimited email accounts');
+  else if (p.max_email_accounts > 1) bullets.push(`${p.max_email_accounts} email accounts`);
+  else if (p.max_email_accounts === 1) bullets.push('1 email account');
+
+  if (p.max_ai_credits >= 9999) bullets.push('Unlimited AI credits/mo');
+  else if (p.max_ai_credits > 0) bullets.push(`${Number(p.max_ai_credits).toLocaleString()} AI credits/mo`);
+
+  return bullets;
+}
 
 function useScopedUser() {
   const [data, setData] = useState(null);
@@ -46,11 +48,25 @@ function useScopedUser() {
 }
 
 export function Billing() {
-  const { user, loading } = useScopedUser();
-  if (loading) return null;
+  const { user, loading: userLoading } = useScopedUser();
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
 
-  const currentPlan = PLANS.find(p => p.id === user?.plan?.toLowerCase()) || PLANS[0];
-  const PlanIcon = currentPlan.icon;
+  useEffect(() => {
+    api.get('/plans')
+      .then(r => setPlans(r.data || []))
+      .catch(() => {})
+      .finally(() => setPlansLoading(false));
+  }, []);
+
+  if (userLoading || plansLoading) return null;
+
+  // Match current user plan to a DB plan by name (case-insensitive)
+  const currentDbPlan = plans.find(p => p.name.toLowerCase() === user?.plan?.toLowerCase());
+  // Visual style by plan position (survives renames)
+  const currentIdx = plans.findIndex(p => p.name.toLowerCase() === user?.plan?.toLowerCase());
+  const currentStyle = PLAN_STYLES[currentIdx] || PLAN_STYLES[0];
+  const PlanIcon = currentStyle.icon;
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -63,18 +79,16 @@ export function Billing() {
         position: 'relative', overflow: 'hidden',
         boxShadow: '0 8px 24px rgba(15,23,42,0.2)',
       }}>
-        {/* Glow orbs */}
-        <div style={{ position:'absolute', top:-40, right:60, width:160, height:160, background:`radial-gradient(circle,${currentPlan.glow} 0%,transparent 70%)`, borderRadius:'50%', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', top:-40, right:60, width:160, height:160, background:`radial-gradient(circle,${currentStyle.glow} 0%,transparent 70%)`, borderRadius:'50%', pointerEvents:'none' }} />
         <div style={{ position:'absolute', bottom:-30, right:240, width:120, height:120, background:'radial-gradient(circle,rgba(124,58,237,0.15) 0%,transparent 70%)', borderRadius:'50%', pointerEvents:'none' }} />
 
         <div style={{ position:'relative', zIndex:1, display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
           <div style={{ display:'flex', alignItems:'center', gap:16 }}>
             <div style={{
               width: 52, height: 52, borderRadius: 14,
-              background: `linear-gradient(135deg,${currentPlan.gradA},${currentPlan.gradB})`,
+              background: `linear-gradient(135deg,${currentStyle.gradA},${currentStyle.gradB})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 4px 16px ${currentPlan.glow}`,
-              flexShrink: 0,
+              boxShadow: `0 4px 16px ${currentStyle.glow}`, flexShrink: 0,
             }}>
               <PlanIcon size={24} color="#fff" />
             </div>
@@ -82,11 +96,21 @@ export function Billing() {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 3, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 Current Plan
               </div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.1, textTransform: 'capitalize' }}>
-                {user?.plan}
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.1 }}>
+                {currentDbPlan?.name || user?.plan}
               </div>
-              {user?.plan === 'trial' && (
-                <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 4, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5 }}>
+              {currentDbPlan && (
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 3, fontWeight: 500 }}>
+                  ${currentDbPlan.price_monthly}/mo
+                  {currentDbPlan.max_ai_credits >= 9999
+                    ? ' · Unlimited AI credits'
+                    : currentDbPlan.max_ai_credits > 0
+                      ? ` · ${currentDbPlan.max_ai_credits} AI credits/mo`
+                      : ''}
+                </div>
+              )}
+              {user?.plan?.toLowerCase() === 'trial' && (
+                <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 4, fontWeight: 500 }}>
                   ⚠ Trial account — upgrade to unlock all features
                 </div>
               )}
@@ -101,7 +125,7 @@ export function Billing() {
         </div>
       </div>
 
-      {/* Upgrade section */}
+      {/* Plan grid — fully driven by DB */}
       <div style={{ marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -111,62 +135,57 @@ export function Billing() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 20 }}>
-          {PLANS.map(p => {
-            const isCurrent = user?.plan?.toLowerCase() === p.id;
-            const Icon = p.icon;
+          {plans.map((p, idx) => {
+            const style = PLAN_STYLES[idx] || PLAN_STYLES[PLAN_STYLES.length - 1];
+            const Icon  = style.icon;
+            const isCurrent = p.name.toLowerCase() === user?.plan?.toLowerCase();
+            const bullets = buildBullets(p);
             return (
               <div key={p.id} style={{
-                border: isCurrent ? `2px solid ${p.color}` : '1px solid var(--border)',
+                border: isCurrent ? `2px solid ${style.color}` : '1px solid var(--border)',
                 borderRadius: 14,
                 background: isCurrent ? '#fff' : 'var(--bg3)',
                 padding: '20px 18px',
-                position: 'relative',
-                overflow: 'hidden',
+                position: 'relative', overflow: 'hidden',
                 transition: 'transform 0.18s, box-shadow 0.18s',
-                boxShadow: isCurrent ? `0 4px 20px ${p.glow}, var(--shadow)` : 'var(--shadow)',
+                boxShadow: isCurrent ? `0 4px 20px ${style.glow}, var(--shadow)` : 'var(--shadow)',
               }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${p.glow}`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = isCurrent ? `0 4px 20px ${p.glow}, var(--shadow)` : 'var(--shadow)'; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${style.glow}`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = isCurrent ? `0 4px 20px ${style.glow}, var(--shadow)` : 'var(--shadow)'; }}
               >
                 {/* Top accent strip */}
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-                  background: `linear-gradient(90deg,${p.gradA},${p.gradB})`,
-                  borderRadius: '14px 14px 0 0',
-                }} />
+                <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg,${style.gradA},${style.gradB})`, borderRadius:'14px 14px 0 0' }} />
 
                 {/* Popular badge */}
-                {p.popular && (
+                {style.popular && (
                   <div style={{
-                    position: 'absolute', top: 12, right: 12,
-                    background: `linear-gradient(135deg,${p.gradA},${p.gradB})`,
-                    color: '#fff', fontSize: 9, fontWeight: 700, padding: '3px 8px',
-                    borderRadius: 20, letterSpacing: '0.06em', textTransform: 'uppercase',
-                  }}>
-                    Popular
-                  </div>
+                    position:'absolute', top:12, right:12,
+                    background:`linear-gradient(135deg,${style.gradA},${style.gradB})`,
+                    color:'#fff', fontSize:9, fontWeight:700, padding:'3px 8px',
+                    borderRadius:20, letterSpacing:'0.06em', textTransform:'uppercase',
+                  }}>Popular</div>
                 )}
 
                 {/* Plan icon */}
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10, marginBottom: 14,
-                  background: `linear-gradient(135deg,${p.gradA},${p.gradB})`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: `0 3px 10px ${p.glow}`,
+                  width:36, height:36, borderRadius:10, marginBottom:14,
+                  background:`linear-gradient(135deg,${style.gradA},${style.gradB})`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  boxShadow:`0 3px 10px ${style.glow}`,
                 }}>
                   <Icon size={17} color="#fff" />
                 </div>
 
-                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6, color: 'var(--text)', letterSpacing: '-0.02em' }}>{p.name}</div>
-                <div style={{ marginBottom: 14 }}>
-                  <span style={{ fontSize: 26, fontWeight: 800, color: p.color, letterSpacing: '-0.04em' }}>${p.price}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 400 }}>/mo</span>
+                <div style={{ fontWeight:700, fontSize:15, marginBottom:6, color:'var(--text)', letterSpacing:'-0.02em' }}>{p.name}</div>
+                <div style={{ marginBottom:14 }}>
+                  <span style={{ fontSize:26, fontWeight:800, color:style.color, letterSpacing:'-0.04em' }}>${p.price_monthly}</span>
+                  <span style={{ fontSize:12, color:'var(--text3)', fontWeight:400 }}>/mo</span>
                 </div>
 
-                <div style={{ marginBottom: 16 }}>
-                  {p.features.map(f => (
-                    <div key={f} style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: `linear-gradient(135deg,${p.gradA},${p.gradB})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ marginBottom:16 }}>
+                  {bullets.map(f => (
+                    <div key={f} style={{ fontSize:12, color:'var(--text2)', marginBottom:5, display:'flex', alignItems:'center', gap:6 }}>
+                      <div style={{ width:14, height:14, borderRadius:'50%', background:`linear-gradient(135deg,${style.gradA},${style.gradB})`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                         <Check size={8} color="#fff" strokeWidth={3} />
                       </div>
                       {f}
@@ -175,17 +194,17 @@ export function Billing() {
                 </div>
 
                 {isCurrent ? (
-                  <div style={{ fontSize: 12, color: p.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ fontSize:12, color:style.color, fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>
                     <Check size={13} /> Current Plan
                   </div>
                 ) : (
                   <button style={{
-                    width: '100%', padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${p.color}`,
-                    background: 'transparent', color: p.color, fontSize: 12.5, fontWeight: 700,
-                    cursor: 'pointer', transition: 'all 0.18s', fontFamily: 'inherit',
+                    width:'100%', padding:'8px 12px', borderRadius:8, border:`1.5px solid ${style.color}`,
+                    background:'transparent', color:style.color, fontSize:12.5, fontWeight:700,
+                    cursor:'pointer', transition:'all 0.18s', fontFamily:'inherit',
                   }}
-                    onMouseEnter={e => { e.currentTarget.style.background = `linear-gradient(135deg,${p.gradA},${p.gradB})`; e.currentTarget.style.color = '#fff'; e.currentTarget.style.border = `1.5px solid transparent`; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = p.color; e.currentTarget.style.border = `1.5px solid ${p.color}`; }}
+                    onMouseEnter={e => { e.currentTarget.style.background=`linear-gradient(135deg,${style.gradA},${style.gradB})`; e.currentTarget.style.color='#fff'; e.currentTarget.style.border='1.5px solid transparent'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color=style.color; e.currentTarget.style.border=`1.5px solid ${style.color}`; }}
                   >
                     Upgrade
                   </button>
