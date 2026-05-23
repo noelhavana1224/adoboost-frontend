@@ -6,7 +6,7 @@ import { Spinner, Pagination, Modal } from '../components/UI';
 import {
   MessageSquare, Search, RefreshCw, Inbox as InboxIcon, CheckCircle,
   Loader2, X, Reply, Tag as TagIcon, ChevronDown, Send, ChevronsRight,
-  Archive, Briefcase, Mail, ChevronUp, CornerUpLeft,
+  Archive, Briefcase, Mail, ChevronUp, CornerUpLeft, Sparkles,
 } from 'lucide-react';
 
 // ── Tags ────────────────────────────────────────────────
@@ -373,7 +373,32 @@ function ThreadReader({ thread, onClose, onUpdate, onDelete, onArchive, isArchiv
   const [tagging, setTagging]     = useState(false);
   const [showTagDrop, setShowTagDrop] = useState(false);
   const [showCompose, setShowCompose] = useState(true);
+  const [aiLoading, setAiLoading]     = useState(false);
+  const [aiReplies, setAiReplies]     = useState(null); // [{tone,label,text}]
   const bottomRef = useRef(null);
+
+  // Build thread context string for the AI
+  const buildThreadContext = () => {
+    const recent = thread.msgs.slice(-4); // last 4 messages max
+    return recent.map(m => {
+      const sender = m.status === 'sent' ? 'You (sent)' : (m.from_name || m.from_email);
+      const body   = extractNew(m.body || '').substring(0, 400);
+      return `From: ${sender}\n${body}`;
+    }).join('\n\n---\n\n');
+  };
+
+  const generateAISuggestions = async () => {
+    setAiLoading(true);
+    setAiReplies(null);
+    try {
+      const { data } = await api.post('/ai/suggest-reply', { thread: buildThreadContext() });
+      setAiReplies(data.replies || []);
+      setShowCompose(true);
+    } catch (e) {
+      if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted.');
+      else toast.error('AI unavailable — add OPENAI_API_KEY to server.');
+    } finally { setAiLoading(false); }
+  };
 
   const leadMsg    = thread.msgs.find(m => m.status !== 'sent') || thread.msgs[0];
   const currentTag = TAG_MAP[leadMsg?.tag];
@@ -558,11 +583,64 @@ function ThreadReader({ thread, onClose, onUpdate, onDelete, onArchive, isArchiv
                   </button>
                 ))}
               </div>
+              {/* AI Suggest Reply button */}
+              <button
+                onClick={e => { e.stopPropagation(); generateAISuggestions(); }}
+                disabled={aiLoading}
+                style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', background: aiReplies ? '#f5f3ff' : 'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none', borderRadius:6, fontSize:12, color:'#fff', cursor: aiLoading ? 'not-allowed' : 'pointer', fontFamily:'inherit', fontWeight:600, opacity: aiLoading ? 0.7 : 1, flexShrink:0, boxShadow: aiReplies ? 'none' : '0 1px 4px rgba(124,58,237,0.3)', ...(aiReplies ? {background:'#f5f3ff', color:'#7c3aed', border:'1px solid #c4b5fd'} : {}) }}>
+                {aiLoading
+                  ? <><Loader2 size={11} style={{animation:'spin 1s linear infinite'}}/> Thinking…</>
+                  : <><Sparkles size={11}/> AI Reply</>}
+              </button>
               <div style={{ color: '#94a3b8' }}>{showCompose ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
             </div>
 
             {showCompose && (
               <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+                {/* ── AI Reply Suggestions panel ── */}
+                {aiReplies && aiReplies.length > 0 && (
+                  <div style={{ background:'#f5f3ff', border:'1px solid #c4b5fd', borderRadius:10, overflow:'hidden' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', borderBottom:'1px solid #e9d5ff', background:'#ede9fe' }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#6d28d9', display:'flex', alignItems:'center', gap:5 }}>
+                        <Sparkles size={12}/>AI Reply Suggestions — click to use
+                      </span>
+                      <button onClick={() => setAiReplies(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#9ca3af', lineHeight:1 }}><X size={13}/></button>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+                      {aiReplies.map((r, idx) => {
+                        const toneColors = {
+                          warm:         { bg:'#fff7ed', border:'#fed7aa', label:'#c2410c', badge:'#fef3c7' },
+                          professional: { bg:'#f0f9ff', border:'#bae6fd', label:'#0369a1', badge:'#e0f2fe' },
+                          brief:        { bg:'#f0fdf4', border:'#bbf7d0', label:'#15803d', badge:'#dcfce7' },
+                        };
+                        const tc = toneColors[r.tone] || toneColors.professional;
+                        return (
+                          <button key={idx} type="button"
+                            onClick={() => {
+                              setReplyBody(r.text);
+                              setAiReplies(null);
+                              setShowCompose(true);
+                            }}
+                            style={{ width:'100%', padding:'10px 14px', border:'none', borderBottom: idx < aiReplies.length-1 ? '1px solid #e9d5ff' : 'none', background:'#fff', textAlign:'left', cursor:'pointer', fontFamily:'inherit' }}
+                            onMouseEnter={e => e.currentTarget.style.background=tc.bg}
+                            onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                            <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                              <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:tc.badge, color:tc.label, fontWeight:700, whiteSpace:'nowrap', flexShrink:0, marginTop:1 }}>
+                                {r.label || r.tone}
+                              </span>
+                              <span style={{ fontSize:13, color:'#374151', lineHeight:1.6 }}>{r.text}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ padding:'6px 12px', background:'#ede9fe', borderTop:'1px solid #e9d5ff', fontSize:11, color:'#7c3aed' }}>
+                      ✏️ Click any option to load it into the editor, then customize before sending.
+                    </div>
+                  </div>
+                )}
+
                 {/* Address fields */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: '1px solid #f1f5f9' }}>
