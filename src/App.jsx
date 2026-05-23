@@ -29,6 +29,7 @@ import AdminTickets from './pages/admin/AdminTickets';
 import Pipeline from './pages/Pipeline';
 import VAUpsell from './pages/VAUpsell';
 import SupportEntry from './pages/SupportEntry';
+import ImpersonateEntry from './pages/ImpersonateEntry';
 
 function ProtectedRoute({ children, adminOnly }) {
   const { user } = useAuth();
@@ -89,7 +90,8 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password"  element={<ResetPassword />} />
           <Route path="/welcome-va"      element={<ProtectedRoute><VAUpsell /></ProtectedRoute>} />
-          <Route path="/support/entry" element={<SupportEntry />} />
+          <Route path="/support/entry"     element={<SupportEntry />} />
+          <Route path="/impersonate-entry" element={<ImpersonateEntry />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Main App */}

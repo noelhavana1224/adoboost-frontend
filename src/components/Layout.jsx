@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, Bell, Star, UserCog,
   CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare,
   ShieldAlert, Eye, EyeOff, Lock, CheckCircle2,
-  Zap, Database, BarChart, TrendingUp,
+  Zap, Database, BarChart, TrendingUp, LogIn,
 } from 'lucide-react';
 
 const NAV = [
@@ -219,6 +219,68 @@ function SupportBanner() {
           cursor:'pointer', display:'flex', alignItems:'center', gap:5,
         }}>
           Exit support <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ImpersonateBanner() {
+  const navigate = useNavigate();
+  const [info, setInfo] = React.useState(null);
+  const [now, setNow] = React.useState(Date.now());
+
+  React.useEffect(() => {
+    const raw = sessionStorage.getItem('ab_impersonating');
+    if (raw) { try { setInfo(JSON.parse(raw)); } catch {} }
+  }, []);
+
+  React.useEffect(() => {
+    if (!info) return;
+    const i = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(i);
+  }, [info]);
+
+  if (!info) return null;
+
+  const remaining = Math.max(0, Math.floor((info.expiresAt - now) / 1000));
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+
+  const handleExit = () => {
+    const backup = sessionStorage.getItem('ab_admin_token_backup');
+    sessionStorage.removeItem('ab_admin_token_backup');
+    sessionStorage.removeItem('ab_impersonating');
+    if (backup) {
+      localStorage.setItem('token', backup);
+      window.location.replace('/admin/users');
+    } else {
+      localStorage.removeItem('token');
+      window.location.replace('/login');
+    }
+  };
+
+  return (
+    <div style={{
+      background: 'linear-gradient(90deg,#7c3aed 0%,#5b21b6 100%)',
+      color: '#fff', padding: '10px 20px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+      borderBottom: '2px solid #4c1d95', fontSize: 13, fontWeight: 600,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <LogIn size={17} />
+        <span><strong>Impersonating</strong> {info.name || 'user'} &lt;{info.email}&gt; — full access session</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <span style={{ background: 'rgba(0,0,0,0.2)', padding: '4px 10px', borderRadius: 6, fontFamily: 'monospace', fontSize: 13 }}>
+          ⏱ {mins}:{secs.toString().padStart(2, '0')}
+        </span>
+        <button onClick={handleExit} style={{
+          background: '#fff', color: '#5b21b6', border: 'none',
+          borderRadius: 6, padding: '6px 14px', fontWeight: 700, fontSize: 12,
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          Exit Impersonation <X size={13} />
         </button>
       </div>
     </div>
@@ -777,6 +839,7 @@ export default function Layout({ children }) {
       {/* Main content */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <SupportBanner />
+        <ImpersonateBanner />
 
         {/* Header */}
         <header style={{
