@@ -8,7 +8,8 @@ const PLAN_ACCENT = {
   trial:        { color: '#64748b', bg: '#f1f5f9' },
   starter:      { color: '#1565C0', bg: '#eff6ff' },
   professional: { color: '#16a34a', bg: '#f0fdf4' },
-  unlimited:    { color: '#7c3aed', bg: '#faf5ff' },
+  agency:       { color: '#7c3aed', bg: '#faf5ff' },
+  unlimited:    { color: '#7c3aed', bg: '#faf5ff' }, // legacy fallback
 };
 
 function fmtNum(n, unlimitedAt = 999) {
@@ -158,8 +159,8 @@ function EditPlanModal({ plan, onClose, onSaved }) {
             onChange={e => f('max_ai_credits', +e.target.value)}
           />
           <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-            💡 Each AI action costs 1 credit (sequence = 5). Set <strong>9999</strong> to give this plan unlimited AI usage.
-            Current defaults: Trial 10 · Starter 100 · Professional 1,000 · Unlimited 9,999
+            💡 Each AI action costs 1 credit (sequence = 5). Set <strong>9999</strong> for unlimited.
+            Defaults: Trial 10 · Starter 100 · Professional 1,000 · Agency 9,999
           </div>
         </div>
 

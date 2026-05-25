@@ -496,7 +496,7 @@ export function ApiKey() {
 
   useEffect(() => { api.get('/auth/me').then(r => setUserData(r.data)); }, []);
 
-  const canAccess = ['professional', 'unlimited'].includes(userData?.plan?.toLowerCase());
+  const canAccess = ['professional', 'unlimited', 'agency'].includes(userData?.plan?.toLowerCase());
   const copy = () => {
     navigator.clipboard.writeText(userData?.api_key || '');
     setCopied(true);
@@ -522,7 +522,7 @@ export function ApiKey() {
             API Access Not Available
           </h3>
           <p style={{ fontSize: 13.5, color: 'var(--text3)', lineHeight: 1.65, maxWidth: 340, margin: '0 auto 24px' }}>
-            API access is available on the <strong style={{ color: 'var(--text2)' }}>Professional</strong> and <strong style={{ color: 'var(--text2)' }}>Unlimited</strong> plans.
+            API access is available on the <strong style={{ color: 'var(--text2)' }}>Professional</strong> and <strong style={{ color: 'var(--text2)' }}>Agency</strong> plans.
             Upgrade your plan to get programmatic access to your campaigns and contacts.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -534,7 +534,7 @@ export function ApiKey() {
             </Link>
           </div>
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center' }}>
-            {[{ label: 'Professional', price: '$79/mo', color: '#2563eb' }, { label: 'Unlimited', price: '$199/mo', color: '#7c3aed' }].map(p => (
+            {[{ label: 'Professional', price: '$79/mo', color: '#16a34a' }, { label: 'Agency', price: '$299/mo', color: '#7c3aed' }].map(p => (
               <div key={p.label} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid var(--border)`, background: 'var(--bg3)', fontSize: 12 }}>
                 <span style={{ fontWeight: 700, color: p.color }}>{p.label}</span>
                 <span style={{ color: 'var(--text3)', marginLeft: 6 }}>{p.price}</span>
