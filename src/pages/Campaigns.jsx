@@ -9,16 +9,17 @@ const pct = (n,d) => d>0?((n/d)*100).toFixed(1)+'%':'—';
 
 // ── Personalization variables ────────────────────
 const VARS = [
-  { label: 'First Name',  value: '{{first_name}}' },
-  { label: 'Last Name',   value: '{{last_name}}' },
-  { label: 'Full Name',   value: '{{full_name}}' },
-  { label: 'Company',     value: '{{company}}' },
-  { label: 'Email',       value: '{{email}}' },
-  { label: 'Title/Role',  value: '{{title}}' },
-  { label: 'Website',     value: '{{website}}' },
-  { label: 'Signature',   value: '{{signature}}' },
-  { label: 'From Name',   value: '{{from_name}}' },
-  { label: 'From Email',  value: '{{from_email}}' },
+  { label: 'First Name',      value: '{{first_name}}' },
+  { label: 'Last Name',       value: '{{last_name}}' },
+  { label: 'Full Name',       value: '{{full_name}}' },
+  { label: 'Company',         value: '{{company}}' },
+  { label: 'Email',           value: '{{email}}' },
+  { label: 'Title/Role',      value: '{{title}}' },
+  { label: 'Website',         value: '{{website}}' },
+  { label: 'Signature',       value: '{{signature}}' },
+  { label: 'From Name',       value: '{{from_name}}' },
+  { label: 'From Email',      value: '{{from_email}}' },
+  { label: 'Unsubscribe URL', value: '{{unsubscribe_url}}' },
 ];
 
 // ── Personalization Dropdown ─────────────────────
@@ -838,36 +839,74 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
 }
 
 // ── Email Preview Modal ──────────────────────────
-// Renders the email with sample contact data so the sender can see
-// exactly how the email will look in a recipient's inbox.
-const PREVIEW_SAMPLE = {
-  first_name: 'John',
-  last_name:  'Smith',
-  full_name:  'John Smith',
-  company:    'Acme Corp',
-  email:      'john@acmecorp.com',
-  title:      'Marketing Director',
-  website:    'acmecorp.com',
-  from_name:  'Your Name',
-  from_email: 'you@yourdomain.com',
-  signature:  '',
-};
+// Renders the email with the first real contact + selected account data so
+// the sender can see exactly how the email will look in a recipient's inbox.
 
-function previewRender(text) {
-  if (!text) return '';
-  return text.replace(/{{(\w+)}}/g, (_, key) => PREVIEW_SAMPLE[key] !== undefined ? (PREVIEW_SAMPLE[key] || `<span style="color:#f59e0b;font-style:italic">(${key} empty)</span>`) : `<span style="color:#dc2626">{{${key}}}</span>`);
-}
-
-function EmailPreviewModal({ open, onClose, sequences }) {
+function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationIds = [], listId = '' }) {
   const [step, setStep] = useState(0);
+  const [previewContact, setPreviewContact] = useState(null);
+  const [loadingContact, setLoadingContact] = useState(false);
+
   useEffect(() => { if (open) setStep(0); }, [open]);
+
+  // Fetch the first real contact from the selected list
+  useEffect(() => {
+    if (!open || !listId) { setPreviewContact(null); return; }
+    setLoadingContact(true);
+    api.get(`/contacts?list_id=${encodeURIComponent(listId)}&limit=1`)
+      .then(r => {
+        const rows = r.data?.contacts || r.data || [];
+        setPreviewContact(Array.isArray(rows) ? (rows[0] || null) : null);
+      })
+      .catch(() => setPreviewContact(null))
+      .finally(() => setLoadingContact(false));
+  }, [open, listId]);
 
   if (!open || !sequences?.length) return null;
   const seq = sequences[step] || sequences[0];
 
+  // Pick the first selected inbox account
+  const selectedAccount = accounts.find(a => rotationIds.includes(a.id)) || accounts[0] || {};
+  const contact = previewContact || {};
+
+  const firstName = contact.first_name || 'Jane';
+  const lastName  = contact.last_name  || 'Doe';
+  const sampleData = {
+    first_name:      firstName,
+    last_name:       lastName,
+    full_name:       [firstName, lastName].filter(Boolean).join(' '),
+    company:         contact.company    || 'Acme Corp',
+    email:           contact.email      || 'jane@acmecorp.com',
+    title:           contact.title      || 'Marketing Director',
+    website:         contact.website    || 'acmecorp.com',
+    from_name:       selectedAccount.from_name  || selectedAccount.name || 'Your Name',
+    from_email:      selectedAccount.from_email || selectedAccount.username || 'you@yourdomain.com',
+    signature:       selectedAccount.signature  || '',
+    unsubscribe_url: '#unsubscribe',
+  };
+
+  const previewRender = (text) => {
+    if (!text) return '';
+    return text.replace(/{{(\w+)}}/g, (_, key) =>
+      sampleData[key] !== undefined
+        ? (sampleData[key] || `<span style="color:#f59e0b;font-style:italic">(${key} empty)</span>`)
+        : `<span style="color:#dc2626">{{${key}}}</span>`
+    );
+  };
+
   const renderedSubject = previewRender(seq.subject || '(No subject)');
   const renderedBody    = previewRender(seq.body || '');
   const today = new Date().toLocaleDateString('en-US', { weekday:'short', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  // Label: are we using real contact data or fallback?
+  const dataLabel = previewContact
+    ? `Previewing with: ${sampleData.full_name} <${sampleData.email}>`
+    : loadingContact ? 'Loading contact…' : 'No list selected — showing sample names';
+
+  // Show which account is being previewed when multiple are selected
+  const accountLabel = selectedAccount.from_email
+    ? `Sent from: ${sampleData.from_name} <${sampleData.from_email}>${rotationIds.length > 1 ? ` (+${rotationIds.length - 1} more)` : ''}`
+    : '';
 
   return (
     <Modal open={open} onClose={onClose} title="📧 Email Preview" width={660}>
@@ -888,14 +927,22 @@ function EmailPreviewModal({ open, onClose, sequences }) {
         </div>
       )}
 
+      {/* Data source info bar */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, fontSize:11, color:'#64748b' }}>
+        <span>👤 {dataLabel}</span>
+        {accountLabel && <span>📬 {accountLabel}</span>}
+      </div>
+
       {/* Email chrome */}
       <div style={{ border:'1.5px solid #e2e8f0', borderRadius:12, overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
         {/* Top bar */}
-        <div style={{ background:'#f1f5f9', padding:'8px 14px', borderBottom:'1px solid #e2e8f0', display:'flex', gap:6 }}>
+        <div style={{ background:'#f1f5f9', padding:'8px 14px', borderBottom:'1px solid #e2e8f0', display:'flex', gap:6, alignItems:'center' }}>
           <div style={{ width:10, height:10, borderRadius:'50%', background:'#fc5c65' }}/>
           <div style={{ width:10, height:10, borderRadius:'50%', background:'#fed330' }}/>
           <div style={{ width:10, height:10, borderRadius:'50%', background:'#26de81' }}/>
-          <span style={{ fontSize:11, color:'#94a3b8', marginLeft:8 }}>Email Preview — Sample Data</span>
+          <span style={{ fontSize:11, color:'#94a3b8', marginLeft:8 }}>
+            {previewContact ? 'Real Contact Data' : 'Sample Data'}
+          </span>
         </div>
 
         {/* Subject bar */}
@@ -904,9 +951,9 @@ function EmailPreviewModal({ open, onClose, sequences }) {
             dangerouslySetInnerHTML={{ __html: renderedSubject }} />
           <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:'4px 10px', fontSize:12 }}>
             <span style={{ color:'#94a3b8', fontWeight:600 }}>From:</span>
-            <span style={{ color:'#374151' }}>{PREVIEW_SAMPLE.from_name} &lt;{PREVIEW_SAMPLE.from_email}&gt;</span>
+            <span style={{ color:'#374151' }}>{sampleData.from_name} &lt;{sampleData.from_email}&gt;</span>
             <span style={{ color:'#94a3b8', fontWeight:600 }}>To:</span>
-            <span style={{ color:'#374151' }}>{PREVIEW_SAMPLE.full_name} &lt;{PREVIEW_SAMPLE.email}&gt;</span>
+            <span style={{ color:'#374151' }}>{sampleData.full_name} &lt;{sampleData.email}&gt;</span>
             <span style={{ color:'#94a3b8', fontWeight:600 }}>Date:</span>
             <span style={{ color:'#374151' }}>{today}</span>
           </div>
@@ -934,8 +981,8 @@ function EmailPreviewModal({ open, onClose, sequences }) {
         <span style={{ fontSize:14 }}>💡</span>
         <div>
           <span style={{ color:'#dc2626', fontWeight:600 }}>Red variables</span> aren't recognised — check your spelling.&nbsp;
-          <span style={{ color:'#d97706', fontWeight:600 }}>Orange variables</span> are valid but empty in sample data (will use your contact's real value).&nbsp;
-          All real emails use your contacts' actual data.
+          <span style={{ color:'#d97706', fontWeight:600 }}>Orange variables</span> are valid but empty for this contact (real emails use their actual value).&nbsp;
+          {!previewContact && !loadingContact && 'Select a contact list to preview with real data.'}
         </div>
       </div>
     </Modal>
@@ -1161,6 +1208,9 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         open={showPreview}
         onClose={() => setShowPreview(false)}
         sequences={sequences}
+        accounts={accounts}
+        rotationIds={form.rotation_ids || []}
+        listId={form.list_id || ''}
       />
     </Modal>
   );
