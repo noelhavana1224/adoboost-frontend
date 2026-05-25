@@ -1044,9 +1044,84 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   );
 }
 
-// ── Create/Edit Campaign Modal ───────────────────
+// ── Timezone list ────────────────────────────────
+const TIMEZONES = [
+  { v:'UTC',                    l:'(UTC+00:00) UTC' },
+  { v:'America/New_York',       l:'(GMT-05:00) Eastern Time (US & Canada)' },
+  { v:'America/Chicago',        l:'(GMT-06:00) Central Time (US & Canada)' },
+  { v:'America/Denver',         l:'(GMT-07:00) Mountain Time (US & Canada)' },
+  { v:'America/Los_Angeles',    l:'(GMT-08:00) Pacific Time (US & Canada)' },
+  { v:'America/Anchorage',      l:'(GMT-09:00) Alaska' },
+  { v:'Pacific/Honolulu',       l:'(GMT-10:00) Hawaii' },
+  { v:'America/Toronto',        l:'(GMT-05:00) Toronto' },
+  { v:'America/Vancouver',      l:'(GMT-08:00) Vancouver' },
+  { v:'America/Mexico_City',    l:'(GMT-06:00) Mexico City' },
+  { v:'America/Bogota',         l:'(GMT-05:00) Bogota' },
+  { v:'America/Lima',           l:'(GMT-05:00) Lima' },
+  { v:'America/Santiago',       l:'(GMT-04:00) Santiago' },
+  { v:'America/Sao_Paulo',      l:'(GMT-03:00) Brasilia' },
+  { v:'America/Buenos_Aires',   l:'(GMT-03:00) Buenos Aires' },
+  { v:'America/Caracas',        l:'(GMT-04:00) Caracas' },
+  { v:'Europe/London',          l:'(GMT+00:00) London' },
+  { v:'Europe/Dublin',          l:'(GMT+00:00) Dublin' },
+  { v:'Europe/Lisbon',          l:'(GMT+00:00) Lisbon' },
+  { v:'Europe/Paris',           l:'(GMT+01:00) Paris' },
+  { v:'Europe/Berlin',          l:'(GMT+01:00) Berlin' },
+  { v:'Europe/Rome',            l:'(GMT+01:00) Rome' },
+  { v:'Europe/Madrid',          l:'(GMT+01:00) Madrid' },
+  { v:'Europe/Amsterdam',       l:'(GMT+01:00) Amsterdam' },
+  { v:'Europe/Warsaw',          l:'(GMT+01:00) Warsaw' },
+  { v:'Europe/Athens',          l:'(GMT+02:00) Athens' },
+  { v:'Europe/Helsinki',        l:'(GMT+02:00) Helsinki' },
+  { v:'Europe/Kiev',            l:'(GMT+02:00) Kyiv' },
+  { v:'Europe/Istanbul',        l:'(GMT+03:00) Istanbul' },
+  { v:'Europe/Moscow',          l:'(GMT+03:00) Moscow' },
+  { v:'Asia/Dubai',             l:'(GMT+04:00) Dubai' },
+  { v:'Asia/Karachi',           l:'(GMT+05:00) Karachi' },
+  { v:'Asia/Kolkata',           l:'(GMT+05:30) Mumbai, Kolkata' },
+  { v:'Asia/Dhaka',             l:'(GMT+06:00) Dhaka' },
+  { v:'Asia/Bangkok',           l:'(GMT+07:00) Bangkok' },
+  { v:'Asia/Jakarta',           l:'(GMT+07:00) Jakarta' },
+  { v:'Asia/Shanghai',          l:'(GMT+08:00) Beijing, Shanghai' },
+  { v:'Asia/Singapore',         l:'(GMT+08:00) Singapore' },
+  { v:'Asia/Manila',            l:'(GMT+08:00) Manila' },
+  { v:'Asia/Kuala_Lumpur',      l:'(GMT+08:00) Kuala Lumpur' },
+  { v:'Asia/Hong_Kong',         l:'(GMT+08:00) Hong Kong' },
+  { v:'Asia/Taipei',            l:'(GMT+08:00) Taipei' },
+  { v:'Asia/Tokyo',             l:'(GMT+09:00) Tokyo' },
+  { v:'Asia/Seoul',             l:'(GMT+09:00) Seoul' },
+  { v:'Australia/Perth',        l:'(GMT+08:00) Perth' },
+  { v:'Australia/Adelaide',     l:'(GMT+09:30) Adelaide' },
+  { v:'Australia/Sydney',       l:'(GMT+10:00) Sydney' },
+  { v:'Australia/Melbourne',    l:'(GMT+10:00) Melbourne' },
+  { v:'Pacific/Auckland',       l:'(GMT+12:00) Auckland' },
+  { v:'Africa/Cairo',           l:'(GMT+02:00) Cairo' },
+  { v:'Africa/Nairobi',         l:'(GMT+03:00) Nairobi' },
+  { v:'Africa/Lagos',           l:'(GMT+01:00) Lagos' },
+  { v:'Africa/Johannesburg',    l:'(GMT+02:00) Johannesburg' },
+  { v:'Africa/Casablanca',      l:'(GMT+00:00) Casablanca' },
+];
+
+const DAYS = [
+  { id:'mon', label:'MON' }, { id:'tue', label:'TUE' }, { id:'wed', label:'WED' },
+  { id:'thu', label:'THU' }, { id:'fri', label:'FRI' }, { id:'sat', label:'SAT' },
+  { id:'sun', label:'SUN' },
+];
+
+const DEFAULT_FORM = {
+  name: '', visibility: 'everyone',
+  send_days: ['mon','tue','wed','thu','fri'],
+  timezone: 'America/New_York',
+  send_time_start: '08:00', send_time_end: '18:00',
+  all_hours: false, start_immediately: false,
+  email_account_id: '', rotation_ids: [], list_id: '',
+  daily_limit: 50, track_opens: true, track_clicks: true,
+};
+
+// ── Create/Edit Campaign Modal (2-step wizard) ───
 function CampaignModal({ open, campaign, onClose, onSaved }) {
-  const [form, setForm]       = useState({ name: '', email_account_id: '', list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
+  const [wizardStep, setWizardStep] = useState('schedule'); // 'schedule' | 'emails'
+  const [form, setForm]       = useState(DEFAULT_FORM);
   const [sequences, setSequences] = useState([{ subject: '', body: '', delay_days: 0, delay_hours: 0 }]);
   const [accounts, setAccounts]   = useState([]);
   const [lists, setLists]         = useState([]);
@@ -1054,11 +1129,12 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
   const [loading, setLoading]     = useState(false);
   const [showAISeq, setShowAISeq] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [creditsKey, setCreditsKey] = useState(0); // bump to refresh credits bar
+  const [creditsKey, setCreditsKey] = useState(0);
   const isActive = campaign?.status === 'active';
 
   useEffect(() => {
     if (!open) return;
+    setWizardStep('schedule');
     api.get('/email-accounts').then(r => setAccounts(r.data));
     api.get('/contacts/lists').then(r => setLists(r.data));
     api.get('/templates').then(r => setTemplates(r.data));
@@ -1066,16 +1142,40 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
       let rotationIds = [];
       try { rotationIds = JSON.parse(campaign.rotation_account_ids || '[]'); } catch {}
       if (!rotationIds.length && campaign.email_account_id) rotationIds = [campaign.email_account_id];
-      setForm({ name: campaign.name, email_account_id: campaign.email_account_id || '', rotation_ids: rotationIds, list_id: campaign.list_id || '', daily_limit: campaign.daily_limit, track_opens: !!campaign.track_opens, track_clicks: !!campaign.track_clicks });
+      let send_days = ['mon','tue','wed','thu','fri'];
+      try { if (campaign.send_days) send_days = campaign.send_days.split(',').map(d => d.trim()); } catch {}
+      setForm({
+        name: campaign.name,
+        visibility: campaign.visibility || 'everyone',
+        send_days,
+        timezone: campaign.timezone || 'America/New_York',
+        send_time_start: campaign.send_time_start || '08:00',
+        send_time_end: campaign.send_time_end || '18:00',
+        all_hours: !!campaign.all_hours,
+        start_immediately: !!campaign.start_immediately,
+        email_account_id: campaign.email_account_id || '',
+        rotation_ids: rotationIds,
+        list_id: campaign.list_id || '',
+        daily_limit: campaign.daily_limit,
+        track_opens: !!campaign.track_opens,
+        track_clicks: !!campaign.track_clicks,
+      });
       api.get(`/campaigns/${campaign.id}`).then(r => { if (r.data.sequences?.length) setSequences(r.data.sequences); });
     } else {
-      setForm({ name: '', email_account_id: '', rotation_ids: [], list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
+      setForm(DEFAULT_FORM);
       setSequences([{ subject: '', body: '', delay_days: 0, delay_hours: 0 }]);
     }
   }, [open, campaign]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const updateSeq = (i, key, val) => setSequences(s => s.map((sq, idx) => idx === i ? { ...sq, [key]: val } : sq));
+  const onCreditUsed = () => setCreditsKey(k => k + 1);
+
+  const toggleDay = (day) => {
+    const cur = form.send_days || [];
+    f('send_days', cur.includes(day) ? cur.filter(d => d !== day) : [...cur, day]);
+  };
+  const allDaysSelected = DAYS.every(d => (form.send_days||[]).includes(d.id));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1084,6 +1184,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
     try {
       const payload = {
         ...form,
+        send_days: (form.send_days||[]).join(','),
         email_account_id: (form.rotation_ids||[]).length > 0 ? form.rotation_ids[0] : form.email_account_id,
         rotation_account_ids: JSON.stringify(form.rotation_ids || []),
         sequences: isActive ? undefined : sequences,
@@ -1091,182 +1192,265 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
       campaign
         ? await api.put(`/campaigns/${campaign.id}`, payload)
         : await api.post('/campaigns', payload);
-      toast.success(campaign ? 'Campaign updated' : 'Campaign created');
+      toast.success(campaign ? 'Campaign updated ✅' : 'Campaign created ✅');
       onSaved();
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
     finally { setLoading(false); }
   };
 
-  // Called by AI sub-components after a credit is consumed
-  const onCreditUsed = () => setCreditsKey(k => k + 1);
+  const scheduleComplete = !!(form.name && (form.send_days||[]).length > 0);
 
   return (
-    <Modal open={open} onClose={onClose} title={campaign ? `Edit Campaign — ${campaign?.name}` : 'Create New Campaign'} width={720}>
+    <Modal open={open} onClose={onClose}
+      title={campaign ? `Edit — ${campaign.name}` : 'Create your next lead-generating campaign'}
+      width={740}>
+
+      {/* ── Wizard Step Indicator ── */}
+      <div style={{ display:'flex', alignItems:'center', gap:0, marginBottom:22, background:'#f8fafc', borderRadius:10, padding:'4px', border:'1px solid #e2e8f0' }}>
+        {[{id:'schedule',label:'1  Schedule & Settings'},{id:'emails',label:'2  Write Emails'}].map((s,i) => (
+          <button key={s.id} type="button"
+            onClick={() => { if (s.id==='emails' && !scheduleComplete) { toast.error('Fill in campaign name first'); return; } setWizardStep(s.id); }}
+            style={{ flex:1, padding:'9px 0', borderRadius:8, border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:wizardStep===s.id?800:500,
+              background: wizardStep===s.id ? 'linear-gradient(135deg,#2563eb,#7c3aed)' : 'transparent',
+              color: wizardStep===s.id ? '#fff' : '#64748b', transition:'all 0.18s' }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       {isActive && (
-        <div style={{ background: '#fffff0', border: '1px solid #faf089', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 13, color: '#975a16' }}>
-          ⚠️ This campaign is <strong>active</strong>. You can update the name and daily limit but sequences cannot be changed while running.
+        <div style={{ background:'#fffff0', border:'1px solid #faf089', borderRadius:8, padding:'10px 14px', marginBottom:14, fontSize:13, color:'#975a16' }}>
+          ⚠️ Campaign is <strong>active</strong>. Name, schedule &amp; limit can be changed; sequences cannot.
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Input label="Campaign Name *" value={form.name} onChange={e => f('name', e.target.value)} required />
+      {/* ═══════════════ STEP 1: SCHEDULE ═══════════════ */}
+      {wizardStep === 'schedule' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <RotationSelect accounts={accounts} value={form.rotation_ids||[]} onChange={ids => { f('rotation_ids', ids); if (ids.length && !form.email_account_id) f('email_account_id', ids[0]); }} disabled={isActive} />
-          <Select label="Contact List" value={form.list_id} onChange={e => f('list_id', e.target.value)} disabled={isActive}>
-            <option value="">Select list...</option>
-            {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_contacts || 0})</option>)}
-          </Select>
-        </div>
+          {/* Campaign name */}
+          <Input label="Campaign Name *" value={form.name} onChange={e => f('name', e.target.value)} required placeholder="Q3 Outreach — SaaS Decision Makers" />
 
-        {/* Auto-computed capacity from selected accounts */}
-        {(form.rotation_ids||[]).length > 0 && (() => {
-          const selected = accounts.filter(a => (form.rotation_ids||[]).includes(a.id));
-          const totalLimit = selected.reduce((sum, a) => sum + (a.daily_limit || 50), 0);
-          return (
-            <div style={{ background:'#f0fff4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13 }}>
-              <div style={{ fontWeight:700, color:'#16a34a', marginBottom:4 }}>
-                📊 Campaign Capacity: <strong>{totalLimit.toLocaleString()} emails/day</strong>
-              </div>
-              <div style={{ color:'#166534', fontSize:12, lineHeight:1.6 }}>
-                {selected.map(a => (
-                  <span key={a.id} style={{ marginRight:12 }}>
-                    {a.name}: <strong>{a.daily_limit || 50}/day</strong>
-                  </span>
-                ))}
-              </div>
-              <div style={{ fontSize:11, color:'#166534', marginTop:4, opacity:0.8 }}>
-                💡 Limit is set per account in <strong>Settings → Sending Speed</strong>. Rotation switches accounts when one hits its limit.
-              </div>
-            </div>
-          );
-        })()}
-
-        {!isActive && (
+          {/* Sharing */}
           <div>
-            {/* ── Sequences header with AI controls ── */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <label style={{ fontSize: 13, fontWeight: 700 }}>
-                Email Sequences ({sequences.length} step{sequences.length !== 1 ? 's' : ''})
-              </label>
-              <div style={{ display:'flex', gap:6 }}>
-                <button type="button" onClick={() => setShowAISeq(true)}
-                  style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none', borderRadius:7, fontSize:12, color:'#fff', cursor:'pointer', fontFamily:'inherit', fontWeight:700, boxShadow:'0 2px 6px rgba(124,58,237,0.35)' }}>
-                  <Sparkles size={12}/>AI Write Sequence
+            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Sharing</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              {[{v:'everyone',label:'👥 Everyone',desc:'Team members can see & edit'},{v:'only_me',label:'🔒 Only Me',desc:'Private to your account'}].map(opt => (
+                <button key={opt.v} type="button" onClick={() => f('visibility', opt.v)}
+                  style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:10, border:`2px solid ${form.visibility===opt.v?'#2563eb':'#e2e8f0'}`, background:form.visibility===opt.v?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all 0.15s' }}>
+                  <div style={{ width:18, height:18, borderRadius:9, border:`2px solid ${form.visibility===opt.v?'#2563eb':'#cbd5e1'}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    {form.visibility===opt.v && <div style={{ width:8, height:8, borderRadius:4, background:'#2563eb' }}/>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color: form.visibility===opt.v?'#1d4ed8':'#0f172a' }}>{opt.label}</div>
+                    <div style={{ fontSize:11, color:'#64748b', marginTop:1 }}>{opt.desc}</div>
+                  </div>
                 </button>
-                <button type="button" onClick={() => setShowPreview(true)}
-                  style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:7, fontSize:12, color:'#16a34a', cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
-                  <Eye size={12}/>Preview
+              ))}
+            </div>
+          </div>
+
+          {/* Send days */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Send Time — Days</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              {/* ALL DAYS shortcut */}
+              <button type="button" onClick={() => f('send_days', allDaysSelected ? [] : DAYS.map(d=>d.id))}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:`2px solid ${allDaysSelected?'#2563eb':'#e2e8f0'}`, background:allDaysSelected?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, color:allDaysSelected?'#1d4ed8':'#475569', transition:'all 0.15s' }}>
+                <div style={{ width:16, height:16, borderRadius:3, border:`2px solid ${allDaysSelected?'#2563eb':'#cbd5e1'}`, background:allDaysSelected?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {allDaysSelected && <span style={{ color:'#fff', fontSize:10, fontWeight:900, lineHeight:1 }}>✓</span>}
+                </div>
+                ALL DAYS
+              </button>
+              {DAYS.map(d => {
+                const sel = (form.send_days||[]).includes(d.id);
+                return (
+                  <button key={d.id} type="button" onClick={() => toggleDay(d.id)}
+                    style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:`2px solid ${sel?'#2563eb':'#e2e8f0'}`, background:sel?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, color:sel?'#1d4ed8':'#475569', transition:'all 0.15s' }}>
+                    <div style={{ width:16, height:16, borderRadius:3, border:`2px solid ${sel?'#2563eb':'#cbd5e1'}`, background:sel?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      {sel && <span style={{ color:'#fff', fontSize:10, fontWeight:900, lineHeight:1 }}>✓</span>}
+                    </div>
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Timezone */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Timezone</div>
+            <select value={form.timezone} onChange={e => f('timezone', e.target.value)}
+              style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 14px', fontSize:13, background:'#fff', outline:'none', color:'#0f172a', cursor:'pointer', appearance:'auto' }}>
+              {TIMEZONES.map(tz => <option key={tz.v} value={tz.v}>{tz.l}</option>)}
+            </select>
+          </div>
+
+          {/* Send window */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Send Window</div>
+            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+              <div style={{ flex:1, minWidth:130 }}>
+                <label style={{ fontSize:11, color:'#64748b', fontWeight:600, display:'block', marginBottom:4 }}>FROM</label>
+                <input type="time" value={form.send_time_start} onChange={e => f('send_time_start', e.target.value)} disabled={form.all_hours}
+                  style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 12px', fontSize:13, background:form.all_hours?'#f1f5f9':'#fff', outline:'none', color:'#0f172a', boxSizing:'border-box', opacity:form.all_hours?0.5:1 }}/>
+              </div>
+              <div style={{ flex:1, minWidth:130 }}>
+                <label style={{ fontSize:11, color:'#64748b', fontWeight:600, display:'block', marginBottom:4 }}>TO</label>
+                <input type="time" value={form.send_time_end} onChange={e => f('send_time_end', e.target.value)} disabled={form.all_hours}
+                  style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 12px', fontSize:13, background:form.all_hours?'#f1f5f9':'#fff', outline:'none', color:'#0f172a', boxSizing:'border-box', opacity:form.all_hours?0.5:1 }}/>
+              </div>
+              {/* All Hours toggle */}
+              <div style={{ display:'flex', alignItems:'center', gap:8, paddingTop:18 }}>
+                <button type="button" onClick={() => f('all_hours', !form.all_hours)}
+                  style={{ width:44, height:24, borderRadius:12, border:'none', cursor:'pointer', padding:0, background:form.all_hours?'#2563eb':'#cbd5e1', position:'relative', transition:'background 0.2s', flexShrink:0 }}>
+                  <div style={{ position:'absolute', top:3, left:form.all_hours?22:3, width:18, height:18, borderRadius:9, background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }}/>
                 </button>
-                <Btn type="button" size="sm" variant="secondary"
-                  onClick={() => setSequences(s => [...s, { subject: '', body: '', delay_days: s.length > 0 ? 3 : 0, delay_hours: 0 }])}>
-                  <Plus size={12}/> Add Follow-up
-                </Btn>
+                <span style={{ fontSize:12, fontWeight:700, color:'#475569', whiteSpace:'nowrap' }}>ALL HOURS?</span>
               </div>
             </div>
-
-            {/* AI Credits bar */}
-            <AICreditsBar refreshKey={creditsKey}/>
-
-            {sequences.map((seq, i) => (
-              <div key={i} style={{ border: '1px solid var(--border2)', borderRadius: 10, padding: 16, marginBottom: 12, background: 'var(--bg3)' }}>
-                {/* Step header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? 'var(--primary)' : 'var(--orange)' }}>
-                    {i === 0 ? '📧 Initial Email' : `🔄 Follow-up ${i}`}
-                  </span>
-                  {i > 0 && (
-                    <button type="button" onClick={() => setSequences(s => s.filter((_, idx) => idx !== i))}
-                      style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer' }}>
-                      <X size={14}/>
-                    </button>
-                  )}
-                </div>
-
-                {/* Template selector */}
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <span style={{ fontSize:12, color:'var(--text3)', fontWeight:600 }}>Load from template:</span>
-                    <select onChange={e => {
-                      const tpl = templates.find(t => t.id === e.target.value);
-                      if (!tpl) return;
-                      updateSeq(i, 'subject', tpl.subject || '');
-                      updateSeq(i, 'body', tpl.body || '');
-                      e.target.value = '';
-                      toast.success(`Template "${tpl.name}" loaded!`);
-                    }} style={{ border:'1px solid var(--border2)', borderRadius:6, padding:'4px 8px', fontSize:12, background:'#fff', outline:'none', color:'var(--text2)', cursor:'pointer' }}>
-                      <option value="">— Select a template —</option>
-                      {templates.map(t => <option key={t.id} value={t.id}>{t.name} ({t.category})</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Delay for follow-ups */}
-                {i > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-                    <Input label="Delay (days)" type="number" min={0} value={seq.delay_days}
-                      onChange={e => updateSeq(i, 'delay_days', +e.target.value)} />
-                    <Input label="Delay (hours)" type="number" min={0} max={23} value={seq.delay_hours}
-                      onChange={e => updateSeq(i, 'delay_hours', +e.target.value)} />
-                  </div>
-                )}
-
-                {/* Subject with AI + variable dropdown */}
-                <div style={{ marginBottom: 12 }}>
-                  <SubjectInput
-                    value={seq.subject}
-                    onChange={val => updateSeq(i, 'subject', val)}
-                    emailBody={seq.body}
-                    onCreditUsed={onCreditUsed}
-                  />
-                </div>
-
-                {/* Rich text body editor with AI rewrite + spam score */}
-                <RichBodyEditor
-                  key={`seq-body-${i}-${seq.subject}`}
-                  value={seq.body}
-                  onChange={val => updateSeq(i, 'body', val)}
-                  subject={seq.subject}
-                  onCreditUsed={onCreditUsed}
-                  placeholder={`Hi {{first_name}},\n\nI noticed {{company}} is...`}
-                />
+            {form.all_hours && (
+              <div style={{ marginTop:8, fontSize:12, color:'#64748b', background:'#f8fafc', borderRadius:7, padding:'7px 10px' }}>
+                ⚡ Emails will send at any time of day — useful for global audiences across timezones.
               </div>
-            ))}
+            )}
           </div>
-        )}
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
-          <Btn type="submit" loading={loading}>{campaign ? 'Save Changes' : 'Create Campaign'}</Btn>
+          {/* Start immediately + Daily leads */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div style={{ border:'1.5px solid #e2e8f0', borderRadius:10, padding:'14px' }}>
+              <button type="button" onClick={() => f('start_immediately', !form.start_immediately)}
+                style={{ display:'flex', alignItems:'flex-start', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit', width:'100%', textAlign:'left' }}>
+                <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${form.start_immediately?'#2563eb':'#cbd5e1'}`, background:form.start_immediately?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>
+                  {form.start_immediately && <span style={{ color:'#fff', fontSize:11, fontWeight:900 }}>✓</span>}
+                </div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Start Campaign Immediately</div>
+                  <div style={{ fontSize:11, color:'#64748b', marginTop:3, lineHeight:1.5 }}>When enabled, campaign starts sending as soon as you create it, bypassing manual launch</div>
+                </div>
+              </button>
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:6 }}>
+                Number of Leads to Start Daily
+              </label>
+              <input type="number" min={1} max={10000} value={form.daily_limit} onChange={e => f('daily_limit', +e.target.value)}
+                style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 14px', fontSize:14, fontWeight:700, color:'#0f172a', outline:'none', background:'#fff', boxSizing:'border-box' }}
+                placeholder="50"/>
+              <div style={{ fontSize:11, color:'#64748b', marginTop:4 }}>Max new contacts to enroll per day</div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:8, paddingTop:4 }}>
+            <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
+            <button type="button"
+              onClick={() => { if (!form.name) return toast.error('Campaign name is required'); setWizardStep('emails'); }}
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 22px', background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 2px 8px rgba(37,99,235,0.35)' }}>
+              Next: Write Emails →
+            </button>
+          </div>
         </div>
-      </form>
+      )}
 
-      {/* AI Sequence Generator modal */}
-      <AISequenceModal
-        open={showAISeq}
-        onClose={() => setShowAISeq(false)}
+      {/* ═══════════════ STEP 2: EMAILS ═══════════════ */}
+      {wizardStep === 'emails' && (
+        <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <RotationSelect accounts={accounts} value={form.rotation_ids||[]} onChange={ids => { f('rotation_ids', ids); if (ids.length && !form.email_account_id) f('email_account_id', ids[0]); }} disabled={isActive} />
+            <Select label="Contact List" value={form.list_id} onChange={e => f('list_id', e.target.value)} disabled={isActive}>
+              <option value="">Select list...</option>
+              {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_contacts || 0})</option>)}
+            </Select>
+          </div>
+
+          {/* Capacity chip */}
+          {(form.rotation_ids||[]).length > 0 && (() => {
+            const selected = accounts.filter(a => (form.rotation_ids||[]).includes(a.id));
+            const totalLimit = selected.reduce((sum, a) => sum + (a.daily_limit || 50), 0);
+            return (
+              <div style={{ background:'#f0fff4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13 }}>
+                <div style={{ fontWeight:700, color:'#16a34a', marginBottom:4 }}>📊 Campaign Capacity: <strong>{totalLimit.toLocaleString()} emails/day</strong></div>
+                <div style={{ color:'#166534', fontSize:12 }}>{selected.map(a => <span key={a.id} style={{ marginRight:12 }}>{a.name}: <strong>{a.daily_limit||50}/day</strong></span>)}</div>
+              </div>
+            );
+          })()}
+
+          {!isActive && (
+            <div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <label style={{ fontSize:13, fontWeight:700 }}>Email Sequences ({sequences.length} step{sequences.length!==1?'s':''})</label>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button type="button" onClick={() => setShowAISeq(true)}
+                    style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none', borderRadius:7, fontSize:12, color:'#fff', cursor:'pointer', fontFamily:'inherit', fontWeight:700, boxShadow:'0 2px 6px rgba(124,58,237,0.35)' }}>
+                    <Sparkles size={12}/>AI Write Sequence
+                  </button>
+                  <button type="button" onClick={() => setShowPreview(true)}
+                    style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:7, fontSize:12, color:'#16a34a', cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
+                    <Eye size={12}/>Preview
+                  </button>
+                  <Btn type="button" size="sm" variant="secondary"
+                    onClick={() => setSequences(s => [...s, { subject:'', body:'', delay_days: s.length>0?3:0, delay_hours:0 }])}>
+                    <Plus size={12}/> Add Follow-up
+                  </Btn>
+                </div>
+              </div>
+              <AICreditsBar refreshKey={creditsKey}/>
+              {sequences.map((seq, i) => (
+                <div key={i} style={{ border:'1px solid var(--border2)', borderRadius:10, padding:16, marginBottom:12, background:'var(--bg3)' }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color: i===0?'var(--primary)':'var(--orange)' }}>
+                      {i===0?'📧 Initial Email':`🔄 Follow-up ${i}`}
+                    </span>
+                    {i>0 && <button type="button" onClick={() => setSequences(s => s.filter((_,idx)=>idx!==i))} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer' }}><X size={14}/></button>}
+                  </div>
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:12, color:'var(--text3)', fontWeight:600 }}>Load from template:</span>
+                      <select onChange={e => { const tpl=templates.find(t=>t.id===e.target.value); if(!tpl)return; updateSeq(i,'subject',tpl.subject||''); updateSeq(i,'body',tpl.body||''); e.target.value=''; toast.success(`Template "${tpl.name}" loaded!`); }}
+                        style={{ border:'1px solid var(--border2)', borderRadius:6, padding:'4px 8px', fontSize:12, background:'#fff', outline:'none', color:'var(--text2)', cursor:'pointer' }}>
+                        <option value="">— Select a template —</option>
+                        {templates.map(t=><option key={t.id} value={t.id}>{t.name} ({t.category})</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {i>0 && (
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+                      <Input label="Delay (days)" type="number" min={0} value={seq.delay_days} onChange={e=>updateSeq(i,'delay_days',+e.target.value)}/>
+                      <Input label="Delay (hours)" type="number" min={0} max={23} value={seq.delay_hours} onChange={e=>updateSeq(i,'delay_hours',+e.target.value)}/>
+                    </div>
+                  )}
+                  <div style={{ marginBottom:12 }}>
+                    <SubjectInput value={seq.subject} onChange={val=>updateSeq(i,'subject',val)} emailBody={seq.body} onCreditUsed={onCreditUsed}/>
+                  </div>
+                  <RichBodyEditor key={`seq-body-${i}-${seq.subject}`} value={seq.body} onChange={val=>updateSeq(i,'body',val)} subject={seq.subject} onCreditUsed={onCreditUsed} placeholder={`Hi {{first_name}},\n\nI noticed {{company}} is...`}/>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display:'flex', gap:8, justifyContent:'space-between', alignItems:'center' }}>
+            <button type="button" onClick={() => setWizardStep('schedule')}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 16px', background:'none', border:'1.5px solid #e2e8f0', borderRadius:9, fontSize:13, color:'#64748b', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+              ← Back to Schedule
+            </button>
+            <div style={{ display:'flex', gap:8 }}>
+              <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
+              <Btn type="submit" loading={loading}>{campaign ? 'Save Changes' : 'Create Campaign 🚀'}</Btn>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* Sub-modals (always mounted so they don't lose state) */}
+      <AISequenceModal open={showAISeq} onClose={() => setShowAISeq(false)}
         onApply={(steps) => {
-          setSequences(steps.map((s, i) => ({
-            subject:     s.subject,
-            body:        s.body,
-            delay_days:  s.delay_days  ?? (i === 0 ? 0 : i * 3),
-            delay_hours: s.delay_hours ?? 0,
-          })));
-          setShowAISeq(false);
-          onCreditUsed();
-          toast.success('✨ AI sequence applied!');
-        }}
-      />
-
-      {/* Email Preview modal */}
-      <EmailPreviewModal
-        open={showPreview}
-        onClose={() => setShowPreview(false)}
-        sequences={sequences}
-        accounts={accounts}
-        rotationIds={form.rotation_ids || []}
-        listId={form.list_id || ''}
-      />
+          setSequences(steps.map((s,i) => ({ subject:s.subject, body:s.body, delay_days:s.delay_days??(i===0?0:i*3), delay_hours:s.delay_hours??0 })));
+          setShowAISeq(false); onCreditUsed(); toast.success('✨ AI sequence applied!');
+        }}/>
+      <EmailPreviewModal open={showPreview} onClose={() => setShowPreview(false)}
+        sequences={sequences} accounts={accounts} rotationIds={form.rotation_ids||[]} listId={form.list_id||''}/>
     </Modal>
   );
 }
