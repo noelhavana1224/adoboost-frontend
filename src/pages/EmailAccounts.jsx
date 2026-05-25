@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Spinner, Modal, Input, Alert } from '../components/UI';
@@ -362,7 +361,8 @@ function BulkImportModal({ open, onClose, onImported }) {
   }, [open]);
 
   /* ── Download template ── */
-  const downloadTemplate = (fmt) => {
+  const downloadTemplate = async (fmt) => {
+    const XLSX = await import('xlsx');
     const headers = BULK_COLS.map(c => c.key);
     const ws = XLSX.utils.aoa_to_sheet([
       headers,
@@ -382,8 +382,9 @@ function BulkImportModal({ open, onClose, onImported }) {
     if (!/\.(csv|xlsx|xls)$/i.test(file.name))
       return toast.error('Please upload a .csv, .xlsx or .xls file');
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx');
         const wb   = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
