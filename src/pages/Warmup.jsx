@@ -91,6 +91,9 @@ function WarmupCard({ account, poolSize, onUpdate }) {
     warmup_start_count: initStart,
     warmup_increment:   initInc,
     warmup_max_count:   initMax,
+    warmup_product:     account.warmup_product  || '',
+    warmup_company:     account.warmup_company  || '',
+    warmup_industry:    account.warmup_industry || '',
   });
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -237,6 +240,72 @@ function WarmupCard({ account, poolSize, onUpdate }) {
               </div>
             </div>
           )}
+
+          {/* ── Warmup Persona (AI content context) ── */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              🤖 AI Warmup Persona
+              <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text3)', marginLeft: 4 }}>
+                — tells the AI what to write about so emails look like real business conversations
+              </span>
+            </div>
+            <div style={{ background: 'linear-gradient(135deg,#f5f3ff,#eff6ff)', border: '1px solid #c4b5fd', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, color: '#5b21b6', marginBottom: 12, lineHeight: 1.5 }}>
+                ✨ Instead of generic "just checking in" emails, AdoBoost generates unique story-driven business emails contextual to your product — just like Mailflow, but smarter. Requires OpenAI API key in your server settings.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>
+                    🏢 Company / Sender Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Nexxis Digital"
+                    value={form.warmup_company}
+                    onChange={e => f('warmup_company', e.target.value)}
+                    style={{ width: '100%', border: '1px solid var(--border2)', borderRadius: 8, padding: '7px 10px', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>
+                    🚀 Product / Service
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. SEO audit software"
+                    value={form.warmup_product}
+                    onChange={e => f('warmup_product', e.target.value)}
+                    style={{ width: '100%', border: '1px solid var(--border2)', borderRadius: 8, padding: '7px 10px', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>
+                  🏷️ Industry / Niche
+                </label>
+                <select
+                  value={form.warmup_industry}
+                  onChange={e => f('warmup_industry', e.target.value)}
+                  style={{ width: '100%', border: '1px solid var(--border2)', borderRadius: 8, padding: '7px 10px', fontSize: 12, outline: 'none', background: '#fff', cursor: 'pointer' }}
+                >
+                  <option value="">— Select your industry —</option>
+                  {[
+                    'SaaS / Software', 'Digital Marketing Agency', 'SEO & Content', 'E-commerce',
+                    'Recruiting / Staffing', 'Real Estate', 'Finance & Fintech', 'Consulting',
+                    'Web Design & Development', 'Social Media Marketing', 'Video Production',
+                    'Accounting & Bookkeeping', 'HR & People Ops', 'Sales & CRM', 'Legal Services',
+                    'Healthcare & MedTech', 'Education & E-learning', 'Logistics & Supply Chain',
+                    'PR & Communications', 'Other',
+                  ].map(ind => <option key={ind} value={ind}>{ind}</option>)}
+                </select>
+              </div>
+              {(!form.warmup_product && !form.warmup_company && !form.warmup_industry) && (
+                <div style={{ marginTop: 10, fontSize: 11, color: '#7c3aed', background: '#f5f3ff', borderRadius: 6, padding: '6px 10px' }}>
+                  💡 Without a persona, emails fall back to generic templates. Fill in at least one field for AI-powered content.
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Ramp presets */}
           <div style={{ marginBottom: 20 }}>
