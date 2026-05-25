@@ -876,23 +876,29 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   const selectedAccount = accounts.find(a => rotationIds.includes(a.id)) || accounts[0] || {};
   const contact = previewContact || {};
 
-  // Parse signature — stored as JSON { mode, html, plain }
-  let signatureHtml = '';
-  try {
-    const sig = JSON.parse(selectedAccount.signature || '{}');
-    if (sig.mode === 'plain') {
-      signatureHtml = (sig.plain || '').split('\n').map(l => `<div>${l || '&nbsp;'}</div>`).join('');
-    } else {
-      signatureHtml = sig.html || '';
-    }
-  } catch {
-    signatureHtml = selectedAccount.signature || '';
-  }
-
   const firstName = contact.first_name || 'Jane';
   const lastName  = contact.last_name  || 'Doe';
   const fromName  = selectedAccount.from_name  || selectedAccount.name || 'Your Name';
   const fromEmail = selectedAccount.from_email || selectedAccount.username || 'you@yourdomain.com';
+
+  // Parse signature — stored as JSON { mode, html, plain }
+  // Also substitute {{from_name}} / {{from_email}} that templates embed inside the sig HTML
+  let signatureHtml = '';
+  try {
+    const sig = JSON.parse(selectedAccount.signature || '{}');
+    const raw = sig.mode === 'plain'
+      ? (sig.plain || '').split('\n').map(l => `<div>${l || '&nbsp;'}</div>`).join('')
+      : (sig.html || '');
+    signatureHtml = raw
+      .replace(/{{from_name}}/g,  fromName)
+      .replace(/{{from_email}}/g, fromEmail);
+  } catch {
+    signatureHtml = (selectedAccount.signature || '')
+      .replace(/{{from_name}}/g,  fromName)
+      .replace(/{{from_email}}/g, fromEmail);
+  }
+
+  const unsubLink = `<a href="#" style="color:#4f46e5;text-decoration:underline;pointer-events:none" title="Real tracking URL in sent emails">Unsubscribe</a>`;
 
   const sampleData = {
     first_name:      firstName,
@@ -905,7 +911,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
     from_name:       fromName,
     from_email:      fromEmail,
     signature:       signatureHtml,
-    unsubscribe_url: '<a href="#" style="color:#4f46e5;text-decoration:underline;pointer-events:none" title="Real tracking URL in sent emails">[Unsubscribe Link]</a>',
+    unsubscribe_url: unsubLink,
   };
 
   const previewRender = (text) => {
@@ -924,11 +930,11 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
       const loc = [userPrefs.company, userPrefs.city, userPrefs.country].filter(Boolean).join(', ');
       unsubFooterHtml = `<div style="margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
         You are receiving this email because you or someone signed you up.
-        <a href="#" style="color:#4f46e5;pointer-events:none" title="Real tracking URL in sent emails">[Unsubscribe Link]</a>${loc ? ` &bull; ${loc}` : ''}
+        <a href="#" style="color:#4f46e5;pointer-events:none" title="Real tracking URL in sent emails">Unsubscribe</a>${loc ? ` &bull; ${loc}` : ''}
       </div>`;
     } else if (userPrefs.custom_unsubscribe_text) {
       const rendered = userPrefs.custom_unsubscribe_text
-        .replace(/{{unsubscribe_url}}/g, '<a href="#" style="color:#4f46e5;text-decoration:underline;pointer-events:none" title="Real tracking URL in sent emails">[Unsubscribe Link]</a>')
+        .replace(/{{unsubscribe_url}}/g, '<a href="#" style="color:#4f46e5;text-decoration:underline;pointer-events:none" title="Real tracking URL in sent emails">Unsubscribe</a>')
         .replace(/{{first_name}}/g,  firstName)
         .replace(/{{last_name}}/g,   lastName)
         .replace(/{{email}}/g,       contact.email  || 'jane@acmecorp.com')
