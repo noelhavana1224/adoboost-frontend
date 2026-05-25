@@ -2,26 +2,28 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-const api = axios.create({ baseURL: BASE, headers: { 'Content-Type': 'application/json' } });
+const api = axios.create({
+  baseURL: BASE,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 12000,   // 12s per attempt — fail fast instead of hanging forever
+});
 
 // ── Service health state (module-level singleton) ─────────────────────────
 let _serviceDown = false;
 const SERVICE_TOAST_ID = 'service-down';
 
 function markServiceDown() {
-  if (_serviceDown) return;          // already showing banner
+  if (_serviceDown) return;
   _serviceDown = true;
-  toast.error(
-    '⚠️ Service unavailable — retrying automatically…',
-    { id: SERVICE_TOAST_ID, duration: Infinity }
-  );
+  // Fire a DOM event — Layout listens and shows the full-screen overlay
+  window.dispatchEvent(new CustomEvent('ab_service_down'));
 }
 
 function markServiceUp() {
   if (!_serviceDown) return;
   _serviceDown = false;
-  toast.dismiss(SERVICE_TOAST_ID);
-  toast.success('✓ Service restored', { duration: 3000 });
+  window.dispatchEvent(new CustomEvent('ab_service_up'));
+  toast.success('✓ Connection restored', { duration: 3000 });
 }
 
 // ── Request interceptor — attach auth token ───────────────────────────────
@@ -57,10 +59,10 @@ api.interceptors.response.use(
     if (serverDown) {
       config._retryCount = (config._retryCount || 0) + 1;
 
-      if (config._retryCount <= 3) {
+      if (config._retryCount <= 2) {
         markServiceDown();
-        // exponential-ish back-off: 4s, 8s, 12s
-        const delay = config._retryCount * 4000;
+        // Short back-off: 2s, 4s — fail fast so pages resolve quickly
+        const delay = config._retryCount * 2000;
         await new Promise(res => setTimeout(res, delay));
         return api(config);           // retry the original request
       }

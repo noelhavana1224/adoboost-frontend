@@ -708,12 +708,125 @@ function ForcePasswordChangeModal() {
   );
 }
 
+// ── Service Down Overlay ──────────────────────────────────────────────────
+function ServiceDownOverlay({ onRetry }) {
+  const [countdown, setCountdown] = React.useState(30);
+  const [spinning, setSpinning]   = React.useState(false);
+
+  // Auto-countdown and retry
+  React.useEffect(() => {
+    const t = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { onRetry(); return 30; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [onRetry]);
+
+  const handleRetry = () => {
+    setSpinning(true);
+    setCountdown(30);
+    onRetry();
+    setTimeout(() => setSpinning(false), 3000);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(15,23,42,0.92)',
+      backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 20, padding: '44px 48px', maxWidth: 480,
+        width: '90%', textAlign: 'center', boxShadow: '0 32px 80px rgba(0,0,0,0.4)',
+      }}>
+        {/* Animated icon */}
+        <div style={{
+          width: 72, height: 72, borderRadius: '50%',
+          background: 'linear-gradient(135deg,#fef3c7,#fde68a)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 20px', fontSize: 34,
+          boxShadow: '0 8px 24px rgba(251,191,36,0.25)',
+        }}>⚡</div>
+
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 10, letterSpacing: '-0.03em' }}>
+          Service Temporarily Unavailable
+        </h2>
+        <p style={{ fontSize: 14, color: '#64748b', lineHeight: 1.7, marginBottom: 28, maxWidth: 340, margin: '0 auto 28px' }}>
+          We're experiencing a brief technical issue. <strong style={{ color: '#0f172a' }}>Your data is safe</strong> and we're reconnecting automatically.
+        </p>
+
+        {/* Progress dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{
+              width: 10, height: 10, borderRadius: '50%',
+              background: spinning ? '#1565C0' : '#e2e8f0',
+              animation: spinning ? `pulse ${0.8 + i * 0.3}s infinite alternate` : 'none',
+            }} />
+          ))}
+        </div>
+        <style>{`@keyframes pulse{from{opacity:0.3;transform:scale(0.8)}to{opacity:1;transform:scale(1.1)}}`}</style>
+
+        {/* Retry button */}
+        <button onClick={handleRetry} style={{
+          background: 'linear-gradient(135deg,#1565C0,#0288d1)',
+          color: '#fff', border: 'none', borderRadius: 10,
+          padding: '12px 32px', fontSize: 14, fontWeight: 700,
+          cursor: 'pointer', fontFamily: 'inherit', width: '100%',
+          marginBottom: 14, boxShadow: '0 4px 16px rgba(21,101,192,0.3)',
+          transition: 'opacity 0.15s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+        >
+          {spinning ? 'Connecting…' : '↺ Try Now'}
+        </button>
+
+        <p style={{ fontSize: 12, color: '#94a3b8' }}>
+          Auto-retrying in <strong style={{ color: '#475569' }}>{countdown}s</strong>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [serviceDown, setServiceDown] = useState(false);
   const isAdmin = user?.role === 'admin';
+
+  // Listen for service-down / service-up events fired by api.js
+  React.useEffect(() => {
+    const onDown = () => setServiceDown(true);
+    const onUp   = () => setServiceDown(false);
+    window.addEventListener('ab_service_down', onDown);
+    window.addEventListener('ab_service_up',   onUp);
+    return () => {
+      window.removeEventListener('ab_service_down', onDown);
+      window.removeEventListener('ab_service_up',   onUp);
+    };
+  }, []);
+
+  // Manual retry — ping /api/health to check if server is back
+  const handleRetry = React.useCallback(async () => {
+    try {
+      const apiBase = (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL)
+        ? `${import.meta.env.VITE_API_URL}/api`
+        : '/api';
+      const r = await fetch(`${apiBase}/health`, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) {
+        setServiceDown(false);
+        window.dispatchEvent(new CustomEvent('ab_service_up'));
+      }
+    } catch { /* still down — overlay stays */ }
+  }, []);
 
   useEffect(() => {
     const fetchUnread = () => {
@@ -886,6 +999,9 @@ export default function Layout({ children }) {
 
       {/* Force password change — blocks all navigation on first team-member login */}
       <ForcePasswordChangeModal />
+
+      {/* Service down overlay — shown whenever backend is unreachable */}
+      {serviceDown && <ServiceDownOverlay onRetry={handleRetry} />}
     </div>
   );
 }
