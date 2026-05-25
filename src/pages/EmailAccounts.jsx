@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Spinner, Modal, Input, Alert } from '../components/UI';
@@ -6,7 +7,7 @@ import {
   Mail, Plus, Trash2, CheckCircle, XCircle, Loader2,
   Edit2, Inbox, PenLine, ChevronDown, X, Zap, Clock,
   ShieldCheck, TrendingUp, RefreshCw, Wifi, WifiOff,
-  Settings, Send, Flame, ChevronRight, AlertTriangle,
+  Settings, Send, Flame, ChevronRight, AlertTriangle, Upload,
 } from 'lucide-react';
 
 // ── Sending Presets ──────────────────────────────
@@ -191,6 +192,7 @@ export default function EmailAccounts() {
   const [drawerAccount, setDrawerAccount] = useState(null); // null = closed, {} = new, account = edit
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sigAccount, setSigAccount] = useState(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [testStatus, setTestStatus] = useState({});
   const [syncing, setSyncing]       = useState({});
 
@@ -250,10 +252,18 @@ export default function EmailAccounts() {
             {accounts.length > 0 && ` · ${accounts.reduce((s,a) => s + (a.sent_today||0), 0)} emails sent today`}
           </p>
         </div>
-        <button onClick={openNew}
-          style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 2px 10px rgba(37,99,235,0.35)' }}>
-          <Plus size={14}/> Add Account
-        </button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => setShowBulkImport(true)}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#fff', color:'#2563eb', border:'1.5px solid #2563eb', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
+            onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+            <Upload size={14}/> Bulk Import
+          </button>
+          <button onClick={openNew}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 2px 10px rgba(37,99,235,0.35)' }}>
+            <Plus size={14}/> Add Account
+          </button>
+        </div>
       </div>
 
       {/* Gmail tip */}
@@ -304,6 +314,346 @@ export default function EmailAccounts() {
         onClose={() => setSigAccount(null)}
         onSaved={() => { setSigAccount(null); load(); }}
       />
+
+      {/* Bulk import */}
+      <BulkImportModal
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        onImported={load}
+      />
+    </div>
+  );
+}
+
+// ── Bulk Import Modal ────────────────────────────
+const BULK_COLS = [
+  { key:'name',        label:'name',        required:false, example:'My Gmail',            desc:'Friendly display name' },
+  { key:'from_name',   label:'from_name',   required:false, example:'John Doe',            desc:'Sender display name' },
+  { key:'from_email',  label:'from_email',  required:false, example:'john@gmail.com',      desc:'Sender email (defaults to username)' },
+  { key:'username',    label:'username',    required:true,  example:'john@gmail.com',      desc:'SMTP login — usually the full email' },
+  { key:'password',    label:'password',    required:true,  example:'app_password_here',   desc:'SMTP / App Password' },
+  { key:'host',        label:'host',        required:true,  example:'smtp.gmail.com',      desc:'SMTP server hostname' },
+  { key:'port',        label:'port',        required:false, example:'587',                 desc:'587 (TLS) or 465 (SSL)' },
+  { key:'secure',      label:'secure',      required:false, example:'false',               desc:'false=TLS/587  true=SSL/465' },
+  { key:'imap_host',   label:'imap_host',   required:false, example:'imap.gmail.com',      desc:'IMAP server (for inbox sync)' },
+  { key:'imap_port',   label:'imap_port',   required:false, example:'993',                 desc:'Usually 993' },
+  { key:'imap_secure', label:'imap_secure', required:false, example:'true',                desc:'Almost always true' },
+  { key:'daily_limit', label:'daily_limit', required:false, example:'50',                  desc:'Max emails sent per day' },
+];
+
+const BULK_SAMPLE = [
+  { name:'Gmail – John',    from_name:'John Doe',     from_email:'john@gmail.com',          username:'john@gmail.com',          password:'xxxx xxxx xxxx xxxx', host:'smtp.gmail.com',           port:587, secure:'false', imap_host:'imap.gmail.com',             imap_port:993, imap_secure:'true',  daily_limit:50  },
+  { name:'Outlook – Jane',  from_name:'Jane Smith',   from_email:'jane@outlook.com',         username:'jane@outlook.com',         password:'your_app_password',   host:'smtp-mail.outlook.com',    port:587, secure:'false', imap_host:'outlook.office365.com',      imap_port:993, imap_secure:'true',  daily_limit:50  },
+  { name:'Yahoo – Bob',     from_name:'Bob Lee',      from_email:'bob@yahoo.com',            username:'bob@yahoo.com',            password:'yahoo_app_password',  host:'smtp.mail.yahoo.com',      port:465, secure:'true',  imap_host:'imap.mail.yahoo.com',        imap_port:993, imap_secure:'true',  daily_limit:40  },
+  { name:'Hostinger – Sue', from_name:'Sue Chen',     from_email:'sue@yourdomain.com',       username:'sue@yourdomain.com',       password:'hosting_password',    host:'smtp.hostinger.com',       port:465, secure:'true',  imap_host:'imap.hostinger.com',         imap_port:993, imap_secure:'true',  daily_limit:100 },
+  { name:'Custom SMTP',     from_name:'Support Team', from_email:'support@yourdomain.com',   username:'support@yourdomain.com',   password:'your_password',       host:'mail.yourdomain.com',      port:587, secure:'false', imap_host:'mail.yourdomain.com',        imap_port:993, imap_secure:'true',  daily_limit:100 },
+];
+
+function BulkImportModal({ open, onClose, onImported }) {
+  const [step, setStep]           = useState('upload');  // upload | preview | result
+  const [parsedRows, setParsedRows] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult]       = useState(null);
+  const [dragOver, setDragOver]   = useState(false);
+  const fileInputRef              = useRef(null);
+
+  useEffect(() => {
+    if (!open) { setStep('upload'); setParsedRows([]); setResult(null); setDragOver(false); }
+  }, [open]);
+
+  /* ── Download template ── */
+  const downloadTemplate = (fmt) => {
+    const headers = BULK_COLS.map(c => c.key);
+    const ws = XLSX.utils.aoa_to_sheet([
+      headers,
+      ...BULK_SAMPLE.map(r => headers.map(h => r[h] ?? '')),
+    ]);
+    ws['!cols'] = BULK_COLS.map(c => ({ wch: Math.max(c.key.length, String(c.example).length) + 4 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Email Accounts');
+    if (fmt === 'xlsx') XLSX.writeFile(wb, 'email_accounts_template.xlsx');
+    else                XLSX.writeFile(wb, 'email_accounts_template.csv', { bookType:'csv' });
+    toast.success('Template downloaded!');
+  };
+
+  /* ── Parse file ── */
+  const parseFile = (file) => {
+    if (!file) return;
+    if (!/\.(csv|xlsx|xls)$/i.test(file.name))
+      return toast.error('Please upload a .csv, .xlsx or .xls file');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+        if (!rows.length) return toast.error('File appears to be empty');
+        setParsedRows(rows);
+        setStep('preview');
+      } catch (err) { toast.error('Could not parse file: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    parseFile(e.dataTransfer?.files[0]);
+  };
+  const onFileInput = (e) => parseFile(e.target.files[0]);
+
+  /* ── Import ── */
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const { data } = await api.post('/email-accounts/bulk-import', { accounts: parsedRows });
+      setResult(data);
+      setStep('result');
+      if (data.imported > 0) { onImported(); toast.success(`✅ ${data.imported} account${data.imported!==1?'s':''} imported!`); }
+    } catch (e) { toast.error(e.response?.data?.error || 'Import failed'); }
+    setImporting(false);
+  };
+
+  if (!open) return null;
+
+  /* ── Step indicator ── */
+  const STEPS = ['Upload', 'Preview', 'Done'];
+  const stepIdx = step === 'upload' ? 0 : step === 'preview' ? 1 : 2;
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div onClick={onClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)' }}/>
+      <div style={{ position:'relative', background:'#fff', borderRadius:18, width:760, maxWidth:'97vw', maxHeight:'92vh', boxShadow:'0 30px 80px rgba(0,0,0,0.25)', zIndex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding:'18px 22px 14px', borderBottom:'1px solid #e2e8f0', background:'linear-gradient(135deg,#eff6ff 0%,#f5f3ff 100%)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontWeight:800, fontSize:17, color:'#0f172a', display:'flex', alignItems:'center', gap:8 }}>
+              <Upload size={18} color="#2563eb"/> Bulk Import Email Accounts
+            </div>
+            <div style={{ fontSize:12, color:'#64748b', marginTop:3 }}>Add up to hundreds of SMTP accounts at once via CSV or Excel</div>
+          </div>
+          {/* Step pills */}
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginRight:32 }}>
+            {STEPS.map((s, i) => (
+              <React.Fragment key={s}>
+                <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color: i <= stepIdx ? '#2563eb' : '#94a3b8' }}>
+                  <div style={{ width:20, height:20, borderRadius:10, background: i < stepIdx ? '#2563eb' : i === stepIdx ? '#eff6ff' : '#f1f5f9', border: i === stepIdx ? '2px solid #2563eb' : 'none', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color: i < stepIdx ? '#fff' : i === stepIdx ? '#2563eb' : '#94a3b8' }}>
+                    {i < stepIdx ? '✓' : i + 1}
+                  </div>
+                  {s}
+                </div>
+                {i < STEPS.length - 1 && <div style={{ width:16, height:1, background: i < stepIdx ? '#2563eb' : '#e2e8f0' }}/>}
+              </React.Fragment>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ position:'absolute', right:18, top:18, background:'none', border:'none', cursor:'pointer', fontSize:22, color:'#94a3b8', lineHeight:1 }}>×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex:1, overflowY:'auto', padding:22 }}>
+
+          {/* ═══ STEP 1: UPLOAD ═══ */}
+          {step === 'upload' && (
+            <>
+              {/* Column reference table */}
+              <div style={{ marginBottom:22 }}>
+                <div style={{ fontWeight:700, fontSize:13, color:'#0f172a', marginBottom:10 }}>📋 Spreadsheet Columns</div>
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                    <thead>
+                      <tr style={{ background:'#f8fafc' }}>
+                        {['Column name','Required','Example value','Description'].map(h => (
+                          <th key={h} style={{ padding:'8px 12px', textAlign:'left', borderBottom:'2px solid #e2e8f0', color:'#475569', fontWeight:700, whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {BULK_COLS.map((c, i) => (
+                        <tr key={c.key} style={{ background: i%2===0 ? '#fff':'#f8fafc' }}>
+                          <td style={{ padding:'6px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', color:'#2563eb', fontWeight:600, whiteSpace:'nowrap' }}>{c.key}</td>
+                          <td style={{ padding:'6px 12px', borderBottom:'1px solid #f1f5f9', whiteSpace:'nowrap' }}>
+                            <span style={{ padding:'2px 8px', borderRadius:6, fontSize:11, fontWeight:700, background:c.required?'#fee2e2':'#f1f5f9', color:c.required?'#dc2626':'#64748b' }}>
+                              {c.required ? '★ Required' : 'Optional'}
+                            </span>
+                          </td>
+                          <td style={{ padding:'6px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', color:'#475569', fontSize:11, whiteSpace:'nowrap' }}>{c.example}</td>
+                          <td style={{ padding:'6px 12px', borderBottom:'1px solid #f1f5f9', color:'#64748b' }}>{c.desc}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Download template */}
+              <div style={{ marginBottom:22 }}>
+                <div style={{ fontWeight:700, fontSize:13, color:'#0f172a', marginBottom:8 }}>📥 Start with a template (includes 5 sample rows)</div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  <button onClick={() => downloadTemplate('xlsx')}
+                    style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#f0fdf4', border:'1.5px solid #86efac', borderRadius:9, fontSize:12.5, color:'#16a34a', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+                    onMouseEnter={e => e.currentTarget.style.background='#dcfce7'}
+                    onMouseLeave={e => e.currentTarget.style.background='#f0fdf4'}>
+                    📊 Download XLSX Template
+                  </button>
+                  <button onClick={() => downloadTemplate('csv')}
+                    style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:9, fontSize:12.5, color:'#2563eb', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+                    onMouseEnter={e => e.currentTarget.style.background='#dbeafe'}
+                    onMouseLeave={e => e.currentTarget.style.background='#eff6ff'}>
+                    📄 Download CSV Template
+                  </button>
+                </div>
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:6 }}>Fill in your data, then upload below. Column names are case-insensitive.</div>
+              </div>
+
+              {/* Drop zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={onDrop}
+                onClick={() => fileInputRef.current?.click()}
+                style={{ border:`2.5px dashed ${dragOver?'#2563eb':'#cbd5e1'}`, borderRadius:14, padding:'44px 20px', textAlign:'center', cursor:'pointer', background:dragOver?'#eff6ff':'#f8fafc', transition:'all 0.18s' }}
+              >
+                <div style={{ fontSize:40, marginBottom:12 }}>📂</div>
+                <div style={{ fontWeight:800, fontSize:15, color:'#1e293b', marginBottom:6 }}>
+                  {dragOver ? 'Drop it!' : 'Drag & drop your file here'}
+                </div>
+                <div style={{ fontSize:12.5, color:'#94a3b8', marginBottom:16 }}>or click to browse your computer</div>
+                <div style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'9px 22px', background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', borderRadius:9, fontSize:13, fontWeight:700 }}>
+                  <Upload size={14}/> Choose File
+                </div>
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:12 }}>Accepts .csv · .xlsx · .xls &nbsp;·&nbsp; Max 10 MB</div>
+                <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" onChange={onFileInput} style={{ display:'none' }}/>
+              </div>
+            </>
+          )}
+
+          {/* ═══ STEP 2: PREVIEW ═══ */}
+          {step === 'preview' && (
+            <>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:14, color:'#0f172a' }}>
+                    👁 Preview — <span style={{ color:'#2563eb' }}>{parsedRows.length} row{parsedRows.length!==1?'s':''}</span> detected
+                  </div>
+                  <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>
+                    Showing first 5. All {parsedRows.length} rows will be imported.
+                  </div>
+                </div>
+                <button onClick={() => setStep('upload')}
+                  style={{ padding:'7px 14px', background:'none', border:'1px solid #e2e8f0', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit', color:'#64748b' }}>
+                  ← Back
+                </button>
+              </div>
+
+              <div style={{ overflowX:'auto', border:'1px solid #e2e8f0', borderRadius:10, marginBottom:16 }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11.5 }}>
+                  <thead>
+                    <tr style={{ background:'#f8fafc' }}>
+                      {['#','username','from_email','host','port','imap_host','daily_limit'].map(h => (
+                        <th key={h} style={{ padding:'9px 12px', textAlign:'left', borderBottom:'2px solid #e2e8f0', color:'#475569', fontWeight:700, whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedRows.slice(0, 5).map((r, i) => {
+                      const get = (key) => {
+                        const lower = key.toLowerCase().replace(/[\s_-]/g,'');
+                        for (const k of Object.keys(r)) {
+                          if (k.toLowerCase().replace(/[\s_-]/g,'') === lower) return String(r[k]||'');
+                        }
+                        return '—';
+                      };
+                      const missingRequired = !get('username') || !get('password') || (!get('host') && !get('smtphost'));
+                      return (
+                        <tr key={i} style={{ background: missingRequired ? '#fff5f5' : i%2===0?'#fff':'#f8fafc' }}>
+                          <td style={{ padding:'7px 12px', borderBottom:'1px solid #f1f5f9', color:'#94a3b8', fontWeight:600 }}>{i+1}</td>
+                          {['username','fromemail','host','port','imaphost','dailylimit'].map(h => (
+                            <td key={h} style={{ padding:'7px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', color:'#334155', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {get(h) || <span style={{ color:'#cbd5e1' }}>—</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {parsedRows.length > 5 && (
+                <div style={{ textAlign:'center', fontSize:12, color:'#94a3b8', marginBottom:16 }}>
+                  + {parsedRows.length - 5} more row{parsedRows.length-5!==1?'s':''} not shown
+                </div>
+              )}
+
+              <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:9, padding:'10px 14px', fontSize:12, color:'#92400e' }}>
+                ⚡ Duplicate usernames (already in your account) will be skipped automatically.
+              </div>
+            </>
+          )}
+
+          {/* ═══ STEP 3: RESULT ═══ */}
+          {step === 'result' && result && (
+            <div>
+              <div style={{ textAlign:'center', padding:'24px 0 16px' }}>
+                <div style={{ fontSize:52, marginBottom:14 }}>{result.imported > 0 ? '🎉' : '⚠️'}</div>
+                <div style={{ fontWeight:800, fontSize:22, color:'#0f172a', marginBottom:8 }}>
+                  {result.imported} of {result.total} imported
+                </div>
+                <div style={{ fontSize:13, color:'#64748b' }}>
+                  {result.errors.length === 0
+                    ? '🎉 All rows imported successfully!'
+                    : `${result.errors.length} row${result.errors.length!==1?'s':''} skipped — see details below`}
+                </div>
+              </div>
+
+              {result.errors.length > 0 && (
+                <div style={{ marginTop:16 }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:'#dc2626', marginBottom:8 }}>⚠️ Skipped Rows</div>
+                  <div style={{ maxHeight:240, overflowY:'auto', border:'1px solid #fecaca', borderRadius:9, background:'#fff5f5' }}>
+                    {result.errors.map((e, i) => (
+                      <div key={i} style={{ padding:'9px 14px', borderBottom: i<result.errors.length-1?'1px solid #fecaca':undefined, fontSize:12, color:'#991b1b', display:'flex', gap:10 }}>
+                        <span style={{ fontWeight:700, whiteSpace:'nowrap' }}>Row {e.row}</span>
+                        <span style={{ color:'#64748b' }}>{e.email}</span>
+                        <span>— {e.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'14px 22px', borderTop:'1px solid #e2e8f0', background:'#fafafa', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontSize:12, color:'#94a3b8' }}>
+            {step === 'upload' && 'Upload a filled template to get started'}
+            {step === 'preview' && `Ready to import ${parsedRows.length} account${parsedRows.length!==1?'s':''}`}
+            {step === 'result' && result && `${result.imported} imported · ${result.errors.length} skipped`}
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            {step === 'upload' && (
+              <button onClick={onClose} style={{ padding:'9px 18px', background:'none', border:'1px solid #e2e8f0', borderRadius:9, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#64748b' }}>Cancel</button>
+            )}
+            {step === 'preview' && (
+              <>
+                <button onClick={() => setStep('upload')} style={{ padding:'9px 18px', background:'none', border:'1px solid #e2e8f0', borderRadius:9, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#64748b' }}>← Back</button>
+                <button onClick={handleImport} disabled={importing}
+                  style={{ padding:'9px 26px', background:importing?'#94a3b8':'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor:importing?'not-allowed':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:7 }}>
+                  {importing
+                    ? <><Loader2 size={13} style={{ animation:'spin 1s linear infinite' }}/> Importing…</>
+                    : <><Upload size={13}/> Import {parsedRows.length} Account{parsedRows.length!==1?'s':''}</>}
+                </button>
+              </>
+            )}
+            {step === 'result' && (
+              <button onClick={onClose} style={{ padding:'9px 22px', background:'#2563eb', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                Done ✓
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
