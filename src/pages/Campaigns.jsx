@@ -846,8 +846,15 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   const [step, setStep] = useState(0);
   const [previewContact, setPreviewContact] = useState(null);
   const [loadingContact, setLoadingContact] = useState(false);
+  const [userPrefs, setUserPrefs] = useState(null);
 
   useEffect(() => { if (open) setStep(0); }, [open]);
+
+  // Fetch user preferences (can_spam_footer, custom_unsubscribe_text, etc.)
+  useEffect(() => {
+    if (!open) return;
+    api.get('/auth/me').then(r => setUserPrefs(r.data)).catch(() => {});
+  }, [open]);
 
   // Fetch the first real contact from the selected list
   useEffect(() => {
@@ -869,8 +876,24 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   const selectedAccount = accounts.find(a => rotationIds.includes(a.id)) || accounts[0] || {};
   const contact = previewContact || {};
 
+  // Parse signature — stored as JSON { mode, html, plain }
+  let signatureHtml = '';
+  try {
+    const sig = JSON.parse(selectedAccount.signature || '{}');
+    if (sig.mode === 'plain') {
+      signatureHtml = (sig.plain || '').split('\n').map(l => `<div>${l || '&nbsp;'}</div>`).join('');
+    } else {
+      signatureHtml = sig.html || '';
+    }
+  } catch {
+    signatureHtml = selectedAccount.signature || '';
+  }
+
   const firstName = contact.first_name || 'Jane';
   const lastName  = contact.last_name  || 'Doe';
+  const fromName  = selectedAccount.from_name  || selectedAccount.name || 'Your Name';
+  const fromEmail = selectedAccount.from_email || selectedAccount.username || 'you@yourdomain.com';
+
   const sampleData = {
     first_name:      firstName,
     last_name:       lastName,
@@ -879,9 +902,9 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
     email:           contact.email      || 'jane@acmecorp.com',
     title:           contact.title      || 'Marketing Director',
     website:         contact.website    || 'acmecorp.com',
-    from_name:       selectedAccount.from_name  || selectedAccount.name || 'Your Name',
-    from_email:      selectedAccount.from_email || selectedAccount.username || 'you@yourdomain.com',
-    signature:       selectedAccount.signature  || '',
+    from_name:       fromName,
+    from_email:      fromEmail,
+    signature:       signatureHtml,
     unsubscribe_url: '#unsubscribe',
   };
 
@@ -894,9 +917,40 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
     );
   };
 
+  // Build the unsubscribe footer HTML exactly as emailService.js would
+  let unsubFooterHtml = '';
+  if (userPrefs) {
+    if (userPrefs.can_spam_footer) {
+      const loc = [userPrefs.company, userPrefs.city, userPrefs.country].filter(Boolean).join(', ');
+      unsubFooterHtml = `<div style="margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
+        You are receiving this email because you or someone signed you up.
+        <a href="#unsubscribe" style="color:#9ca3af">Unsubscribe</a>${loc ? ` &bull; ${loc}` : ''}
+      </div>`;
+    } else if (userPrefs.custom_unsubscribe_text) {
+      const rendered = userPrefs.custom_unsubscribe_text
+        .replace(/{{unsubscribe_url}}/g, '#unsubscribe')
+        .replace(/{{first_name}}/g,  firstName)
+        .replace(/{{last_name}}/g,   lastName)
+        .replace(/{{email}}/g,       contact.email  || 'jane@acmecorp.com')
+        .replace(/{{company}}/g,     contact.company || '')
+        .replace(/{{from_name}}/g,   fromName)
+        .replace(/{{from_email}}/g,  fromEmail);
+      unsubFooterHtml = `<div style="margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af">${rendered}</div>`;
+    }
+  }
+
+  const renderedBody = previewRender(seq.body || '');
   const renderedSubject = previewRender(seq.subject || '(No subject)');
-  const renderedBody    = previewRender(seq.body || '');
   const today = new Date().toLocaleDateString('en-US', { weekday:'short', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  // Full iframe content — body + unsubscribe footer in one document (mirrors the real email)
+  const iframeSrc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.7;color:#1a1a1a;margin:0;padding:0}
+    a{color:#4f46e5} img{max-width:100%}
+  </style></head><body>
+    ${renderedBody || '<p style="color:#9ca3af;font-style:italic">No body content yet.</p>'}
+    ${unsubFooterHtml}
+  </body></html>`;
 
   // Label: are we using real contact data or fallback?
   const dataLabel = previewContact
@@ -905,7 +959,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
 
   // Show which account is being previewed when multiple are selected
   const accountLabel = selectedAccount.from_email
-    ? `Sent from: ${sampleData.from_name} <${sampleData.from_email}>${rotationIds.length > 1 ? ` (+${rotationIds.length - 1} more)` : ''}`
+    ? `Sent from: ${fromName} <${fromEmail}>${rotationIds.length > 1 ? ` (+${rotationIds.length - 1} more)` : ''}`
     : '';
 
   return (
@@ -951,7 +1005,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
             dangerouslySetInnerHTML={{ __html: renderedSubject }} />
           <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:'4px 10px', fontSize:12 }}>
             <span style={{ color:'#94a3b8', fontWeight:600 }}>From:</span>
-            <span style={{ color:'#374151' }}>{sampleData.from_name} &lt;{sampleData.from_email}&gt;</span>
+            <span style={{ color:'#374151' }}>{fromName} &lt;{fromEmail}&gt;</span>
             <span style={{ color:'#94a3b8', fontWeight:600 }}>To:</span>
             <span style={{ color:'#374151' }}>{sampleData.full_name} &lt;{sampleData.email}&gt;</span>
             <span style={{ color:'#94a3b8', fontWeight:600 }}>Date:</span>
@@ -959,20 +1013,15 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
           </div>
         </div>
 
-        {/* Body */}
-        <div style={{ background:'#fff', padding:'18px 20px', minHeight:120 }}>
+        {/* Body — signature + unsubscribe footer rendered inside the iframe */}
+        <div style={{ background:'#fff', padding:'18px 20px' }}>
           <iframe
             title="email-preview"
-            srcDoc={`<!DOCTYPE html><html><head><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.7;color:#1a1a1a;margin:0;padding:0}a{color:#4f46e5}</style></head><body>${renderedBody || '<p style="color:#9ca3af;font-style:italic">No body content yet.</p>'}</body></html>`}
-            style={{ width:'100%', border:'none', display:'block', minHeight:100 }}
-            onLoad={e => { try { e.target.style.height = e.target.contentWindow.document.body.scrollHeight + 30 + 'px'; } catch {} }}
+            srcDoc={iframeSrc}
+            style={{ width:'100%', border:'none', display:'block', minHeight:120 }}
+            onLoad={e => { try { e.target.style.height = e.target.contentWindow.document.body.scrollHeight + 20 + 'px'; } catch {} }}
             sandbox="allow-same-origin"
           />
-        </div>
-
-        {/* Unsubscribe footer preview */}
-        <div style={{ background:'#fafafa', borderTop:'1px solid #f1f5f9', padding:'8px 20px', fontSize:11, color:'#9ca3af' }}>
-          Unsubscribe
         </div>
       </div>
 
