@@ -252,10 +252,10 @@ function ImpersonateBanner() {
     sessionStorage.removeItem('ab_admin_token_backup');
     sessionStorage.removeItem('ab_impersonating');
     if (backup) {
-      localStorage.setItem('token', backup);
+      localStorage.setItem('ab_token', backup);
       window.location.replace('/admin/users');
     } else {
-      localStorage.removeItem('token');
+      localStorage.removeItem('ab_token');
       window.location.replace('/login');
     }
   };

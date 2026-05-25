@@ -27,14 +27,14 @@ export default function ImpersonateEntry() {
     }
 
     // Back up current admin token in sessionStorage (tab-scoped, survives navigation)
-    const existing = localStorage.getItem('token');
+    const existing = localStorage.getItem('ab_token');
     if (existing) sessionStorage.setItem('ab_admin_token_backup', existing);
 
     // Store impersonation metadata so banner can show who we are acting as
     sessionStorage.setItem('ab_impersonating', JSON.stringify({ name, email, expiresAt: Date.now() + 15 * 60 * 1000 }));
 
     // Set impersonation token as active auth token
-    localStorage.setItem('token', token);
+    localStorage.setItem('ab_token', token);
 
     // Hard-reload to /dashboard so AuthContext picks up the new token cleanly
     window.location.replace('/dashboard');
