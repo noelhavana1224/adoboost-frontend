@@ -352,18 +352,89 @@ export function UserSettings() {
   );
 }
 
+// Available variables for the custom unsubscribe field
+const UNSUB_VARS = [
+  { label: 'Unsubscribe URL', value: '{{unsubscribe_url}}' },
+  { label: 'First Name',      value: '{{first_name}}' },
+  { label: 'Last Name',       value: '{{last_name}}' },
+  { label: 'Email',           value: '{{email}}' },
+  { label: 'Company',         value: '{{company}}' },
+  { label: 'From Name',       value: '{{from_name}}' },
+  { label: 'From Email',      value: '{{from_email}}' },
+];
+
+function UnsubVarsDropdown({ onInsert }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button type="button" onClick={() => setOpen(p => !p)} style={{
+        display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px',
+        background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 5,
+        fontSize: 11, color: '#2563eb', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+      }}>
+        {'{ }'} Insert Variable
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+          <div style={{
+            position: 'absolute', top: '110%', left: 0, zIndex: 100,
+            background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.12)', minWidth: 200, overflow: 'hidden',
+          }}>
+            <div style={{ padding: '5px 10px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', borderBottom: '1px solid #f1f5f9' }}>
+              Variables
+            </div>
+            {UNSUB_VARS.map(v => (
+              <button key={v.value} type="button" onClick={() => { onInsert(v.value); setOpen(false); }} style={{
+                width: '100%', padding: '7px 12px', border: 'none', background: 'none',
+                textAlign: 'left', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                <span style={{ color: '#374151' }}>{v.label}</span>
+                <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 4, color: '#2563eb' }}>{v.value}</code>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function UserPreferences() {
   const { user, loading } = useScopedUser();
-  const [form, setForm] = useState({ notify_replies: true, can_spam_footer: true, notify_email: '' });
+  const [form, setForm] = useState({ notify_replies: true, can_spam_footer: true, custom_unsubscribe_text: '', notify_email: '' });
   const [saving, setSaving] = useState(false);
+  const unsubRef = React.useRef(null);
+
   useEffect(() => {
-    if (user) setForm({ notify_replies: user.notify_replies !== 0, can_spam_footer: user.can_spam_footer !== 0, notify_email: user.notify_email || user.email || '' });
+    if (user) setForm({
+      notify_replies: user.notify_replies !== 0,
+      can_spam_footer: user.can_spam_footer !== 0,
+      custom_unsubscribe_text: user.custom_unsubscribe_text || '',
+      notify_email: user.notify_email || user.email || '',
+    });
   }, [user]);
+
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true);
     try { await api.put('/auth/settings', form); toast.success('Preferences saved'); }
     catch { toast.error('Failed'); } finally { setSaving(false); }
   };
+
+  const insertUnsubVar = (variable) => {
+    const el = unsubRef.current;
+    if (!el) { setForm(p => ({ ...p, custom_unsubscribe_text: p.custom_unsubscribe_text + variable })); return; }
+    const start = el.selectionStart;
+    const end   = el.selectionEnd;
+    const newVal = form.custom_unsubscribe_text.substring(0, start) + variable + form.custom_unsubscribe_text.substring(end);
+    setForm(p => ({ ...p, custom_unsubscribe_text: newVal }));
+    setTimeout(() => { el.focus(); el.setSelectionRange(start + variable.length, start + variable.length); }, 0);
+  };
+
   if (loading) return null;
   return (
     <div>
@@ -383,6 +454,35 @@ export function UserPreferences() {
             </label>
           ))}
           {form.notify_replies && <Input label="Notification Email" type="email" value={form.notify_email} onChange={e => setForm(f => ({ ...f, notify_email: e.target.value }))} />}
+
+          {/* Custom unsubscribe — shown only when CAN-SPAM footer is OFF */}
+          {!form.can_spam_footer && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Custom Unsubscribe Footer</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+                    Shown at the bottom of every email in place of the CAN-SPAM footer. Use <code style={{ background:'#f1f5f9', padding:'1px 4px', borderRadius:3, fontSize:11 }}>{'{{unsubscribe_url}}'}</code> for the unsubscribe link.
+                  </div>
+                </div>
+                <UnsubVarsDropdown onInsert={insertUnsubVar} />
+              </div>
+              <textarea
+                ref={unsubRef}
+                rows={3}
+                placeholder={`You received this because you opted in. <a href="{{unsubscribe_url}}">Unsubscribe</a>`}
+                value={form.custom_unsubscribe_text}
+                onChange={e => setForm(f => ({ ...f, custom_unsubscribe_text: e.target.value }))}
+                style={{ width: '100%', border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6 }}
+              />
+              <div style={{ marginTop: 6, background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: '#0369a1' }}>
+                <strong>Available variables:</strong> {`{{unsubscribe_url}}`} · {`{{first_name}}`} · {`{{email}}`} · {`{{company}}`} · {`{{from_name}}`} · {`{{from_email}}`}
+                <br/>
+                <strong>Example:</strong> {`Hi {{first_name}}, to stop emails sent to {{email}}, <a href="{{unsubscribe_url}}">click here</a>.`}
+              </div>
+            </div>
+          )}
+
           <Btn type="submit" loading={saving} style={{ alignSelf: 'flex-start' }}>Update Settings</Btn>
         </form>
       </Card>

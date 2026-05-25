@@ -837,6 +837,111 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
   );
 }
 
+// ── Email Preview Modal ──────────────────────────
+// Renders the email with sample contact data so the sender can see
+// exactly how the email will look in a recipient's inbox.
+const PREVIEW_SAMPLE = {
+  first_name: 'John',
+  last_name:  'Smith',
+  full_name:  'John Smith',
+  company:    'Acme Corp',
+  email:      'john@acmecorp.com',
+  title:      'Marketing Director',
+  website:    'acmecorp.com',
+  from_name:  'Your Name',
+  from_email: 'you@yourdomain.com',
+  signature:  '',
+};
+
+function previewRender(text) {
+  if (!text) return '';
+  return text.replace(/{{(\w+)}}/g, (_, key) => PREVIEW_SAMPLE[key] !== undefined ? (PREVIEW_SAMPLE[key] || `<span style="color:#f59e0b;font-style:italic">(${key} empty)</span>`) : `<span style="color:#dc2626">{{${key}}}</span>`);
+}
+
+function EmailPreviewModal({ open, onClose, sequences }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => { if (open) setStep(0); }, [open]);
+
+  if (!open || !sequences?.length) return null;
+  const seq = sequences[step] || sequences[0];
+
+  const renderedSubject = previewRender(seq.subject || '(No subject)');
+  const renderedBody    = previewRender(seq.body || '');
+  const today = new Date().toLocaleDateString('en-US', { weekday:'short', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  return (
+    <Modal open={open} onClose={onClose} title="📧 Email Preview" width={660}>
+      {/* Step navigation */}
+      {sequences.length > 1 && (
+        <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+          {sequences.map((s, i) => (
+            <button key={i} type="button" onClick={() => setStep(i)} style={{
+              padding:'5px 12px', borderRadius:6, fontSize:12, fontWeight: step===i ? 700 : 400,
+              border:`1px solid ${step===i ? 'var(--primary)' : 'var(--border2)'}`,
+              background: step===i ? 'var(--primary-dim)' : '#fff',
+              color: step===i ? 'var(--primary)' : 'var(--text2)', cursor:'pointer', fontFamily:'inherit',
+            }}>
+              {i===0 ? '📧 Initial' : `🔄 Follow-up ${i}`}
+              {i>0 && s.delay_days > 0 && <span style={{ fontSize:10, opacity:0.7 }}> +{s.delay_days}d</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Email chrome */}
+      <div style={{ border:'1.5px solid #e2e8f0', borderRadius:12, overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+        {/* Top bar */}
+        <div style={{ background:'#f1f5f9', padding:'8px 14px', borderBottom:'1px solid #e2e8f0', display:'flex', gap:6 }}>
+          <div style={{ width:10, height:10, borderRadius:'50%', background:'#fc5c65' }}/>
+          <div style={{ width:10, height:10, borderRadius:'50%', background:'#fed330' }}/>
+          <div style={{ width:10, height:10, borderRadius:'50%', background:'#26de81' }}/>
+          <span style={{ fontSize:11, color:'#94a3b8', marginLeft:8 }}>Email Preview — Sample Data</span>
+        </div>
+
+        {/* Subject bar */}
+        <div style={{ background:'#fff', padding:'12px 18px', borderBottom:'1px solid #f1f5f9' }}>
+          <div style={{ fontSize:15, fontWeight:700, color:'#0f172a', marginBottom:10 }}
+            dangerouslySetInnerHTML={{ __html: renderedSubject }} />
+          <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:'4px 10px', fontSize:12 }}>
+            <span style={{ color:'#94a3b8', fontWeight:600 }}>From:</span>
+            <span style={{ color:'#374151' }}>{PREVIEW_SAMPLE.from_name} &lt;{PREVIEW_SAMPLE.from_email}&gt;</span>
+            <span style={{ color:'#94a3b8', fontWeight:600 }}>To:</span>
+            <span style={{ color:'#374151' }}>{PREVIEW_SAMPLE.full_name} &lt;{PREVIEW_SAMPLE.email}&gt;</span>
+            <span style={{ color:'#94a3b8', fontWeight:600 }}>Date:</span>
+            <span style={{ color:'#374151' }}>{today}</span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ background:'#fff', padding:'18px 20px', minHeight:120 }}>
+          <iframe
+            title="email-preview"
+            srcDoc={`<!DOCTYPE html><html><head><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.7;color:#1a1a1a;margin:0;padding:0}a{color:#4f46e5}</style></head><body>${renderedBody || '<p style="color:#9ca3af;font-style:italic">No body content yet.</p>'}</body></html>`}
+            style={{ width:'100%', border:'none', display:'block', minHeight:100 }}
+            onLoad={e => { try { e.target.style.height = e.target.contentWindow.document.body.scrollHeight + 30 + 'px'; } catch {} }}
+            sandbox="allow-same-origin"
+          />
+        </div>
+
+        {/* Unsubscribe footer preview */}
+        <div style={{ background:'#fafafa', borderTop:'1px solid #f1f5f9', padding:'8px 20px', fontSize:11, color:'#9ca3af' }}>
+          Unsubscribe
+        </div>
+      </div>
+
+      {/* Hint */}
+      <div style={{ marginTop:10, background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, padding:'8px 12px', fontSize:12, color:'#92400e', display:'flex', alignItems:'flex-start', gap:8 }}>
+        <span style={{ fontSize:14 }}>💡</span>
+        <div>
+          <span style={{ color:'#dc2626', fontWeight:600 }}>Red variables</span> aren't recognised — check your spelling.&nbsp;
+          <span style={{ color:'#d97706', fontWeight:600 }}>Orange variables</span> are valid but empty in sample data (will use your contact's real value).&nbsp;
+          All real emails use your contacts' actual data.
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Create/Edit Campaign Modal ───────────────────
 function CampaignModal({ open, campaign, onClose, onSaved }) {
   const [form, setForm]       = useState({ name: '', email_account_id: '', list_id: '', daily_limit: 50, track_opens: true, track_clicks: true });
@@ -846,6 +951,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading]     = useState(false);
   const [showAISeq, setShowAISeq] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [creditsKey, setCreditsKey] = useState(0); // bump to refresh credits bar
   const isActive = campaign?.status === 'active';
 
@@ -946,6 +1052,10 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                   style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none', borderRadius:7, fontSize:12, color:'#fff', cursor:'pointer', fontFamily:'inherit', fontWeight:700, boxShadow:'0 2px 6px rgba(124,58,237,0.35)' }}>
                   <Sparkles size={12}/>AI Write Sequence
                 </button>
+                <button type="button" onClick={() => setShowPreview(true)}
+                  style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:7, fontSize:12, color:'#16a34a', cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
+                  <Eye size={12}/>Preview
+                </button>
                 <Btn type="button" size="sm" variant="secondary"
                   onClick={() => setSequences(s => [...s, { subject: '', body: '', delay_days: s.length > 0 ? 3 : 0, delay_hours: 0 }])}>
                   <Plus size={12}/> Add Follow-up
@@ -1044,6 +1154,13 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
           onCreditUsed();
           toast.success('✨ AI sequence applied!');
         }}
+      />
+
+      {/* Email Preview modal */}
+      <EmailPreviewModal
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        sequences={sequences}
       />
     </Modal>
   );
