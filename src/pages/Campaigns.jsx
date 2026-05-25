@@ -905,7 +905,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
     from_name:       fromName,
     from_email:      fromEmail,
     signature:       signatureHtml,
-    unsubscribe_url: '#unsubscribe',
+    unsubscribe_url: '<a href="#" style="color:#4f46e5;text-decoration:underline;pointer-events:none" title="Real tracking URL in sent emails">[Unsubscribe Link]</a>',
   };
 
   const previewRender = (text) => {
@@ -924,11 +924,11 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
       const loc = [userPrefs.company, userPrefs.city, userPrefs.country].filter(Boolean).join(', ');
       unsubFooterHtml = `<div style="margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
         You are receiving this email because you or someone signed you up.
-        <a href="#unsubscribe" style="color:#9ca3af">Unsubscribe</a>${loc ? ` &bull; ${loc}` : ''}
+        <a href="#" style="color:#4f46e5;pointer-events:none" title="Real tracking URL in sent emails">[Unsubscribe Link]</a>${loc ? ` &bull; ${loc}` : ''}
       </div>`;
     } else if (userPrefs.custom_unsubscribe_text) {
       const rendered = userPrefs.custom_unsubscribe_text
-        .replace(/{{unsubscribe_url}}/g, '#unsubscribe')
+        .replace(/{{unsubscribe_url}}/g, '<a href="#" style="color:#4f46e5;text-decoration:underline;pointer-events:none" title="Real tracking URL in sent emails">[Unsubscribe Link]</a>')
         .replace(/{{first_name}}/g,  firstName)
         .replace(/{{last_name}}/g,   lastName)
         .replace(/{{email}}/g,       contact.email  || 'jane@acmecorp.com')
