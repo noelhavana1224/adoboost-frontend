@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Spinner, Modal, Input, Alert } from '../components/UI';
@@ -361,38 +360,57 @@ function BulkImportModal({ open, onClose, onImported }) {
     if (!open) { setStep('upload'); setParsedRows([]); setResult(null); setDragOver(false); }
   }, [open]);
 
-  /* ── Download template ── */
-  const downloadTemplate = (fmt) => {
+  /* ── Download CSV template (no library needed) ── */
+  const downloadTemplate = () => {
     const headers = BULK_COLS.map(c => c.key);
-    const ws = XLSX.utils.aoa_to_sheet([
-      headers,
-      ...BULK_SAMPLE.map(r => headers.map(h => r[h] ?? '')),
-    ]);
-    ws['!cols'] = BULK_COLS.map(c => ({ wch: Math.max(c.key.length, String(c.example).length) + 4 }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Email Accounts');
-    if (fmt === 'xlsx') XLSX.writeFile(wb, 'email_accounts_template.xlsx');
-    else                XLSX.writeFile(wb, 'email_accounts_template.csv', { bookType:'csv' });
+    const csvVal  = (v) => { const s = String(v ?? ''); return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s; };
+    const lines   = [headers.join(','), ...BULK_SAMPLE.map(r => headers.map(h => csvVal(r[h])).join(','))];
+    const blob    = new Blob([lines.join('\n')], { type:'text/csv;charset=utf-8;' });
+    const url     = URL.createObjectURL(blob);
+    const a       = Object.assign(document.createElement('a'), { href:url, download:'email_accounts_template.csv' });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     toast.success('Template downloaded!');
   };
 
-  /* ── Parse file ── */
+  /* ── Tiny CSV parser (handles quoted fields) ── */
+  const parseCSV = (text) => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const parseLine = (line) => {
+      const out = []; let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+        else if (c === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
+        else cur += c;
+      }
+      out.push(cur.trim()); return out;
+    };
+    const headers = parseLine(lines[0]);
+    return lines.slice(1).map(line => {
+      const vals = parseLine(line);
+      const obj  = {};
+      headers.forEach((h, i) => { obj[h.trim()] = vals[i] ?? ''; });
+      return obj;
+    }).filter(r => Object.values(r).some(v => v !== ''));
+  };
+
+  /* ── Parse file (CSV only — no build dependencies) ── */
   const parseFile = (file) => {
     if (!file) return;
-    if (!/\.(csv|xlsx|xls)$/i.test(file.name))
-      return toast.error('Please upload a .csv, .xlsx or .xls file');
+    if (!/\.(csv|txt)$/i.test(file.name))
+      return toast.error('Please upload a .csv file (Excel users: Save As → CSV)');
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const wb   = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
-        const ws   = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+        const rows = parseCSV(e.target.result);
         if (!rows.length) return toast.error('File appears to be empty');
         setParsedRows(rows);
         setStep('preview');
       } catch (err) { toast.error('Could not parse file: ' + err.message); }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsText(file);
   };
 
   const onDrop = (e) => {
@@ -489,20 +507,14 @@ function BulkImportModal({ open, onClose, onImported }) {
               <div style={{ marginBottom:22 }}>
                 <div style={{ fontWeight:700, fontSize:13, color:'#0f172a', marginBottom:8 }}>📥 Start with a template (includes 5 sample rows)</div>
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                  <button onClick={() => downloadTemplate('xlsx')}
+                  <button onClick={downloadTemplate}
                     style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#f0fdf4', border:'1.5px solid #86efac', borderRadius:9, fontSize:12.5, color:'#16a34a', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
                     onMouseEnter={e => e.currentTarget.style.background='#dcfce7'}
                     onMouseLeave={e => e.currentTarget.style.background='#f0fdf4'}>
-                    📊 Download XLSX Template
-                  </button>
-                  <button onClick={() => downloadTemplate('csv')}
-                    style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#eff6ff', border:'1.5px solid #bfdbfe', borderRadius:9, fontSize:12.5, color:'#2563eb', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
-                    onMouseEnter={e => e.currentTarget.style.background='#dbeafe'}
-                    onMouseLeave={e => e.currentTarget.style.background='#eff6ff'}>
                     📄 Download CSV Template
                   </button>
                 </div>
-                <div style={{ fontSize:11, color:'#94a3b8', marginTop:6 }}>Fill in your data, then upload below. Column names are case-insensitive.</div>
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:6 }}>Fill in your data, save as <strong>.csv</strong>, then upload below. Column names are case-insensitive.</div>
               </div>
 
               {/* Drop zone */}
@@ -521,8 +533,8 @@ function BulkImportModal({ open, onClose, onImported }) {
                 <div style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'9px 22px', background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', borderRadius:9, fontSize:13, fontWeight:700 }}>
                   <Upload size={14}/> Choose File
                 </div>
-                <div style={{ fontSize:11, color:'#94a3b8', marginTop:12 }}>Accepts .csv · .xlsx · .xls &nbsp;·&nbsp; Max 10 MB</div>
-                <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" onChange={onFileInput} style={{ display:'none' }}/>
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:12 }}>Accepts .csv &nbsp;·&nbsp; Excel users: File → Save As → CSV</div>
+                <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={onFileInput} style={{ display:'none' }}/>
               </div>
             </>
           )}
