@@ -1316,29 +1316,21 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
             )}
           </div>
 
-          {/* Start immediately + Daily leads */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <div style={{ border:'1.5px solid #e2e8f0', borderRadius:10, padding:'14px' }}>
-              <button type="button" onClick={() => f('start_immediately', !form.start_immediately)}
-                style={{ display:'flex', alignItems:'flex-start', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit', width:'100%', textAlign:'left' }}>
-                <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${form.start_immediately?'#2563eb':'#cbd5e1'}`, background:form.start_immediately?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>
-                  {form.start_immediately && <span style={{ color:'#fff', fontSize:11, fontWeight:900 }}>✓</span>}
+          {/* Start immediately */}
+          <div style={{ border:'1.5px solid #e2e8f0', borderRadius:10, padding:'14px' }}>
+            <button type="button" onClick={() => f('start_immediately', !form.start_immediately)}
+              style={{ display:'flex', alignItems:'flex-start', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit', width:'100%', textAlign:'left' }}>
+              <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${form.start_immediately?'#2563eb':'#cbd5e1'}`, background:form.start_immediately?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>
+                {form.start_immediately && <span style={{ color:'#fff', fontSize:11, fontWeight:900 }}>✓</span>}
+              </div>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Start Campaign Immediately</div>
+                <div style={{ fontSize:11, color:'#64748b', marginTop:3, lineHeight:1.5 }}>
+                  When enabled, campaign starts sending as soon as you create it, bypassing manual launch.
+                  Send volume is controlled by each inbox's daily limit set in <strong>Email Accounts → Sending Speed</strong>.
                 </div>
-                <div>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Start Campaign Immediately</div>
-                  <div style={{ fontSize:11, color:'#64748b', marginTop:3, lineHeight:1.5 }}>When enabled, campaign starts sending as soon as you create it, bypassing manual launch</div>
-                </div>
-              </button>
-            </div>
-            <div>
-              <label style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:6 }}>
-                Number of Leads to Start Daily
-              </label>
-              <input type="number" min={1} max={10000} value={form.daily_limit} onChange={e => f('daily_limit', +e.target.value)}
-                style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:9, padding:'10px 14px', fontSize:14, fontWeight:700, color:'#0f172a', outline:'none', background:'#fff', boxSizing:'border-box' }}
-                placeholder="50"/>
-              <div style={{ fontSize:11, color:'#64748b', marginTop:4 }}>Max new contacts to enroll per day</div>
-            </div>
+              </div>
+            </button>
           </div>
 
           {/* Footer */}
