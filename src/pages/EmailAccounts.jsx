@@ -82,7 +82,7 @@ function MiniBar({ value, max, color = '#2563eb', label, warn = 70 }) {
 }
 
 // ── Account Card ─────────────────────────────────
-function AccountCard({ account, onEdit, onDelete, onTest, onSync, testStatus, syncing }) {
+function AccountCard({ account, onEdit, onDelete, onTest, onSync, onSignature, testStatus, syncing }) {
   const preset = PRESETS[account.sending_preset] || PRESETS.moderate;
   const color  = avatarColor(account.from_email);
   const hasImap = !!account.imap_host;
@@ -166,6 +166,12 @@ function AccountCard({ account, onEdit, onDelete, onTest, onSync, testStatus, sy
           onMouseEnter={e => e.currentTarget.style.borderColor='#2563eb'}
           onMouseLeave={e => e.currentTarget.style.borderColor='#e2e8f0'}>
           <Edit2 size={10}/> Edit
+        </button>
+        <button onClick={() => onSignature(account)} title="Edit signature"
+          style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:6, border:'1px solid #e2e8f0', background:'#fff', fontSize:11, color:'#7c3aed', cursor:'pointer', fontFamily:'inherit' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor='#7c3aed'; e.currentTarget.style.background='#f5f3ff'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.background='#fff'; }}>
+          <PenLine size={10}/> Signature
         </button>
         <button onClick={() => onDelete(account.id)} title="Remove account"
           style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:6, border:'1px solid #fca5a5', background:'#fff', fontSize:11, color:'#dc2626', cursor:'pointer', fontFamily:'inherit', marginLeft:'auto' }}
@@ -277,6 +283,7 @@ export default function EmailAccounts() {
             <AccountCard key={a.id} account={a}
               onEdit={openEdit} onDelete={handleDelete}
               onTest={handleTest} onSync={handleSync}
+              onSignature={setSigAccount}
               testStatus={testStatus[a.id]} syncing={syncing[a.id]}
             />
           ))}
