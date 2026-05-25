@@ -74,12 +74,23 @@ function WarmupCard({ account, poolSize, onUpdate }) {
   const [saving, setSaving]       = useState(false);
   const [logs, setLogs]           = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  const [preset, setPreset]       = useState('standard');
+
+  // Detect which preset matches the account's current saved settings (if any)
+  const detectPreset = (start, inc, max) => {
+    const match = RAMP_PRESETS.find(p => p.start === start && p.increment === inc && p.max === max);
+    return match ? match.id : 'custom';
+  };
+
+  const initStart = account.warmup_start_count || 5;
+  const initInc   = account.warmup_increment   || 5;
+  const initMax   = account.warmup_max_count   || 50;
+
+  const [preset, setPreset] = useState(() => detectPreset(initStart, initInc, initMax));
   const [form, setForm] = useState({
-    warmup_enabled:    account.warmup_enabled === 1,
-    warmup_start_count: account.warmup_start_count || 5,
-    warmup_increment:  account.warmup_increment   || 5,
-    warmup_max_count:  account.warmup_max_count   || 50,
+    warmup_enabled:     account.warmup_enabled === 1,
+    warmup_start_count: initStart,
+    warmup_increment:   initInc,
+    warmup_max_count:   initMax,
   });
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -357,7 +368,8 @@ export default function Warmup() {
       ]);
       const statsMap = {};
       (stats || []).forEach(s => { statsMap[s.id] = s; });
-      const enriched = (accounts || []).map(a => ({ ...a, sent_today: statsMap[a.id]?.sent_today || 0 }));
+      // Merge ALL stat fields (sent_today, failed_today, total_sent, total_replied)
+      const enriched = (accounts || []).map(a => ({ ...a, ...(statsMap[a.id] || {}) }));
       setAccounts(enriched);
       const active = enriched.filter(a => a.warmup_enabled === 1);
       const avgHealth = active.length
