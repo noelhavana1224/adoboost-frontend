@@ -1102,6 +1102,30 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
 
               {form.warmup_enabled === 1 && (
                 <>
+                  {/* Community network notice */}
+                  <div style={{ background:'linear-gradient(135deg,#eff6ff,#f5f3ff)', borderRadius:12, padding:'14px 16px', border:'1px solid #c4b5fd' }}>
+                    <div style={{ fontSize:12, fontWeight:800, color:'#5b21b6', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                      🌐 You're joining the AdoBoost Warmup Network
+                    </div>
+                    <div style={{ fontSize:12, color:'#4c1d95', lineHeight:1.75, marginBottom:10 }}>
+                      Your inbox will <strong>send and receive warmup emails</strong> with other inboxes in the platform community.
+                      This is what makes the warmup work — every inbox helps every other inbox build reputation.
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {[
+                        { icon:'📨', text:'Your inbox will receive warmup emails from other users\' inboxes on the platform.' },
+                        { icon:'↩️', text:'AdoBoost auto-replies to those emails via IMAP — you don\'t need to do anything.' },
+                        { icon:'📈', text:'The bigger the network, the faster and stronger your reputation builds.' },
+                        { icon:'🏷️', text:'Tip: create a filter in your email client to label emails with header X-Warmup-Email: true so they stay out of your main inbox.' },
+                      ].map((item, i) => (
+                        <div key={i} style={{ display:'flex', gap:8, alignItems:'flex-start', fontSize:11, color:'#5b21b6' }}>
+                          <span style={{ flexShrink:0, marginTop:1 }}>{item.icon}</span>
+                          <span style={{ lineHeight:1.6 }}>{item.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* How warmup works */}
                   <div style={{ background:'#fffbeb', borderRadius:10, padding:'12px 14px', border:'1px solid #fcd34d' }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'#92400e', marginBottom:6 }}>🔥 How Humanized Warmup Works</div>
