@@ -774,12 +774,15 @@ export default function Messages({ type = 'inbox' }) {
   const handleDelete = useCallback(async (thread) => {
     if (!confirm('Delete this thread? Cannot be undone.')) return;
     try {
+      // Optimistic update: immediately drop unread count for any unread msgs in this thread
+      const deletedUnread = (thread.msgs || []).filter(m => m.status === 'unread').length;
+      if (deletedUnread > 0) setUnread(u => Math.max(0, u - deletedUnread));
       for (const m of (thread.msgs || [thread])) {
         try { await api.delete(`/messages/${m.id}`); } catch {}
       }
       setOpenThread(null);
       toast.success('Thread deleted');
-      load();
+      load(); // re-fetch so server count is authoritative
     } catch { toast.error('Failed to delete'); }
   }, [load]);
 
@@ -806,6 +809,9 @@ export default function Messages({ type = 'inbox' }) {
     const toDelete = threads.filter(t => selectedKeys.has(t.key));
     if (!confirm(`Delete ${toDelete.length} conversation${toDelete.length !== 1 ? 's' : ''}?`)) return;
     setBulkDeleting(true);
+    // Optimistic update: drop unread count immediately
+    const deletedUnread = toDelete.reduce((acc, t) => acc + t.msgs.filter(m => m.status === 'unread').length, 0);
+    if (deletedUnread > 0) setUnread(u => Math.max(0, u - deletedUnread));
     for (const thread of toDelete) for (const m of thread.msgs) { try { await api.delete(`/messages/${m.id}`); } catch {} }
     setSelectedKeys(new Set()); setBulkDeleting(false);
     toast.success(`${toDelete.length} thread${toDelete.length !== 1 ? 's' : ''} deleted`);
