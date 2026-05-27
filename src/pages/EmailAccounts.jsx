@@ -6,8 +6,16 @@ import {
   Mail, Plus, Trash2, CheckCircle, XCircle, Loader2,
   Edit2, Inbox, PenLine, ChevronDown, X, Zap, Clock,
   ShieldCheck, TrendingUp, RefreshCw, Wifi, WifiOff,
-  Settings, Send, Flame, ChevronRight, AlertTriangle, Upload,
+  Settings, Send, Flame, ChevronRight, AlertTriangle, Upload, Users,
 } from 'lucide-react';
+
+const INDUSTRIES = [
+  'Technology / SaaS','Marketing / Advertising','Sales / Business Development',
+  'E-commerce / Retail','Finance / Fintech','Real Estate','Healthcare',
+  'Legal / Law','Consulting / Professional Services','Recruitment / HR',
+  'Education / E-learning','Media / Publishing','Manufacturing / Industrial',
+  'Logistics / Supply Chain','Non-Profit / NGO','Other',
+];
 
 // ── Sending Presets ──────────────────────────────
 const PRESETS = {
@@ -191,7 +199,8 @@ export default function EmailAccounts() {
   const [drawerAccount, setDrawerAccount] = useState(null); // null = closed, {} = new, account = edit
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sigAccount, setSigAccount] = useState(null);
-  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showBulkImport, setShowBulkImport]   = useState(false);
+  const [showBulkWarmup, setShowBulkWarmup]   = useState(false);
   const [testStatus, setTestStatus] = useState({});
   const [syncing, setSyncing]       = useState({});
 
@@ -252,6 +261,12 @@ export default function EmailAccounts() {
           </p>
         </div>
         <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => setShowBulkWarmup(true)}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#fff', color:'#d97706', border:'1.5px solid #d97706', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.background='#fffbeb'}
+            onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+            <Flame size={14}/> Bulk Warmup
+          </button>
           <button onClick={() => setShowBulkImport(true)}
             style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#fff', color:'#2563eb', border:'1.5px solid #2563eb', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
             onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
@@ -320,7 +335,231 @@ export default function EmailAccounts() {
         onClose={() => setShowBulkImport(false)}
         onImported={load}
       />
+
+      {/* Bulk warmup */}
+      <BulkWarmupModal
+        open={showBulkWarmup}
+        accounts={accounts}
+        onClose={() => setShowBulkWarmup(false)}
+        onSaved={() => { setShowBulkWarmup(false); load(); }}
+      />
     </div>
+  );
+}
+
+// ── Bulk Warmup Modal ─────────────────────────────
+function BulkWarmupModal({ open, accounts, onClose, onSaved }) {
+  const [selected, setSelected]     = useState([]);
+  const [saving, setSaving]         = useState(false);
+  const [warmupEnabled, setWarmupEnabled] = useState(true);
+  const [company, setCompany]       = useState('');
+  const [product, setProduct]       = useState('');
+  const [industry, setIndustry]     = useState('');
+  const [startCount, setStartCount] = useState(1);
+  const [increment, setIncrement]   = useState(2);
+  const [maxCount, setMaxCount]     = useState(50);
+
+  const warmupAccounts = accounts; // allow selecting any account
+  const allSelected    = selected.length === warmupAccounts.length && warmupAccounts.length > 0;
+
+  const toggleAll = () => {
+    setSelected(allSelected ? [] : warmupAccounts.map(a => a.id));
+  };
+  const toggleOne = (id) => {
+    setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+  };
+
+  const handleSave = async () => {
+    if (!selected.length) return toast.error('Select at least one inbox');
+    setSaving(true);
+    let ok = 0, fail = 0;
+    for (const id of selected) {
+      const acc = accounts.find(a => a.id === id);
+      if (!acc) continue;
+      try {
+        await api.put(`/email-accounts/${id}`, {
+          ...acc,
+          warmup_enabled:     warmupEnabled ? 1 : 0,
+          warmup_company:     company,
+          warmup_product:     product,
+          warmup_industry:    industry,
+          warmup_start_count: startCount,
+          warmup_increment:   increment,
+          warmup_max_count:   maxCount,
+        });
+        ok++;
+      } catch { fail++; }
+    }
+    setSaving(false);
+    if (ok > 0) toast.success(`✅ Warmup updated for ${ok} inbox${ok > 1 ? 'es' : ''}!`);
+    if (fail > 0) toast.error(`${fail} inbox${fail > 1 ? 'es' : ''} failed to update`);
+    onSaved();
+  };
+
+  if (!open) return null;
+
+  const numSlider = (label, val, set, min, max) => (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+        <label style={{ fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.07em' }}>{label}</label>
+        <span style={{ fontSize:12, fontWeight:800, color:'#d97706' }}>{val}</span>
+      </div>
+      <input type="range" min={min} max={max} value={val} onChange={e => set(+e.target.value)}
+        style={{ width:'100%', accentColor:'#d97706' }}/>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#94a3b8' }}>
+        <span>{min}</span><span>{max}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.55)', zIndex:300, backdropFilter:'blur(2px)' }}/>
+      <div style={{
+        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+        width: Math.min(860, window.innerWidth - 32), maxHeight:'90vh',
+        background:'#fff', borderRadius:16, boxShadow:'0 24px 80px rgba(0,0,0,0.25)',
+        zIndex:301, display:'flex', flexDirection:'column', overflow:'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ background:'linear-gradient(135deg,#92400e,#d97706)', padding:'18px 24px', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ width:36, height:36, borderRadius:9, background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <Flame size={18} color="#fff"/>
+              </div>
+              <div>
+                <div style={{ fontSize:16, fontWeight:800, color:'#fff' }}>Bulk Warmup Setup</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)' }}>Select inboxes → set persona & settings → apply to all at once</div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', cursor:'pointer', borderRadius:7, padding:'6px 8px', display:'flex', alignItems:'center' }}>
+              <X size={15}/>
+            </button>
+          </div>
+        </div>
+
+        {/* Body — two columns */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', flex:1, overflow:'hidden', minHeight:0 }}>
+
+          {/* LEFT — inbox selection */}
+          <div style={{ borderRight:'1px solid #e2e8f0', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+            <div style={{ padding:'14px 18px', borderBottom:'1px solid #e2e8f0', background:'#fafafa', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>
+                Select Inboxes
+                {selected.length > 0 && <span style={{ marginLeft:8, background:'#d97706', color:'#fff', borderRadius:12, padding:'1px 8px', fontSize:11 }}>{selected.length}</span>}
+              </div>
+              <button onClick={toggleAll}
+                style={{ fontSize:11, fontWeight:700, color: allSelected ? '#dc2626' : '#d97706', background:'none', border:`1px solid ${allSelected ? '#fca5a5' : '#fcd34d'}`, borderRadius:6, padding:'4px 10px', cursor:'pointer', fontFamily:'inherit' }}>
+                {allSelected ? 'Deselect All' : `Select All (${warmupAccounts.length})`}
+              </button>
+            </div>
+            <div style={{ overflowY:'auto', flex:1 }}>
+              {warmupAccounts.length === 0 ? (
+                <div style={{ padding:24, textAlign:'center', color:'#94a3b8', fontSize:13 }}>No accounts yet</div>
+              ) : warmupAccounts.map(acc => {
+                const isSel = selected.includes(acc.id);
+                return (
+                  <div key={acc.id} onClick={() => toggleOne(acc.id)}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 18px', cursor:'pointer', borderBottom:'1px solid #f8fafc', background: isSel ? '#fffbeb' : '#fff', transition:'background 0.1s' }}
+                    onMouseEnter={e => { if (!isSel) e.currentTarget.style.background='#fafafa'; }}
+                    onMouseLeave={e => { if (!isSel) e.currentTarget.style.background='#fff'; }}>
+                    {/* Checkbox */}
+                    <div style={{ width:18, height:18, borderRadius:5, border:`2px solid ${isSel ? '#d97706' : '#cbd5e1'}`, background: isSel ? '#d97706' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all 0.15s' }}>
+                      {isSel && <CheckCircle size={11} color="#fff"/>}
+                    </div>
+                    {/* Avatar */}
+                    <div style={{ width:34, height:34, borderRadius:9, background: avatarColor(acc.from_email), display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700, fontSize:13, flexShrink:0 }}>
+                      {initials(acc.from_name || acc.from_email)}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{acc.name}</div>
+                      <div style={{ fontSize:11, color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{acc.from_email}</div>
+                    </div>
+                    {acc.warmup_enabled === 1 && (
+                      <span style={{ fontSize:10, background:'#fffbeb', color:'#d97706', border:'1px solid #fcd34d', borderRadius:6, padding:'2px 6px', fontWeight:600, flexShrink:0 }}>🔥 ON</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* RIGHT — settings */}
+          <div style={{ overflowY:'auto', padding:'20px' }}>
+            {/* Enable/disable toggle */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background: warmupEnabled ? '#fffbeb' : '#f8fafc', borderRadius:10, border:`1px solid ${warmupEnabled ? '#fcd34d' : '#e2e8f0'}`, marginBottom:18 }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:13, color: warmupEnabled ? '#92400e' : '#475569' }}>🔥 Email Warmup</div>
+                <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>Enable for all selected inboxes</div>
+              </div>
+              <label style={{ position:'relative', display:'inline-block', width:44, height:24, flexShrink:0 }}>
+                <input type="checkbox" checked={warmupEnabled} onChange={e => setWarmupEnabled(e.target.checked)} style={{ opacity:0, width:0, height:0 }}/>
+                <div style={{ position:'absolute', cursor:'pointer', inset:0, background: warmupEnabled ? '#f59e0b' : '#cbd5e1', borderRadius:12, transition:'background 0.2s' }}>
+                  <div style={{ position:'absolute', top:3, left: warmupEnabled ? 23 : 3, width:18, height:18, background:'#fff', borderRadius:'50%', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }}/>
+                </div>
+              </label>
+            </div>
+
+            {/* AI Persona */}
+            <div style={{ background:'#f5f3ff', borderRadius:10, padding:'14px 16px', border:'1px solid #ddd6fe', marginBottom:18 }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#6d28d9', marginBottom:10 }}>🤖 AI Warmup Persona</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#6d28d9', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>🏢 Company / Sender Name</label>
+                  <input value={company} onChange={e => setCompany(e.target.value)} placeholder="e.g. Adobo Solutions"
+                    style={{ width:'100%', border:'1.5px solid #ddd6fe', borderRadius:8, padding:'8px 11px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor='#7c3aed'} onBlur={e => e.target.style.borderColor='#ddd6fe'}
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#6d28d9', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>🚀 Product / Service</label>
+                  <input value={product} onChange={e => setProduct(e.target.value)} placeholder="e.g. Email outreach platform"
+                    style={{ width:'100%', border:'1.5px solid #ddd6fe', borderRadius:8, padding:'8px 11px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', boxSizing:'border-box' }}
+                    onFocus={e => e.target.style.borderColor='#7c3aed'} onBlur={e => e.target.style.borderColor='#ddd6fe'}
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#6d28d9', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>🏷️ Industry / Niche</label>
+                  <select value={industry} onChange={e => setIndustry(e.target.value)}
+                    style={{ width:'100%', border:'1.5px solid #ddd6fe', borderRadius:8, padding:'8px 11px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', color: industry ? '#0f172a' : '#94a3b8', cursor:'pointer' }}>
+                    <option value="">— Select industry —</option>
+                    {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ fontSize:11, color:'#7c3aed', marginTop:10, lineHeight:1.5 }}>
+                💡 Leave blank to keep each inbox's existing persona.
+              </div>
+            </div>
+
+            {/* Ramp settings */}
+            <div style={{ display:'flex', flexDirection:'column', gap:14, marginBottom:18 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.07em' }}>📈 Warmup Ramp Settings</div>
+              {numSlider('Start Count (emails/day on day 1)', startCount, setStartCount, 1, 20)}
+              {numSlider('Daily Increment (+X/day each day)', increment, setIncrement, 1, 10)}
+              {numSlider('Maximum Daily Target', maxCount, setMaxCount, 5, 100)}
+            </div>
+
+            <div style={{ background:'#f0fdf4', borderRadius:8, padding:'10px 12px', border:'1px solid #86efac', fontSize:11, color:'#166534', lineHeight:1.6 }}>
+              ✅ <strong>{selected.length} inbox{selected.length !== 1 ? 'es' : ''} selected.</strong> All settings above will be applied to every selected inbox when you click Apply.
+              Blank persona fields will overwrite existing values — fill them in to set the AI context.
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'14px 24px', borderTop:'1px solid #e2e8f0', background:'#fafafa', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+          <button onClick={onClose} style={{ padding:'8px 18px', background:'none', border:'1px solid #e2e8f0', borderRadius:8, fontSize:13, color:'#475569', cursor:'pointer', fontFamily:'inherit' }}>
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving || !selected.length}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 24px', background: (!selected.length || saving) ? '#94a3b8' : 'linear-gradient(135deg,#d97706,#b45309)', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:700, cursor: (!selected.length || saving) ? 'not-allowed' : 'pointer', fontFamily:'inherit', boxShadow: selected.length ? '0 2px 10px rgba(217,119,6,0.35)' : 'none' }}>
+            {saving ? <><Loader2 size={13} style={{ animation:'spin 1s linear infinite' }}/> Applying…</> : <><Flame size={14}/> Apply to {selected.length} Inbox{selected.length !== 1 ? 'es' : ''}</>}
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -683,6 +922,7 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
     send_window_start:8, send_window_end:18, sending_preset:'moderate',
     warmup_enabled:0, warmup_start_count:5, warmup_increment:3, warmup_max_count:40,
     warmup_window_start:9, warmup_window_end:17,
+    warmup_product:'', warmup_company:'', warmup_industry:'',
   });
   const [imapPassword, setImapPassword] = useState('');
   const [showImap, setShowImap] = useState(false);
@@ -723,6 +963,9 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
         warmup_max_count:   account.warmup_max_count   || 40,
         warmup_window_start: account.warmup_window_start ?? 9,
         warmup_window_end:   account.warmup_window_end   ?? 17,
+        warmup_product:  account.warmup_product  || '',
+        warmup_company:  account.warmup_company  || '',
+        warmup_industry: account.warmup_industry || '',
       });
       setShowImap(!!account.imap_host);
       if (account.host?.includes('hostinger'))   setProvider('hostinger');
@@ -741,6 +984,7 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
         send_window_start:8, send_window_end:18, sending_preset:'moderate',
         warmup_enabled:0, warmup_start_count:5, warmup_increment:3, warmup_max_count:40,
         warmup_window_start:9, warmup_window_end:17,
+        warmup_product:'', warmup_company:'', warmup_industry:'',
       });
     }
   }, [open, account]);
@@ -1144,24 +1388,64 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
                     {numRow('Maximum Daily Target', 'warmup_max_count', 5, 100)}
                   </div>
 
-                  {/* Warmup window */}
-                  <div>
-                    <div style={{ fontSize:12, fontWeight:700, color:'#475569', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>Warmup Window</div>
-                    <div style={{ fontSize:11, color:'#94a3b8', marginBottom:10 }}>Warmup emails only fire within these hours.</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  {/* AI Warmup Persona */}
+                  <div style={{ background:'#f5f3ff', borderRadius:10, padding:'14px 16px', border:'1px solid #ddd6fe' }}>
+                    <div style={{ fontSize:12, fontWeight:800, color:'#6d28d9', marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>
+                      🤖 AI Warmup Persona
+                    </div>
+                    <div style={{ fontSize:11, color:'#7c3aed', marginBottom:12, lineHeight:1.6 }}>
+                      Tells the AI what to write about so warmup emails look like real business conversations.
+                      Without this, emails fall back to generic templates.
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                       <div>
-                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>Start</label>
-                        <select value={form.warmup_window_start} onChange={e => f('warmup_window_start', +e.target.value)}
-                          style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fafafa', cursor:'pointer' }}>
-                          {Array.from({length:24},(_,i)=>i).map(h => <option key={h} value={h}>{fmtHour(h)}</option>)}
-                        </select>
+                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#6d28d9', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>🏢 Company / Sender Name</label>
+                        <input value={form.warmup_company||''} onChange={e => f('warmup_company', e.target.value)}
+                          placeholder="e.g. Nexxis Digital"
+                          style={{ width:'100%', border:'1.5px solid #ddd6fe', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', color:'#0f172a', boxSizing:'border-box' }}
+                          onFocus={e => e.target.style.borderColor='#7c3aed'} onBlur={e => e.target.style.borderColor='#ddd6fe'}
+                        />
                       </div>
                       <div>
-                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>End</label>
-                        <select value={form.warmup_window_end} onChange={e => f('warmup_window_end', +e.target.value)}
-                          style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fafafa', cursor:'pointer' }}>
-                          {Array.from({length:24},(_,i)=>i).map(h => <option key={h} value={h}>{fmtHour(h)}</option>)}
+                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#6d28d9', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>🚀 Product / Service</label>
+                        <input value={form.warmup_product||''} onChange={e => f('warmup_product', e.target.value)}
+                          placeholder="e.g. SEO audit software"
+                          style={{ width:'100%', border:'1.5px solid #ddd6fe', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', color:'#0f172a', boxSizing:'border-box' }}
+                          onFocus={e => e.target.style.borderColor='#7c3aed'} onBlur={e => e.target.style.borderColor='#ddd6fe'}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#6d28d9', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>🏷️ Industry / Niche</label>
+                        <select value={form.warmup_industry||''} onChange={e => f('warmup_industry', e.target.value)}
+                          style={{ width:'100%', border:'1.5px solid #ddd6fe', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', color: form.warmup_industry ? '#0f172a' : '#94a3b8', cursor:'pointer' }}>
+                          <option value="">— Select your industry —</option>
+                          {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
                         </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Warmup window — linked to Sending tab */}
+                  <div style={{ background:'#f8fafc', borderRadius:10, padding:'12px 14px', border:'1px solid #e2e8f0' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.07em' }}>📅 Warmup Window</div>
+                      <button type="button" onClick={() => setTab('sending')}
+                        style={{ fontSize:11, color:'#2563eb', fontWeight:600, background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit', textDecoration:'underline' }}>
+                        Edit in Sending & Schedule →
+                      </button>
+                    </div>
+                    <div style={{ fontSize:11, color:'#64748b', marginBottom:8 }}>
+                      Warmup emails fire within your sending window. Change the window in the <strong>Sending & Schedule</strong> tab — one setting, no confusion.
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <div style={{ flex:1, background:'#fff', borderRadius:8, padding:'8px 12px', border:'1px solid #e2e8f0', textAlign:'center' }}>
+                        <div style={{ fontSize:10, color:'#94a3b8', marginBottom:2 }}>FROM</div>
+                        <div style={{ fontSize:14, fontWeight:800, color:'#2563eb' }}>{fmtHour(form.send_window_start)}</div>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', color:'#94a3b8', fontSize:18, fontWeight:300 }}>→</div>
+                      <div style={{ flex:1, background:'#fff', borderRadius:8, padding:'8px 12px', border:'1px solid #e2e8f0', textAlign:'center' }}>
+                        <div style={{ fontSize:10, color:'#94a3b8', marginBottom:2 }}>TO</div>
+                        <div style={{ fontSize:14, fontWeight:800, color:'#2563eb' }}>{fmtHour(form.send_window_end)}</div>
                       </div>
                     </div>
                   </div>
