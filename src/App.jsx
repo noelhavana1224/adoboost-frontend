@@ -30,6 +30,7 @@ import Pipeline from './pages/Pipeline';
 import VAUpsell from './pages/VAUpsell';
 import SupportEntry from './pages/SupportEntry';
 import ImpersonateEntry from './pages/ImpersonateEntry';
+import LinkedIn from './pages/LinkedIn';
 
 function ProtectedRoute({ children, adminOnly }) {
   const { user } = useAuth();
@@ -106,6 +107,7 @@ export default function App() {
           <Route path="/messages/auto-replies" element={<ProtectedRoute><Messages type="auto-replies" /></ProtectedRoute>} />
           <Route path="/messages/archive"    element={<ProtectedRoute><Messages type="archive" /></ProtectedRoute>} />
           <Route path="/pipeline"            element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
+          <Route path="/linkedin"            element={<ProtectedRoute><LinkedIn /></ProtectedRoute>} />
           <Route path="/exclusions"          element={<ProtectedRoute><Exclusions type="exclusions" /></ProtectedRoute>} />
           <Route path="/exclusions/unsubscribes" element={<ProtectedRoute><Exclusions type="unsubscribes" /></ProtectedRoute>} />
           <Route path="/templates"           element={<ProtectedRoute><Templates /></ProtectedRoute>} />
