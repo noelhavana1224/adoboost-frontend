@@ -158,10 +158,16 @@ function AccountsTab() {
           <Info size={16} color="#2563eb" style={{ flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontSize: 12, color: '#1e40af', lineHeight: 1.8 }}>
             <strong>How to get your LinkedIn cookies:</strong><br />
-            1. Log into LinkedIn in Chrome &nbsp;·&nbsp;
-            2. Open DevTools (F12) → Application → Cookies → linkedin.com &nbsp;·&nbsp;
-            3. Copy the value of <code style={{ background: '#dbeafe', padding: '1px 5px', borderRadius: 3 }}>li_at</code> &nbsp;·&nbsp;
-            4. Copy the value of <code style={{ background: '#dbeafe', padding: '1px 5px', borderRadius: 3 }}>JSESSIONID</code> (starts with <code style={{ background: '#dbeafe', padding: '1px 5px', borderRadius: 3 }}>ajax:</code>)
+            Install the{' '}
+            <a
+              href="https://chromewebstore.google.com/detail/copy-cookies/jcbpglbplpblnagieibnemmkiamekcdg"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'underline' }}
+            >
+              Copy Cookies Chrome Extension
+            </a>
+            , then log into LinkedIn, click the extension, and copy the <code style={{ background: '#dbeafe', padding: '1px 5px', borderRadius: 3 }}>li_at</code> and <code style={{ background: '#dbeafe', padding: '1px 5px', borderRadius: 3 }}>JSESSIONID</code> cookie values from the list.
           </div>
         </div>
       </Card>
