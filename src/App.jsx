@@ -31,6 +31,8 @@ import VAUpsell from './pages/VAUpsell';
 import SupportEntry from './pages/SupportEntry';
 import ImpersonateEntry from './pages/ImpersonateEntry';
 import LinkedIn from './pages/LinkedIn';
+import BookingCalendarPage from './pages/BookingCalendar';
+import PublicBooking from './pages/PublicBooking';
 
 function ProtectedRoute({ children, adminOnly }) {
   const { user } = useAuth();
@@ -107,6 +109,7 @@ export default function App() {
           <Route path="/messages/auto-replies" element={<ProtectedRoute><Messages type="auto-replies" /></ProtectedRoute>} />
           <Route path="/messages/archive"    element={<ProtectedRoute><Messages type="archive" /></ProtectedRoute>} />
           <Route path="/pipeline"            element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
+          <Route path="/booking-calendar"   element={<ProtectedRoute><BookingCalendarPage /></ProtectedRoute>} />
           <Route path="/linkedin"            element={<ProtectedRoute><LinkedIn /></ProtectedRoute>} />
           <Route path="/exclusions"          element={<ProtectedRoute><Exclusions type="exclusions" /></ProtectedRoute>} />
           <Route path="/exclusions/unsubscribes" element={<ProtectedRoute><Exclusions type="unsubscribes" /></ProtectedRoute>} />
@@ -126,6 +129,9 @@ export default function App() {
           <Route path="/admin/plans"     element={<ProtectedRoute adminOnly><AdminPlans /></ProtectedRoute>} />
           <Route path="/admin/tickets"   element={<ProtectedRoute adminOnly><AdminTickets /></ProtectedRoute>} />
           <Route path="/admin/team"      element={<ProtectedRoute adminOnly><AdminTeam /></ProtectedRoute>} />
+
+          {/* Public booking page — no auth required */}
+          <Route path="/book/:slug" element={<PublicBooking />} />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
