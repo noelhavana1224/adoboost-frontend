@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import { PageHeader, Card, Badge, Spinner } from '../components/UI';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 
 const STATUS_COLOR = { draft:'default', active:'green', paused:'yellow', completed:'blue' };
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 export default function SendingCalendar() {
+  const { user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [sends, setSends] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,27 @@ export default function SendingCalendar() {
       return false;
     });
   };
+
+  // Block Trial users
+  if (!loading && user?.plan?.toLowerCase() === 'trial') {
+    return (
+      <div>
+        <PageHeader title="Calendar Booking Page" subtitle="Share a booking link so prospects can schedule calls directly." />
+        <div style={{ textAlign:'center', padding:'64px 24px', background:'var(--bg2)', borderRadius:16, border:'1px solid var(--border)', maxWidth:520, margin:'0 auto' }}>
+          <div style={{ width:60, height:60, borderRadius:16, background:'linear-gradient(135deg,#2563eb,#7c3aed)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
+            <Lock size={26} color="#fff" />
+          </div>
+          <h2 style={{ fontSize:20, fontWeight:700, marginBottom:10 }}>Upgrade to access Calendar Booking</h2>
+          <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.7, marginBottom:24, maxWidth:380, margin:'0 auto 24px' }}>
+            The Calendar Booking Page is available on Starter and above. Share a booking link with prospects so they can schedule calls directly — no third-party tools needed.
+          </p>
+          <a href="/settings/billing" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', padding:'11px 28px', borderRadius:10, fontWeight:700, fontSize:14, textDecoration:'none' }}>
+            Upgrade your plan →
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return <Spinner />;
 
