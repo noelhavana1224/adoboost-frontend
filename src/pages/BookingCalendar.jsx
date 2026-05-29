@@ -71,6 +71,7 @@ function CalendarEditor({ calendar, onSave, onClose }) {
   const isEdit = !!calendar;
   const [tab, setTab] = useState('general');
   const [saving, setSaving] = useState(false);
+  const [testingSmtp, setTestingSmtp] = useState(false);
   const [form, setForm] = useState({
     name: calendar?.name || '',
     description: calendar?.description || '',
@@ -83,6 +84,15 @@ function CalendarEditor({ calendar, onSave, onClose }) {
     accent_color: calendar?.accent_color || '#1d4ed8',
     custom_questions: calendar?.custom_questions || [],
     availability: calendar?.availability || { ...DEFAULT_AVAILABILITY },
+    // Branding
+    logo_url: calendar?.logo_url || '',
+    smtp_host: calendar?.smtp_host || '',
+    smtp_port: calendar?.smtp_port || 587,
+    smtp_user: calendar?.smtp_user || '',
+    smtp_pass: calendar?.smtp_pass || '',
+    smtp_from_name: calendar?.smtp_from_name || '',
+    smtp_from_email: calendar?.smtp_from_email || '',
+    smtp_secure: calendar?.smtp_secure ? true : false,
   });
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -120,12 +130,28 @@ function CalendarEditor({ calendar, onSave, onClose }) {
     set('availability', { ...form.availability, [day]: { ...form.availability[day], [field]: val } });
   }
 
+  async function testSmtp() {
+    setTestingSmtp(true);
+    try {
+      await api.post('/booking-calendar/test-smtp', {
+        smtp_host: form.smtp_host, smtp_port: form.smtp_port,
+        smtp_user: form.smtp_user, smtp_pass: form.smtp_pass,
+        smtp_from_email: form.smtp_from_email, smtp_from_name: form.smtp_from_name,
+        smtp_secure: form.smtp_secure,
+      });
+      toast.success('SMTP connection successful!');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'SMTP test failed');
+    } finally { setTestingSmtp(false); }
+  }
+
   const TABS = [
     { id: 'general', label: 'General' },
     { id: 'availability', label: 'Availability' },
     { id: 'meeting', label: 'Meeting Link' },
     { id: 'questions', label: 'Questions' },
     { id: 'notify', label: 'Notifications' },
+    { id: 'branding', label: 'Branding & Email' },
   ];
 
   return (
@@ -325,6 +351,104 @@ function CalendarEditor({ calendar, onSave, onClose }) {
                 style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 16px', border:'2px dashed #d1d5db', borderRadius:8, background:'#fff', cursor:'pointer', fontSize:13, color:'#6b7280', width:'100%', justifyContent:'center' }}>
                 <Plus size={16} /> Add Custom Question
               </button>
+            </div>
+          )}
+
+          {/* BRANDING & EMAIL */}
+          {tab === 'branding' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
+              {/* Logo */}
+              <div style={{ background:'#f8fafc', borderRadius:10, padding:16, border:'1px solid #e2e8f0' }}>
+                <div style={{ fontWeight:700, fontSize:14, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
+                  🖼️ Your Logo
+                </div>
+                <p style={{ fontSize:13, color:'#718096', margin:'0 0 10px' }}>Shown in booking confirmation emails instead of the AdoBoost logo.</p>
+                <input value={form.logo_url} onChange={e => set('logo_url', e.target.value)}
+                  placeholder="https://yourcompany.com/logo.png"
+                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, boxSizing:'border-box' }} />
+                {form.logo_url && (
+                  <div style={{ marginTop:10, padding:12, background:'#fff', borderRadius:8, border:'1px solid #e2e8f0', textAlign:'center' }}>
+                    <img src={form.logo_url} alt="logo preview" style={{ maxHeight:60, maxWidth:200, objectFit:'contain' }}
+                      onError={e => { e.target.style.display='none'; }} />
+                    <div style={{ fontSize:11, color:'#9ca3af', marginTop:6 }}>Preview</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Custom SMTP */}
+              <div style={{ background:'#f8fafc', borderRadius:10, padding:16, border:'1px solid #e2e8f0' }}>
+                <div style={{ fontWeight:700, fontSize:14, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
+                  📧 Custom Sender Email (SMTP)
+                </div>
+                <p style={{ fontSize:13, color:'#718096', margin:'0 0 14px', lineHeight:1.5 }}>
+                  Send booking notifications from your own email (e.g. <em>noreply@yourcompany.com</em>).
+                  Leave blank to use the AdoBoost system mailer.
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    <div>
+                      <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>From Name</label>
+                      <input value={form.smtp_from_name} onChange={e => set('smtp_from_name', e.target.value)}
+                        placeholder="Apple Inc."
+                        style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>From Email</label>
+                      <input type="email" value={form.smtp_from_email} onChange={e => set('smtp_from_email', e.target.value)}
+                        placeholder="noreply@apple.com"
+                        style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>SMTP Host</label>
+                    <input value={form.smtp_host} onChange={e => set('smtp_host', e.target.value)}
+                      placeholder="smtp.gmail.com  or  smtp.hostinger.com"
+                      style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    <div>
+                      <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>Port</label>
+                      <select value={form.smtp_port} onChange={e => set('smtp_port', Number(e.target.value))}
+                        style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13 }}>
+                        <option value={587}>587 (TLS/STARTTLS)</option>
+                        <option value={465}>465 (SSL)</option>
+                        <option value={25}>25 (Plain)</option>
+                      </select>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'flex-end', paddingBottom:2 }}>
+                      <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13 }}>
+                        <input type="checkbox" checked={form.smtp_secure} onChange={e => set('smtp_secure', e.target.checked)}
+                          style={{ width:16, height:16, accentColor:'#1d4ed8' }} />
+                        <span style={{ fontWeight:600 }}>Use SSL (port 465)</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>SMTP Username</label>
+                    <input value={form.smtp_user} onChange={e => set('smtp_user', e.target.value)}
+                      placeholder="noreply@apple.com"
+                      style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>SMTP Password</label>
+                    <input type="password" value={form.smtp_pass} onChange={e => set('smtp_pass', e.target.value)}
+                      placeholder="••••••••••••"
+                      style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
+                  </div>
+                  {form.smtp_host && form.smtp_user && form.smtp_pass && (
+                    <button onClick={testSmtp} disabled={testingSmtp}
+                      style={{ padding:'9px 16px', border:'1px solid #1d4ed8', borderRadius:8, background:'#eff6ff', color:'#1d4ed8', cursor:'pointer', fontSize:13, fontWeight:700, opacity: testingSmtp ? 0.7 : 1 }}>
+                      {testingSmtp ? '⏳ Testing…' : '🔌 Test SMTP Connection'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ background:'#fefce8', borderRadius:10, padding:12, border:'1px solid #fde68a' }}>
+                <p style={{ margin:0, fontSize:13, color:'#92400e' }}>
+                  💡 This SMTP is <strong>only for calendar booking emails</strong> — it won't be used for campaigns or warmup. Credentials are stored securely in your account.
+                </p>
+              </div>
             </div>
           )}
 
