@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import { PageHeader, Spinner, Badge } from '../components/UI';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import {
   CalendarCheck, Plus, Copy, ExternalLink, Trash2, Edit2,
@@ -48,6 +49,79 @@ const DEFAULT_AVAILABILITY = {
   sat: { enabled: false, start: '09:00', end: '17:00' },
   sun: { enabled: false, start: '09:00', end: '17:00' },
 };
+
+// ── Logo Field — URL or Upload ─────────────────────────────────────────────
+function LogoField({ value, onChange }) {
+  const [mode, setMode] = useState(value && !value.startsWith('http') ? 'upload' : 'url');
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error('Logo must be under 3 MB'); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('logo', file);
+      const res = await api.post('/booking-calendar/upload-logo', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onChange(res.data.url);
+      toast.success('Logo uploaded!');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Upload failed');
+    } finally { setUploading(false); }
+  }
+
+  return (
+    <div style={{ background:'#f8fafc', borderRadius:10, padding:16, border:'1px solid #e2e8f0' }}>
+      <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>🖼️ Your Logo</div>
+      <p style={{ fontSize:13, color:'#718096', margin:'0 0 12px' }}>
+        Shown in booking confirmation emails instead of the AdoBoost logo.
+      </p>
+      {/* Mode toggle */}
+      <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+        {[['url','🔗 Image URL'], ['upload','📁 Upload File']].map(([m, label]) => (
+          <button key={m} onClick={() => setMode(m)}
+            style={{ padding:'6px 14px', border:`2px solid ${mode===m ? '#1d4ed8' : '#e2e8f0'}`,
+              borderRadius:8, background: mode===m ? '#eff6ff' : '#fff',
+              color: mode===m ? '#1d4ed8' : '#6b7280', fontSize:13, fontWeight: mode===m ? 700 : 400, cursor:'pointer' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'url' ? (
+        <input value={value || ''} onChange={e => onChange(e.target.value)}
+          placeholder="https://yourcompany.com/logo.png"
+          style={{ width:'100%', padding:'10px 12px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, boxSizing:'border-box' }} />
+      ) : (
+        <label style={{ display:'block', padding:'20px', border:'2px dashed #d1d5db', borderRadius:8, textAlign:'center', cursor:'pointer', background:'#fff' }}>
+          <input type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+            onChange={handleFile} style={{ display:'none' }} />
+          {uploading
+            ? <div style={{ color:'#1d4ed8', fontSize:13, fontWeight:600 }}>⏳ Uploading…</div>
+            : <div>
+                <div style={{ fontSize:28, marginBottom:4 }}>📁</div>
+                <div style={{ fontSize:13, color:'#6b7280' }}>Click to choose a file <span style={{ color:'#9ca3af' }}>(JPG, PNG, SVG — max 3 MB)</span></div>
+              </div>
+          }
+        </label>
+      )}
+
+      {value && (
+        <div style={{ marginTop:12, padding:12, background:'#fff', borderRadius:8, border:'1px solid #e2e8f0', textAlign:'center', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <img src={value} alt="logo" style={{ maxHeight:52, maxWidth:180, objectFit:'contain' }}
+            onError={e => { e.target.style.display='none'; }} />
+          <button onClick={() => onChange('')}
+            style={{ fontSize:12, color:'#dc2626', background:'#fee2e2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer' }}>
+            Remove
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function fmtDateTime(dt) {
   try {
@@ -358,22 +432,7 @@ function CalendarEditor({ calendar, onSave, onClose }) {
           {tab === 'branding' && (
             <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
               {/* Logo */}
-              <div style={{ background:'#f8fafc', borderRadius:10, padding:16, border:'1px solid #e2e8f0' }}>
-                <div style={{ fontWeight:700, fontSize:14, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
-                  🖼️ Your Logo
-                </div>
-                <p style={{ fontSize:13, color:'#718096', margin:'0 0 10px' }}>Shown in booking confirmation emails instead of the AdoBoost logo.</p>
-                <input value={form.logo_url} onChange={e => set('logo_url', e.target.value)}
-                  placeholder="https://yourcompany.com/logo.png"
-                  style={{ width:'100%', padding:'10px 12px', border:'1px solid #d1d5db', borderRadius:8, fontSize:13, boxSizing:'border-box' }} />
-                {form.logo_url && (
-                  <div style={{ marginTop:10, padding:12, background:'#fff', borderRadius:8, border:'1px solid #e2e8f0', textAlign:'center' }}>
-                    <img src={form.logo_url} alt="logo preview" style={{ maxHeight:60, maxWidth:200, objectFit:'contain' }}
-                      onError={e => { e.target.style.display='none'; }} />
-                    <div style={{ fontSize:11, color:'#9ca3af', marginTop:6 }}>Preview</div>
-                  </div>
-                )}
-              </div>
+              <LogoField value={form.logo_url} onChange={v => set('logo_url', v)} />
 
               {/* Custom SMTP */}
               <div style={{ background:'#f8fafc', borderRadius:10, padding:16, border:'1px solid #e2e8f0' }}>
@@ -395,7 +454,7 @@ function CalendarEditor({ calendar, onSave, onClose }) {
                     <div>
                       <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>From Email</label>
                       <input type="email" value={form.smtp_from_email} onChange={e => set('smtp_from_email', e.target.value)}
-                        placeholder="noreply@apple.com"
+                        placeholder="noreply@yourdomain.com"
                         style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
                     </div>
                   </div>
@@ -426,7 +485,7 @@ function CalendarEditor({ calendar, onSave, onClose }) {
                   <div>
                     <label style={{ fontSize:12, fontWeight:600, color:'#374151', display:'block', marginBottom:4 }}>SMTP Username</label>
                     <input value={form.smtp_user} onChange={e => set('smtp_user', e.target.value)}
-                      placeholder="noreply@apple.com"
+                      placeholder="noreply@yourdomain.com"
                       style={{ width:'100%', padding:'9px 10px', border:'1px solid #d1d5db', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
                   </div>
                   <div>
@@ -556,6 +615,33 @@ function BookingRow({ booking, onCancel }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function BookingCalendarPage() {
+  const { user } = useAuth();
+  const isTrial = !user || user.plan === 'trial';
+
+  // Plan gate — show upgrade prompt for trial users
+  if (isTrial) return (
+    <div style={{ maxWidth:560, margin:'80px auto', textAlign:'center', padding:32 }}>
+      <div style={{ fontSize:56, marginBottom:16 }}>📅</div>
+      <h2 style={{ fontWeight:800, fontSize:22, marginBottom:8 }}>Booking Calendar</h2>
+      <p style={{ color:'#718096', fontSize:15, marginBottom:24, lineHeight:1.6 }}>
+        Let prospects book meetings directly from your email outreach — with automatic .ics calendar invites, custom questions, and your own branded emails.
+      </p>
+      <div style={{ background:'#fefce8', borderRadius:12, padding:20, border:'1px solid #fde68a', marginBottom:24, textAlign:'left' }}>
+        <div style={{ fontWeight:700, fontSize:14, color:'#92400e', marginBottom:10 }}>Available on Starter, Professional & Agency</div>
+        {['Unlimited booking pages','Custom availability & time zones','Branded emails with your logo & SMTP','Custom questions for your booking form','.ics calendar invites (no OAuth needed)','Zoom, Teams, Meet, Phone support'].map(f => (
+          <div key={f} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'#78350f', marginBottom:6 }}>
+            <span style={{ color:'#d97706', fontWeight:700 }}>✓</span> {f}
+          </div>
+        ))}
+      </div>
+      <a href="/settings/billing"
+        style={{ display:'inline-block', padding:'12px 32px', background:'#1d4ed8', color:'#fff', borderRadius:8, fontWeight:700, fontSize:15, textDecoration:'none' }}>
+        Upgrade to Starter — $29/mo →
+      </a>
+      <p style={{ fontSize:12, color:'#9ca3af', marginTop:12 }}>No contracts. Cancel anytime.</p>
+    </div>
+  );
+
   const [tab, setTab] = useState('pages');
   const [calendars, setCalendars] = useState([]);
   const [bookings, setBookings] = useState([]);
