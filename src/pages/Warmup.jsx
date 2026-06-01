@@ -444,6 +444,7 @@ export default function Warmup() {
   const [loading, setLoading]           = useState(true);
   const [networkStats, setNetworkStats] = useState({ total: 0, active: 0, avgHealth: 0 });
   const [bulkRetrying, setBulkRetrying] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(null); // { done, total, ok, fail }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -478,20 +479,40 @@ export default function Warmup() {
   const bulkRetryAll = async () => {
     if (!failedAccounts.length) return;
     setBulkRetrying(true);
+    setBulkProgress({ done: 0, total: failedAccounts.length, ok: 0, fail: 0 });
     try {
+      // Returns immediately with a jobId — actual testing runs in background
       const { data } = await api.post('/email-accounts/bulk-retry-smtp', {
         account_ids: failedAccounts.map(a => a.id),
       });
-      const results = data.results || [];
-      const ok  = results.filter(r => r.success);
-      const bad = results.filter(r => !r.success);
-      if (ok.length)  {
-        toast.success(`✅ ${ok.length} inbox${ok.length>1?'es':''} reconnected!`);
-        ok.forEach(r => handleUpdate(r.id, { failed_today: 0 }));
-      }
-      if (bad.length) toast.error(`❌ ${bad.length} still failing — check credentials`);
-    } catch { toast.error('Bulk retry failed'); }
-    finally { setBulkRetrying(false); }
+
+      if (!data.jobId) { toast.error('Unexpected response'); setBulkRetrying(false); return; }
+
+      // Poll for progress every 3 seconds
+      const poll = setInterval(async () => {
+        try {
+          const { data: job } = await api.get(`/email-accounts/bulk-retry-status/${data.jobId}`);
+          setBulkProgress({ done: job.done, total: job.total, ok: job.ok, fail: job.fail });
+
+          if (job.status === 'done') {
+            clearInterval(poll);
+            setBulkRetrying(false);
+            setBulkProgress(null);
+            if (job.ok > 0) {
+              toast.success(`✅ ${job.ok} inbox${job.ok>1?'es':''} reconnected!`);
+              // Refresh account list so banners clear
+              load();
+            }
+            if (job.fail > 0) toast.error(`❌ ${job.fail} still failing — update their passwords`);
+          }
+        } catch { clearInterval(poll); setBulkRetrying(false); setBulkProgress(null); }
+      }, 3000);
+
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Bulk retry failed');
+      setBulkRetrying(false);
+      setBulkProgress(null);
+    }
   };
 
   return (
@@ -564,22 +585,46 @@ export default function Warmup() {
       )}
 
       {/* ── Bulk retry banner ── */}
-      {failedAccounts.length > 0 && (
-        <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:12, padding:'14px 18px', marginBottom:20, display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
-          <span style={{ fontSize:20 }}>🔴</span>
-          <div style={{ flex:1 }}>
-            <div style={{ fontWeight:700, fontSize:13, color:'#991b1b', marginBottom:2 }}>
-              {failedAccounts.length} inbox{failedAccounts.length>1?'es':''} disconnected
+      {(failedAccounts.length > 0 || bulkRetrying) && (
+        <div style={{ background: bulkRetrying ? '#f0f9ff' : '#fef2f2', border:`1px solid ${bulkRetrying ? '#bae6fd' : '#fecaca'}`, borderRadius:12, padding:'14px 18px', marginBottom:20 }}>
+          {bulkRetrying && bulkProgress ? (
+            /* Progress state */
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                <RefreshCw size={16} color="#0369a1" style={{ animation:'spin 1s linear infinite', flexShrink:0 }} />
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:'#0369a1' }}>
+                    Reconnecting inboxes in background… {bulkProgress.done}/{bulkProgress.total}
+                  </div>
+                  <div style={{ fontSize:12, color:'#0284c7', marginTop:2 }}>
+                    ✅ {bulkProgress.ok} reconnected · ❌ {bulkProgress.fail} failed · ⏳ {bulkProgress.total - bulkProgress.done} remaining
+                  </div>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div style={{ height:6, background:'#e0f2fe', borderRadius:99, overflow:'hidden' }}>
+                <div style={{ height:'100%', background:'#0284c7', borderRadius:99, width:`${(bulkProgress.done/bulkProgress.total)*100}%`, transition:'width 0.4s' }} />
+              </div>
             </div>
-            <div style={{ fontSize:12, color:'#b91c1c' }}>
-              {failedAccounts.map(a => a.from_email).join(', ')}
+          ) : (
+            /* Idle state */
+            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+              <span style={{ fontSize:20 }}>🔴</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:13, color:'#991b1b', marginBottom:2 }}>
+                  {failedAccounts.length} inbox{failedAccounts.length>1?'es':''} disconnected
+                </div>
+                <div style={{ fontSize:12, color:'#b91c1c' }}>
+                  {failedAccounts.slice(0,5).map(a => a.from_email).join(', ')}{failedAccounts.length>5?` +${failedAccounts.length-5} more`:''}
+                </div>
+              </div>
+              <button onClick={bulkRetryAll} disabled={bulkRetrying}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', background:'#dc2626', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }}>
+                <RefreshCw size={14} />
+                🔄 Reconnect All {failedAccounts.length} Inboxes
+              </button>
             </div>
-          </div>
-          <button onClick={bulkRetryAll} disabled={bulkRetrying}
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', background:'#dc2626', color:'#fff', border:'none', borderRadius:8, cursor: bulkRetrying ? 'not-allowed' : 'pointer', fontSize:13, fontWeight:700, opacity: bulkRetrying ? 0.7 : 1, flexShrink:0 }}>
-            <RefreshCw size={14} style={bulkRetrying ? { animation:'spin 1s linear infinite' } : {}} />
-            {bulkRetrying ? 'Retrying…' : `🔄 Reconnect All ${failedAccounts.length} Inboxes`}
-          </button>
+          )}
         </div>
       )}
 
