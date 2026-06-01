@@ -275,16 +275,6 @@ export default function EmailAccounts() {
           </p>
         </div>
         <div style={{ display:'flex', gap:8 }}>
-          <button onClick={handleFixNames} disabled={fixingNames}
-            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#fff', color:'#7c3aed', border:'1.5px solid #7c3aed', borderRadius:9, fontSize:13, fontWeight:700, cursor: fixingNames ? 'not-allowed' : 'pointer', fontFamily:'inherit', opacity: fixingNames ? 0.7 : 1 }}
-            onMouseEnter={e => { if (!fixingNames) e.currentTarget.style.background='#f5f3ff'; }}
-            onMouseLeave={e => e.currentTarget.style.background='#fff'}
-            title="Reset all account display names to match their email address">
-            {fixingNames
-              ? <Loader2 size={14} style={{ animation:'spin 1s linear infinite' }}/>
-              : <RefreshCw size={14}/>
-            } Fix Names
-          </button>
           <button onClick={() => setShowBulkWarmup(true)}
             style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#fff', color:'#d97706', border:'1.5px solid #d97706', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
             onMouseEnter={e => e.currentTarget.style.background='#fffbeb'}
@@ -589,12 +579,12 @@ function BulkWarmupModal({ open, accounts, onClose, onSaved }) {
 
 // ── Bulk Import Modal ────────────────────────────
 const BULK_COLS = [
-  { key:'name',        label:'name',        required:false, example:'My Gmail',            desc:'Friendly display name' },
-  { key:'from_name',   label:'from_name',   required:false, example:'John Doe',            desc:'Sender display name' },
+  { key:'username',    label:'username',    required:true,  example:'john@gmail.com',      desc:'Email address — used as the KEY to match existing accounts' },
+  { key:'name',        label:'name',        required:false, example:'John Doe',            desc:'Display name shown on the card (updates existing accounts)' },
+  { key:'from_name',   label:'from_name',   required:false, example:'John Doe',            desc:'Sender name in outgoing emails' },
   { key:'from_email',  label:'from_email',  required:false, example:'john@gmail.com',      desc:'Sender email (defaults to username)' },
-  { key:'username',    label:'username',    required:true,  example:'john@gmail.com',      desc:'SMTP login — usually the full email' },
-  { key:'password',    label:'password',    required:true,  example:'app_password_here',   desc:'SMTP / App Password' },
-  { key:'host',        label:'host',        required:true,  example:'smtp.gmail.com',      desc:'SMTP server hostname' },
+  { key:'password',    label:'password',    required:false, example:'app_password_here',   desc:'SMTP / App Password (optional for updates — keeps current if blank)' },
+  { key:'host',        label:'host',        required:false, example:'smtp.gmail.com',      desc:'SMTP server (required only for NEW accounts)' },
   { key:'port',        label:'port',        required:false, example:'587',                 desc:'587 (TLS) or 465 (SSL)' },
   { key:'secure',      label:'secure',      required:false, example:'false',               desc:'false=TLS/587  true=SSL/465' },
   { key:'imap_host',   label:'imap_host',   required:false, example:'imap.gmail.com',      desc:'IMAP server (for inbox sync)' },
@@ -899,7 +889,7 @@ function BulkImportModal({ open, onClose, onImported }) {
               )}
 
               <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:9, padding:'10px 14px', fontSize:12, color:'#1e40af' }}>
-                💡 <strong>Smart import:</strong> New accounts will be added. Existing accounts will have their <strong>name, from name, password &amp; SMTP settings</strong> updated from the file — re-upload your sheet anytime to fix mismatched names or credentials.
+                💡 <strong>Smart update:</strong> The <strong>username/email</strong> column is the key — existing accounts are matched by email and updated. You can upload a simple sheet with just <strong>username + name</strong> to fix display names. Password and host are only required for brand-new accounts.
               </div>
             </>
             );
