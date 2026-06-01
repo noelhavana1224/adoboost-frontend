@@ -74,6 +74,7 @@ function WarmupCard({ account, poolSize, onUpdate }) {
   const [saving, setSaving]       = useState(false);
   const [logs, setLogs]           = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [retrying, setRetrying]   = useState(false);
 
   // Detect which preset matches the account's current saved settings (if any)
   const detectPreset = (start, inc, max) => {
@@ -120,6 +121,17 @@ function WarmupCard({ account, poolSize, onUpdate }) {
       const { data } = await api.get(`/warmup/logs/${account.id}`);
       setLogs(data || []);
     } catch {} finally { setLoadingLogs(false); }
+  };
+
+  const retrySmtp = async () => {
+    setRetrying(true);
+    try {
+      await api.post(`/email-accounts/${account.id}/retry-smtp`);
+      toast.success(`✅ ${account.from_email} reconnected! Warmup will resume shortly.`);
+      onUpdate(account.id, { failed_today: 0 });
+    } catch (e) {
+      toast.error(`❌ Still failing: ${e.response?.data?.error || 'Check your SMTP credentials'}`);
+    } finally { setRetrying(false); }
   };
 
   const handleSave = async () => {
@@ -197,18 +209,22 @@ function WarmupCard({ account, poolSize, onUpdate }) {
 
       {/* SMTP failure warning — visible without expanding */}
       {form.warmup_enabled && account.failed_today > 0 && account.sent_today === 0 && (
-        <div style={{ background: '#fef2f2', borderTop: '1px solid #fecaca', borderBottom: expanded ? '1px solid #fecaca' : 'none', padding: '10px 18px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ background: '#fef2f2', borderTop: '1px solid #fecaca', borderBottom: expanded ? '1px solid #fecaca' : 'none', padding: '12px 18px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>🔴</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#991b1b', marginBottom: 2 }}>
               SMTP Authentication Failed — Warmup Stopped
             </div>
-            <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5, marginBottom: 8 }}>
               All {account.failed_today} warmup email attempt{account.failed_today !== 1 ? 's' : ''} failed for <strong>{account.from_email}</strong>.
               This is usually caused by a wrong password, changed credentials, or blocked port.
-              <br/>
-              <strong>Fix:</strong> Go to <em>Email Accounts</em> → edit this account → update the SMTP password → click <em>Test Connection</em>.
             </div>
+            <button onClick={retrySmtp} disabled={retrying}
+              style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', background:'#dc2626', color:'#fff', border:'none', borderRadius:7, cursor: retrying ? 'not-allowed' : 'pointer', fontSize:12, fontWeight:700, opacity: retrying ? 0.7 : 1 }}>
+              <RefreshCw size={13} style={retrying ? { animation:'spin 1s linear infinite' } : {}} />
+              {retrying ? 'Testing connection…' : '🔄 Retry Connection'}
+            </button>
+            <span style={{ fontSize:11, color:'#b91c1c', marginLeft:10 }}>Uses your saved password — no re-entry needed</span>
           </div>
         </div>
       )}
@@ -424,9 +440,10 @@ function WarmupCard({ account, poolSize, onUpdate }) {
 
 // ── Main Warmup Page ─────────────────────────────
 export default function Warmup() {
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [accounts, setAccounts]         = useState([]);
+  const [loading, setLoading]           = useState(true);
   const [networkStats, setNetworkStats] = useState({ total: 0, active: 0, avgHealth: 0 });
+  const [bulkRetrying, setBulkRetrying] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -455,10 +472,31 @@ export default function Warmup() {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
   };
 
-  const activeAccounts = accounts.filter(a => a.warmup_enabled === 1);
+  const activeAccounts  = accounts.filter(a => a.warmup_enabled === 1);
+  const failedAccounts  = accounts.filter(a => a.warmup_enabled === 1 && (a.failed_today||0) > 0 && (a.sent_today||0) === 0);
+
+  const bulkRetryAll = async () => {
+    if (!failedAccounts.length) return;
+    setBulkRetrying(true);
+    try {
+      const { data } = await api.post('/email-accounts/bulk-retry-smtp', {
+        account_ids: failedAccounts.map(a => a.id),
+      });
+      const results = data.results || [];
+      const ok  = results.filter(r => r.success);
+      const bad = results.filter(r => !r.success);
+      if (ok.length)  {
+        toast.success(`✅ ${ok.length} inbox${ok.length>1?'es':''} reconnected!`);
+        ok.forEach(r => handleUpdate(r.id, { failed_today: 0 }));
+      }
+      if (bad.length) toast.error(`❌ ${bad.length} still failing — check credentials`);
+    } catch { toast.error('Bulk retry failed'); }
+    finally { setBulkRetrying(false); }
+  };
 
   return (
     <div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <PageHeader
         title="Email Warmup"
         subtitle="Build sender reputation with the AdoBoost Community Warmup Network"
@@ -522,6 +560,26 @@ export default function Warmup() {
             Currently {activeAccounts.length} account{activeAccounts.length !== 1 ? 's' : ''} active.
             The more accounts in the pool, the better the warmup quality!
           </div>
+        </div>
+      )}
+
+      {/* ── Bulk retry banner ── */}
+      {failedAccounts.length > 0 && (
+        <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:12, padding:'14px 18px', marginBottom:20, display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+          <span style={{ fontSize:20 }}>🔴</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:700, fontSize:13, color:'#991b1b', marginBottom:2 }}>
+              {failedAccounts.length} inbox{failedAccounts.length>1?'es':''} disconnected
+            </div>
+            <div style={{ fontSize:12, color:'#b91c1c' }}>
+              {failedAccounts.map(a => a.from_email).join(', ')}
+            </div>
+          </div>
+          <button onClick={bulkRetryAll} disabled={bulkRetrying}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', background:'#dc2626', color:'#fff', border:'none', borderRadius:8, cursor: bulkRetrying ? 'not-allowed' : 'pointer', fontSize:13, fontWeight:700, opacity: bulkRetrying ? 0.7 : 1, flexShrink:0 }}>
+            <RefreshCw size={14} style={bulkRetrying ? { animation:'spin 1s linear infinite' } : {}} />
+            {bulkRetrying ? 'Retrying…' : `🔄 Reconnect All ${failedAccounts.length} Inboxes`}
+          </button>
         </div>
       )}
 
