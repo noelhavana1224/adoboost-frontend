@@ -203,6 +203,7 @@ export default function EmailAccounts() {
   const [showBulkWarmup, setShowBulkWarmup]   = useState(false);
   const [testStatus, setTestStatus] = useState({});
   const [syncing, setSyncing]       = useState({});
+  const [fixingNames, setFixingNames] = useState(false);
 
   const load = useCallback(() => {
     api.get('/email-accounts').then(r => setAccounts(r.data)).finally(() => setLoading(false));
@@ -245,6 +246,19 @@ export default function EmailAccounts() {
     catch { toast.error('Failed'); }
   };
 
+  const handleFixNames = async () => {
+    if (!confirm(`This will reset all ${accounts.length} account names to be derived from their email address (e.g. jalcaraz@ → "Jalcaraz"). Continue?`)) return;
+    setFixingNames(true);
+    try {
+      const { data } = await api.post('/email-accounts/fix-names-from-email', {});
+      toast.success(`✅ Fixed names for ${data.fixed} accounts`);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to fix names');
+    }
+    setFixingNames(false);
+  };
+
   if (loading) return <Spinner />;
 
   return (
@@ -261,6 +275,16 @@ export default function EmailAccounts() {
           </p>
         </div>
         <div style={{ display:'flex', gap:8 }}>
+          <button onClick={handleFixNames} disabled={fixingNames}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#fff', color:'#7c3aed', border:'1.5px solid #7c3aed', borderRadius:9, fontSize:13, fontWeight:700, cursor: fixingNames ? 'not-allowed' : 'pointer', fontFamily:'inherit', opacity: fixingNames ? 0.7 : 1 }}
+            onMouseEnter={e => { if (!fixingNames) e.currentTarget.style.background='#f5f3ff'; }}
+            onMouseLeave={e => e.currentTarget.style.background='#fff'}
+            title="Reset all account display names to match their email address">
+            {fixingNames
+              ? <Loader2 size={14} style={{ animation:'spin 1s linear infinite' }}/>
+              : <RefreshCw size={14}/>
+            } Fix Names
+          </button>
           <button onClick={() => setShowBulkWarmup(true)}
             style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#fff', color:'#d97706', border:'1.5px solid #d97706', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
             onMouseEnter={e => e.currentTarget.style.background='#fffbeb'}
