@@ -233,6 +233,7 @@ function WarmupCard({ account, poolSize, onUpdate }) {
   const [logs, setLogs]           = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [retrying, setRetrying]   = useState(false);
 
   // Detect which preset matches the account's current saved settings (if any)
   const detectPreset = (start, inc, max) => {
@@ -279,6 +280,17 @@ function WarmupCard({ account, poolSize, onUpdate }) {
       const { data } = await api.get(`/warmup/logs/${account.id}`);
       setLogs(data || []);
     } catch {} finally { setLoadingLogs(false); }
+  };
+
+  const retrySmtp = async () => {
+    setRetrying(true);
+    try {
+      await api.post(`/email-accounts/${account.id}/retry-smtp`);
+      toast.success(`✅ ${account.from_email} reconnected! Warmup will resume shortly.`);
+      onUpdate(account.id, { failed_today: 0 });
+    } catch (e) {
+      toast.error(`❌ Still failing: ${e.response?.data?.error || 'Check your SMTP credentials'}`);
+    } finally { setRetrying(false); }
   };
 
   const handleSave = async () => {
@@ -356,7 +368,7 @@ function WarmupCard({ account, poolSize, onUpdate }) {
 
       {/* SMTP failure warning — visible without expanding */}
       {form.warmup_enabled && account.failed_today > 0 && account.sent_today === 0 && (
-        <div style={{ background: '#fef2f2', borderTop: '1px solid #fecaca', borderBottom: expanded ? '1px solid #fecaca' : 'none', padding: '10px 18px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ background: '#fef2f2', borderTop: '1px solid #fecaca', borderBottom: expanded ? '1px solid #fecaca' : 'none', padding: '12px 18px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>🔴</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#991b1b', marginBottom: 2 }}>
@@ -366,14 +378,18 @@ function WarmupCard({ account, poolSize, onUpdate }) {
               All {account.failed_today} warmup email attempt{account.failed_today !== 1 ? 's' : ''} failed for <strong>{account.from_email}</strong>.
               This is usually caused by a wrong password, changed credentials, or blocked port.
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button onClick={retrySmtp} disabled={retrying}
+                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', background:'#dc2626', color:'#fff', border:'none', borderRadius:7, cursor: retrying ? 'not-allowed' : 'pointer', fontSize:12, fontWeight:700, opacity: retrying ? 0.7 : 1, fontFamily:'inherit' }}>
+                <RefreshCw size={13} style={retrying ? { animation:'spin 1s linear infinite' } : {}} />
+                {retrying ? 'Testing connection…' : '🔄 Retry Connection'}
+              </button>
               <button
                 onClick={() => setShowPasswordModal(true)}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#dc2626', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', background:'#fff', color:'#dc2626', border:'1px solid #fca5a5', borderRadius:7, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
                 <KeyRound size={12}/> Update Password
               </button>
-              <span style={{ fontSize:11, color:'#9ca3af', alignSelf:'center' }}>Uses your saved password — no re-entry needed for retry</span>
-            </div>
+              <span style={{ fontSize:11, color:'#b91c1c' }}>Uses your saved password — no re-entry needed</span>
           </div>
         </div>
       )}
@@ -596,9 +612,11 @@ function WarmupCard({ account, poolSize, onUpdate }) {
 
 // ── Main Warmup Page ─────────────────────────────
 export default function Warmup() {
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [accounts, setAccounts]         = useState([]);
+  const [loading, setLoading]           = useState(true);
   const [networkStats, setNetworkStats] = useState({ total: 0, active: 0, avgHealth: 0 });
+  const [bulkRetrying, setBulkRetrying] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(null); // { done, total, ok, fail }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -627,11 +645,51 @@ export default function Warmup() {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
   };
 
-  const activeAccounts = accounts.filter(a => a.warmup_enabled === 1);
+  const activeAccounts  = accounts.filter(a => a.warmup_enabled === 1);
+  const failedAccounts  = accounts.filter(a => a.warmup_enabled === 1 && (a.failed_today||0) > 0 && (a.sent_today||0) === 0);
+
+  const bulkRetryAll = async () => {
+    if (!failedAccounts.length) return;
+    setBulkRetrying(true);
+    setBulkProgress({ done: 0, total: failedAccounts.length, ok: 0, fail: 0 });
+    try {
+      // Returns immediately with a jobId — actual testing runs in background
+      const { data } = await api.post('/email-accounts/bulk-retry-smtp', {
+        account_ids: failedAccounts.map(a => a.id),
+      });
+
+      if (!data.jobId) { toast.error('Unexpected response'); setBulkRetrying(false); return; }
+
+      // Poll for progress every 3 seconds
+      const poll = setInterval(async () => {
+        try {
+          const { data: job } = await api.get(`/email-accounts/bulk-retry-status/${data.jobId}`);
+          setBulkProgress({ done: job.done, total: job.total, ok: job.ok, fail: job.fail });
+
+          if (job.status === 'done') {
+            clearInterval(poll);
+            setBulkRetrying(false);
+            setBulkProgress(null);
+            if (job.ok > 0) {
+              toast.success(`✅ ${job.ok} inbox${job.ok>1?'es':''} reconnected!`);
+              // Refresh account list so banners clear
+              load();
+            }
+            if (job.fail > 0) toast.error(`❌ ${job.fail} still failing — update their passwords`);
+          }
+        } catch { clearInterval(poll); setBulkRetrying(false); setBulkProgress(null); }
+      }, 3000);
+
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Bulk retry failed');
+      setBulkRetrying(false);
+      setBulkProgress(null);
+    }
+  };
 
   return (
     <div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <PageHeader
         title="Email Warmup"
         subtitle="Build sender reputation with the AdoBoost Community Warmup Network"
@@ -695,6 +753,50 @@ export default function Warmup() {
             Currently {activeAccounts.length} account{activeAccounts.length !== 1 ? 's' : ''} active.
             The more accounts in the pool, the better the warmup quality!
           </div>
+        </div>
+      )}
+
+      {/* ── Bulk retry banner ── */}
+      {(failedAccounts.length > 0 || bulkRetrying) && (
+        <div style={{ background: bulkRetrying ? '#f0f9ff' : '#fef2f2', border:`1px solid ${bulkRetrying ? '#bae6fd' : '#fecaca'}`, borderRadius:12, padding:'14px 18px', marginBottom:20 }}>
+          {bulkRetrying && bulkProgress ? (
+            /* Progress state */
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                <RefreshCw size={16} color="#0369a1" style={{ animation:'spin 1s linear infinite', flexShrink:0 }} />
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:'#0369a1' }}>
+                    Reconnecting inboxes in background… {bulkProgress.done}/{bulkProgress.total}
+                  </div>
+                  <div style={{ fontSize:12, color:'#0284c7', marginTop:2 }}>
+                    ✅ {bulkProgress.ok} reconnected · ❌ {bulkProgress.fail} failed · ⏳ {bulkProgress.total - bulkProgress.done} remaining
+                  </div>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div style={{ height:6, background:'#e0f2fe', borderRadius:99, overflow:'hidden' }}>
+                <div style={{ height:'100%', background:'#0284c7', borderRadius:99, width:`${(bulkProgress.done/bulkProgress.total)*100}%`, transition:'width 0.4s' }} />
+              </div>
+            </div>
+          ) : (
+            /* Idle state */
+            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+              <span style={{ fontSize:20 }}>🔴</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:13, color:'#991b1b', marginBottom:2 }}>
+                  {failedAccounts.length} inbox{failedAccounts.length>1?'es':''} disconnected
+                </div>
+                <div style={{ fontSize:12, color:'#b91c1c' }}>
+                  {failedAccounts.slice(0,5).map(a => a.from_email).join(', ')}{failedAccounts.length>5?` +${failedAccounts.length-5} more`:''}
+                </div>
+              </div>
+              <button onClick={bulkRetryAll} disabled={bulkRetrying}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', background:'#dc2626', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:700, flexShrink:0 }}>
+                <RefreshCw size={14} />
+                🔄 Reconnect All {failedAccounts.length} Inboxes
+              </button>
+            </div>
+          )}
         </div>
       )}
 

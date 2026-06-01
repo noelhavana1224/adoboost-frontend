@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Card, Btn, Input, Select, PageHeader, Alert, Badge } from '../components/UI';
-import { User, CreditCard, Zap, Settings2, Key, Copy, Check, Lock, Star, Crown, Rocket, Shield } from 'lucide-react';
+import { User, CreditCard, Zap, Settings2, Key, Copy, Check, Lock, Star, Crown, Rocket, Shield, Linkedin, CalendarCheck } from 'lucide-react';
 
 // Visual styles keyed by position (index 0–3) so they survive plan renames
 const PLAN_STYLES = [
@@ -15,22 +15,34 @@ const PLAN_STYLES = [
 ];
 
 // Auto-generate feature bullets from DB plan limits
+// Returns { text, linkedin? } objects
 function buildBullets(p) {
   const bullets = [];
-  if (p.max_campaigns >= 999)   bullets.push('Unlimited campaigns');
-  else                          bullets.push(`${p.max_campaigns} campaign${p.max_campaigns !== 1 ? 's' : ''}`);
+  if (p.max_campaigns >= 999)   bullets.push({ text: 'Unlimited campaigns' });
+  else                          bullets.push({ text: `${p.max_campaigns} campaign${p.max_campaigns !== 1 ? 's' : ''}` });
 
-  if (p.max_contacts >= 999999) bullets.push('Unlimited contacts');
-  else                          bullets.push(`${Number(p.max_contacts).toLocaleString()} contacts`);
+  if (p.max_contacts >= 999999) bullets.push({ text: 'Unlimited contacts' });
+  else                          bullets.push({ text: `${Number(p.max_contacts).toLocaleString()} contacts` });
 
-  bullets.push(`${Number(p.max_emails_per_day).toLocaleString()} emails/day`);
+  bullets.push({ text: `${Number(p.max_emails_per_day).toLocaleString()} emails/day` });
 
-  if (p.max_email_accounts >= 999) bullets.push('Unlimited email accounts');
-  else if (p.max_email_accounts > 1) bullets.push(`${p.max_email_accounts} email accounts`);
-  else if (p.max_email_accounts === 1) bullets.push('1 email account');
+  if (p.max_email_accounts >= 999) bullets.push({ text: 'Unlimited email accounts' });
+  else if (p.max_email_accounts > 1) bullets.push({ text: `${p.max_email_accounts} email accounts` });
+  else if (p.max_email_accounts === 1) bullets.push({ text: '1 email account' });
 
-  if (p.max_ai_credits >= 9999) bullets.push('Unlimited AI credits/mo');
-  else if (p.max_ai_credits > 0) bullets.push(`${Number(p.max_ai_credits).toLocaleString()} AI credits/mo`);
+  if (p.max_ai_credits >= 9999) bullets.push({ text: 'Unlimited AI credits/mo' });
+  else if (p.max_ai_credits > 0) bullets.push({ text: `${Number(p.max_ai_credits).toLocaleString()} AI credits/mo` });
+
+  // Calendar booking page — Starter, Professional & Agency (not Trial)
+  const slug = p.name?.toLowerCase() || '';
+  if (slug === 'starter' || slug === 'professional' || slug === 'agency') {
+    bullets.push({ text: 'Calendar booking page', calendar: true });
+  }
+
+  // LinkedIn outreach steps — Professional & Agency only
+  if (slug === 'professional' || slug === 'agency') {
+    bullets.push({ text: 'LinkedIn outreach steps', linkedin: true });
+  }
 
   return bullets;
 }
@@ -183,12 +195,19 @@ export function Billing() {
                 </div>
 
                 <div style={{ marginBottom:16 }}>
-                  {bullets.map(f => (
-                    <div key={f} style={{ fontSize:12, color:'var(--text2)', marginBottom:5, display:'flex', alignItems:'center', gap:6 }}>
-                      <div style={{ width:14, height:14, borderRadius:'50%', background:`linear-gradient(135deg,${style.gradA},${style.gradB})`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                        <Check size={8} color="#fff" strokeWidth={3} />
+                  {bullets.map(b => (
+                    <div key={b.text} style={{ fontSize:12, color:'var(--text2)', marginBottom:5, display:'flex', alignItems:'center', gap:6 }}>
+                      <div style={{
+                        width:14, height:14, flexShrink:0,
+                        borderRadius: b.linkedin ? 3 : b.calendar ? 3 : '50%',
+                        background: b.linkedin ? '#0a66c2' : b.calendar ? '#16a34a' : `linear-gradient(135deg,${style.gradA},${style.gradB})`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>
+                        {b.linkedin ? <Linkedin size={8} color="#fff" strokeWidth={2.5} />
+                          : b.calendar ? <CalendarCheck size={8} color="#fff" strokeWidth={2.5} />
+                          : <Check size={8} color="#fff" strokeWidth={3} />}
                       </div>
-                      {f}
+                      {b.text}
                     </div>
                   ))}
                 </div>

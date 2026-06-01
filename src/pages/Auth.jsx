@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User, ArrowRight, Check, Zap, BarChart2, Shield, Users, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Check, Zap, BarChart2, Shield, Users, Eye, EyeOff, Linkedin, CalendarCheck, RefreshCw, Bot } from 'lucide-react';
 
 const CSS = `
   @keyframes gradientShift {
@@ -93,9 +93,15 @@ const CSS = `
   }
   .feature-row {
     display: flex;
-    align-items: flex-start;
-    gap: 14px;
+    align-items: center;
+    gap: 12px;
     animation: fadeUp 0.6s ease both;
+  }
+  .feat-new {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
+    background: linear-gradient(135deg,#f59e0b,#ef4444);
+    color: #fff; padding: 2px 7px; border-radius: 20px;
+    text-transform: uppercase; flex-shrink: 0;
   }
   @media (max-width: 768px) {
     .auth-left { display: none !important; }
@@ -127,10 +133,12 @@ function Field({ icon: Icon, label, ...props }) {
 }
 
 const FEATURES = [
-  { icon: Zap,       text: 'Multi-step email sequences with smart pausing' },
-  { icon: BarChart2, text: 'Real-time inbox, replies & deliverability tracking' },
-  { icon: Shield,    text: 'Built-in warmup network across your team' },
-  { icon: Users,     text: 'CRM-style pipeline with drag-and-drop stages' },
+  { icon: Bot,          color: '#60a5fa', text: 'AI-powered email sequences & rewriting',    isNew: false },
+  { icon: Linkedin,     color: '#0a66c2', text: 'LinkedIn outreach steps inside campaigns',  isNew: true  },
+  { icon: Shield,       color: '#4ade80', text: 'Inbox warmup network & rotation built-in',  isNew: false },
+  { icon: CalendarCheck,color: '#34d399', text: 'Calendar booking page for prospects',       isNew: true  },
+  { icon: BarChart2,    color: '#a78bfa', text: 'Real-time replies, opens & deliverability', isNew: false },
+  { icon: RefreshCw,    color: '#fb923c', text: 'Multi-inbox rotation for higher volume',    isNew: false },
 ];
 
 const STATS = [
@@ -251,7 +259,7 @@ export default function Auth({ mode = 'login' }) {
             }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 8px #3b82f6' }} />
               <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                Cold Email Outreach Platform
+                All-in-One Outreach Platform
               </span>
             </div>
 
@@ -266,27 +274,31 @@ export default function Auth({ mode = 'login' }) {
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
             }}>
-              Cold email that<br />gets replies.
+              Outreach that<br />books meetings.
             </h1>
 
-            <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, margin: '0 0 36px', maxWidth: 420 }}>
-              The outreach platform built for solo founders and small teams.
-              Send sequences, track every reply, and warm up your inbox — all in one place.
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, margin: '0 0 30px', maxWidth: 420 }}>
+              Cold email, LinkedIn outreach, inbox warmup, and calendar booking — all connected in one platform built to get you more replies and booked calls.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {FEATURES.map(({ icon: Icon, text }, i) => (
-                <div key={text} className="feature-row" style={{ animationDelay: `${i * 0.08}s` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
+              {FEATURES.map(({ icon: Icon, color, text, isNew }, i) => (
+                <div key={text} className="feature-row" style={{ animationDelay: `${i * 0.07}s`, alignItems: 'flex-start' }}>
                   <div style={{
-                    width: 30, height: 30, borderRadius: 8,
-                    background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(124,58,237,0.2))',
-                    border: '1px solid rgba(99,102,241,0.3)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    boxShadow: '0 0 12px rgba(99,102,241,0.15)',
+                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                    background: `${color}18`,
+                    border: `1px solid ${color}35`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: `0 0 10px ${color}20`,
                   }}>
-                    <Icon size={13} color="#93c5fd" />
+                    <Icon size={13} color={color} />
                   </div>
-                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, paddingTop: 4 }}>{text}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.45 }}>{text}</span>
+                      {isNew && <span className="feat-new">NEW</span>}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

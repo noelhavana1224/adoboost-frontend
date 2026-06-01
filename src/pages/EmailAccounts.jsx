@@ -588,15 +588,17 @@ const BULK_SAMPLE = [
 ];
 
 function BulkImportModal({ open, onClose, onImported }) {
-  const [step, setStep]           = useState('upload');  // upload | preview | result
+  const [step, setStep]             = useState('upload');  // upload | preview | result
   const [parsedRows, setParsedRows] = useState([]);
-  const [importing, setImporting] = useState(false);
-  const [result, setResult]       = useState(null);
-  const [dragOver, setDragOver]   = useState(false);
-  const fileInputRef              = useRef(null);
+  const [importing, setImporting]   = useState(false);
+  const [result, setResult]         = useState(null);
+  const [dragOver, setDragOver]     = useState(false);
+  const [existingMap, setExistingMap] = useState({}); // username.lower → true/false
+  const [checkingExisting, setCheckingExisting] = useState(false);
+  const fileInputRef                = useRef(null);
 
   useEffect(() => {
-    if (!open) { setStep('upload'); setParsedRows([]); setResult(null); setDragOver(false); }
+    if (!open) { setStep('upload'); setParsedRows([]); setResult(null); setDragOver(false); setExistingMap({}); }
   }, [open]);
 
   /* ── Download CSV template (no library needed) ── */
@@ -635,18 +637,30 @@ function BulkImportModal({ open, onClose, onImported }) {
     }).filter(r => Object.values(r).some(v => v !== ''));
   };
 
-  /* ── Parse file (CSV only — no build dependencies) ── */
+  /* ── Parse file + check which accounts already exist ── */
   const parseFile = (file) => {
     if (!file) return;
     if (!/\.(csv|txt)$/i.test(file.name))
       return toast.error('Please upload a .csv file (Excel users: Save As → CSV)');
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const rows = parseCSV(e.target.result);
         if (!rows.length) return toast.error('File appears to be empty');
         setParsedRows(rows);
         setStep('preview');
+
+        // Check which usernames already exist in the system
+        setCheckingExisting(true);
+        try {
+          const usernames = rows.map(r => {
+            const get = (key) => { const lower=key.toLowerCase().replace(/[\s_-]/g,''); for(const k of Object.keys(r)){if(k.toLowerCase().replace(/[\s_-]/g,'')===lower) return String(r[k]||'').trim();} return ''; };
+            return get('username') || get('email');
+          }).filter(Boolean);
+          const { data } = await api.post('/email-accounts/check-existing', { usernames });
+          setExistingMap(data.existing || {});
+        } catch {}
+        setCheckingExisting(false);
       } catch (err) { toast.error('Could not parse file: ' + err.message); }
     };
     reader.readAsText(file);
@@ -658,14 +672,20 @@ function BulkImportModal({ open, onClose, onImported }) {
   };
   const onFileInput = (e) => parseFile(e.target.files[0]);
 
-  /* ── Import ── */
+  /* ── Import (smart upsert) ── */
   const handleImport = async () => {
     setImporting(true);
     try {
       const { data } = await api.post('/email-accounts/bulk-import', { accounts: parsedRows });
       setResult(data);
       setStep('result');
-      if (data.imported > 0) { onImported(); toast.success(`✅ ${data.imported} account${data.imported!==1?'s':''} imported!`); }
+      if (data.imported > 0) {
+        onImported();
+        const parts = [];
+        if (data.added)   parts.push(`${data.added} added`);
+        if (data.updated) parts.push(`${data.updated} passwords updated`);
+        toast.success(`✅ Done! ${parts.join(', ')}`);
+      }
     } catch (e) { toast.error(e.response?.data?.error || 'Import failed'); }
     setImporting(false);
   };
@@ -779,16 +799,25 @@ function BulkImportModal({ open, onClose, onImported }) {
           )}
 
           {/* ═══ STEP 2: PREVIEW ═══ */}
-          {step === 'preview' && (
+          {step === 'preview' && (() => {
+            const getU = (r) => { const get=(key)=>{const lower=key.toLowerCase().replace(/[\s_-]/g,'');for(const k of Object.keys(r)){if(k.toLowerCase().replace(/[\s_-]/g,'')===lower)return String(r[k]||'').trim();}return '';};return get('username')||get('email'); };
+            const newCount      = parsedRows.filter(r => !existingMap[getU(r).toLowerCase()]).length;
+            const updateCount   = parsedRows.filter(r =>  existingMap[getU(r).toLowerCase()]).length;
+            return (
             <>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
                 <div>
                   <div style={{ fontWeight:700, fontSize:14, color:'#0f172a' }}>
                     👁 Preview — <span style={{ color:'#2563eb' }}>{parsedRows.length} row{parsedRows.length!==1?'s':''}</span> detected
                   </div>
-                  <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>
-                    Showing first 5. All {parsedRows.length} rows will be imported.
-                  </div>
+                  {checkingExisting ? (
+                    <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>⏳ Checking existing accounts…</div>
+                  ) : (
+                    <div style={{ fontSize:12, color:'#64748b', marginTop:2, display:'flex', gap:12 }}>
+                      {newCount > 0 && <span>🆕 <strong>{newCount}</strong> new</span>}
+                      {updateCount > 0 && <span>🔄 <strong>{updateCount}</strong> will update password</span>}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => setStep('upload')}
                   style={{ padding:'7px 14px', background:'none', border:'1px solid #e2e8f0', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'inherit', color:'#64748b' }}>
@@ -800,7 +829,7 @@ function BulkImportModal({ open, onClose, onImported }) {
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11.5 }}>
                   <thead>
                     <tr style={{ background:'#f8fafc' }}>
-                      {['#','username','from_email','host','port','imap_host','daily_limit'].map(h => (
+                      {['#','Status','username','from_email','host','port','imap_host','daily_limit'].map(h => (
                         <th key={h} style={{ padding:'9px 12px', textAlign:'left', borderBottom:'2px solid #e2e8f0', color:'#475569', fontWeight:700, whiteSpace:'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -812,14 +841,23 @@ function BulkImportModal({ open, onClose, onImported }) {
                         for (const k of Object.keys(r)) {
                           if (k.toLowerCase().replace(/[\s_-]/g,'') === lower) return String(r[k]||'');
                         }
-                        return '—';
+                        return '';
                       };
-                      const missingRequired = !get('username') || !get('password') || (!get('host') && !get('smtphost'));
+                      const username = get('username') || get('email');
+                      const isExisting = existingMap[username.toLowerCase()];
+                      const missingRequired = !username || !get('password') || (!get('host') && !get('smtphost'));
                       return (
                         <tr key={i} style={{ background: missingRequired ? '#fff5f5' : i%2===0?'#fff':'#f8fafc' }}>
                           <td style={{ padding:'7px 12px', borderBottom:'1px solid #f1f5f9', color:'#94a3b8', fontWeight:600 }}>{i+1}</td>
+                          <td style={{ padding:'7px 12px', borderBottom:'1px solid #f1f5f9', whiteSpace:'nowrap' }}>
+                            {checkingExisting ? <span style={{ color:'#94a3b8', fontSize:11 }}>…</span>
+                              : isExisting
+                                ? <span style={{ background:'#fef3c7', color:'#92400e', borderRadius:6, padding:'2px 8px', fontSize:11, fontWeight:700 }}>🔄 Update</span>
+                                : <span style={{ background:'#f0fdf4', color:'#15803d', borderRadius:6, padding:'2px 8px', fontSize:11, fontWeight:700 }}>🆕 New</span>
+                            }
+                          </td>
                           {['username','fromemail','host','port','imaphost','dailylimit'].map(h => (
-                            <td key={h} style={{ padding:'7px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', color:'#334155', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            <td key={h} style={{ padding:'7px 12px', borderBottom:'1px solid #f1f5f9', fontFamily:'monospace', color:'#334155', maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                               {get(h) || <span style={{ color:'#cbd5e1' }}>—</span>}
                             </td>
                           ))}
@@ -836,11 +874,12 @@ function BulkImportModal({ open, onClose, onImported }) {
                 </div>
               )}
 
-              <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:9, padding:'10px 14px', fontSize:12, color:'#92400e' }}>
-                ⚡ Duplicate usernames (already in your account) will be skipped automatically.
+              <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:9, padding:'10px 14px', fontSize:12, color:'#1e40af' }}>
+                💡 <strong>Smart import:</strong> New accounts will be added. Existing accounts will have their password &amp; SMTP settings updated from the file — no need to edit one by one.
               </div>
             </>
-          )}
+            );
+          })()}
 
           {/* ═══ STEP 3: RESULT ═══ */}
           {step === 'result' && result && (
@@ -848,12 +887,30 @@ function BulkImportModal({ open, onClose, onImported }) {
               <div style={{ textAlign:'center', padding:'24px 0 16px' }}>
                 <div style={{ fontSize:52, marginBottom:14 }}>{result.imported > 0 ? '🎉' : '⚠️'}</div>
                 <div style={{ fontWeight:800, fontSize:22, color:'#0f172a', marginBottom:8 }}>
-                  {result.imported} of {result.total} imported
+                  All done!
+                </div>
+                <div style={{ display:'flex', justifyContent:'center', gap:16, marginBottom:8 }}>
+                  {result.added > 0 && (
+                    <div style={{ background:'#f0fdf4', border:'1px solid #86efac', borderRadius:10, padding:'10px 20px', textAlign:'center' }}>
+                      <div style={{ fontSize:28, fontWeight:800, color:'#16a34a' }}>{result.added}</div>
+                      <div style={{ fontSize:12, color:'#15803d' }}>🆕 New accounts added</div>
+                    </div>
+                  )}
+                  {result.updated > 0 && (
+                    <div style={{ background:'#fefce8', border:'1px solid #fde68a', borderRadius:10, padding:'10px 20px', textAlign:'center' }}>
+                      <div style={{ fontSize:28, fontWeight:800, color:'#ca8a04' }}>{result.updated}</div>
+                      <div style={{ fontSize:12, color:'#92400e' }}>🔄 Passwords updated</div>
+                    </div>
+                  )}
+                  {result.errors.length > 0 && (
+                    <div style={{ background:'#fff5f5', border:'1px solid #fecaca', borderRadius:10, padding:'10px 20px', textAlign:'center' }}>
+                      <div style={{ fontSize:28, fontWeight:800, color:'#dc2626' }}>{result.errors.length}</div>
+                      <div style={{ fontSize:12, color:'#991b1b' }}>⚠️ Rows with errors</div>
+                    </div>
+                  )}
                 </div>
                 <div style={{ fontSize:13, color:'#64748b' }}>
-                  {result.errors.length === 0
-                    ? '🎉 All rows imported successfully!'
-                    : `${result.errors.length} row${result.errors.length!==1?'s':''} skipped — see details below`}
+                  {result.errors.length === 0 ? '✅ All rows processed successfully!' : `${result.errors.length} row${result.errors.length!==1?'s':''} had errors — see below`}
                 </div>
               </div>
 
@@ -879,8 +936,16 @@ function BulkImportModal({ open, onClose, onImported }) {
         <div style={{ padding:'14px 22px', borderTop:'1px solid #e2e8f0', background:'#fafafa', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ fontSize:12, color:'#94a3b8' }}>
             {step === 'upload' && 'Upload a filled template to get started'}
-            {step === 'preview' && `Ready to import ${parsedRows.length} account${parsedRows.length!==1?'s':''}`}
-            {step === 'result' && result && `${result.imported} imported · ${result.errors.length} skipped`}
+            {step === 'preview' && (() => {
+              const getU = (r) => { const get=(key)=>{const lower=key.toLowerCase().replace(/[\s_-]/g,'');for(const k of Object.keys(r)){if(k.toLowerCase().replace(/[\s_-]/g,'')===lower)return String(r[k]||'').trim();}return '';};return get('username')||get('email'); };
+              const nc = parsedRows.filter(r => !existingMap[getU(r).toLowerCase()]).length;
+              const uc = parsedRows.filter(r =>  existingMap[getU(r).toLowerCase()]).length;
+              const parts = [];
+              if (nc) parts.push(`${nc} new`);
+              if (uc) parts.push(`${uc} update`);
+              return parts.length ? parts.join(' · ') : `${parsedRows.length} accounts`;
+            })()}
+            {step === 'result' && result && `${result.added||0} added · ${result.updated||0} updated · ${result.errors.length} errors`}
           </div>
           <div style={{ display:'flex', gap:8 }}>
             {step === 'upload' && (
@@ -891,9 +956,17 @@ function BulkImportModal({ open, onClose, onImported }) {
                 <button onClick={() => setStep('upload')} style={{ padding:'9px 18px', background:'none', border:'1px solid #e2e8f0', borderRadius:9, fontSize:13, cursor:'pointer', fontFamily:'inherit', color:'#64748b' }}>← Back</button>
                 <button onClick={handleImport} disabled={importing}
                   style={{ padding:'9px 26px', background:importing?'#94a3b8':'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor:importing?'not-allowed':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:7 }}>
-                  {importing
-                    ? <><Loader2 size={13} style={{ animation:'spin 1s linear infinite' }}/> Importing…</>
-                    : <><Upload size={13}/> Import {parsedRows.length} Account{parsedRows.length!==1?'s':''}</>}
+                  {importing ? (
+                    <><Loader2 size={13} style={{ animation:'spin 1s linear infinite' }}/> Processing…</>
+                  ) : (() => {
+                    const getU = (r) => { const get=(key)=>{const lower=key.toLowerCase().replace(/[\s_-]/g,'');for(const k of Object.keys(r)){if(k.toLowerCase().replace(/[\s_-]/g,'')===lower)return String(r[k]||'').trim();}return '';};return get('username')||get('email'); };
+                    const nc = parsedRows.filter(r => !existingMap[getU(r).toLowerCase()]).length;
+                    const uc = parsedRows.filter(r =>  existingMap[getU(r).toLowerCase()]).length;
+                    const parts = [];
+                    if (nc) parts.push(`Add ${nc}`);
+                    if (uc) parts.push(`Update ${uc}`);
+                    return <><Upload size={13}/> {parts.length ? parts.join(' & ') : `Import ${parsedRows.length}`}</>;
+                  })()}
                 </button>
               </>
             )}
@@ -931,7 +1004,9 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
   const [imapTest, setImapTest] = useState(null);
   const [smtpError, setSmtpError] = useState('');
   const [imapError, setImapError] = useState('');
-  const [showSig, setShowSig]   = useState(false);
+  const [showSig, setShowSig]           = useState(false);
+  const [pwStatus, setPwStatus]         = useState(null); // null | {has_password, length}
+  const [testingStored, setTestingStored] = useState(false);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -941,6 +1016,13 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
     setSmtpTest(null); setImapTest(null);
     setSmtpError(''); setImapError('');
     setImapPassword('');
+    setPwStatus(null);
+    if (account?.id) {
+      // Fetch password status (not the actual password)
+      api.get(`/email-accounts/${account.id}/password-status`)
+        .then(r => setPwStatus(r.data))
+        .catch(() => {});
+    }
     if (account?.id) {
       const smtpSecure = account.secure === 1 || account.secure === true || account.port === 465;
       const imapPort   = account.imap_port || 993;
@@ -1014,8 +1096,27 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
     setSmtpTest(null); setImapTest(null);
   };
 
+  // Test using SAVED password in DB (no need to re-enter)
+  const handleTestStoredSmtp = async () => {
+    if (!account?.id) return;
+    setTestingStored(true); setSmtpTest(null); setSmtpError('');
+    try {
+      await api.post(`/email-accounts/${account.id}/retry-smtp`);
+      setSmtpTest('ok');
+      toast.success('✅ Stored password works! Connection verified.');
+    } catch (e) {
+      setSmtpTest('error');
+      setSmtpError(e.response?.data?.error || 'Connection failed with stored password');
+      toast.error('❌ Stored password failed — enter a new password below');
+    } finally { setTestingStored(false); }
+  };
+
   const handleTestSmtp = async () => {
-    if (!form.host || !form.username || !form.password) return toast.error('Enter SMTP host, username and password first');
+    if (!form.host || !form.username || !form.password) {
+      // If editing and no new password entered, test the stored one
+      if (account?.id && pwStatus?.has_password) return handleTestStoredSmtp();
+      return toast.error('Enter SMTP host, username and password first');
+    }
     setSmtpTest('loading'); setSmtpError('');
     try {
       const { data } = await api.post('/smtp-test/full-test', { host:form.host, username:form.username, password:form.password });
@@ -1182,13 +1283,27 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
                 {fld('Username / Email', 'username', 'email', { required:true })}
                 <div style={{ marginTop:10 }}>
                   <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>
-                    SMTP Password {isEdit && <span style={{ fontWeight:400, textTransform:'none' }}>(leave blank to keep)</span>}
+                    SMTP Password {isEdit && <span style={{ fontWeight:400, textTransform:'none' }}>(leave blank to keep existing)</span>}
                   </label>
                   <input type="password" placeholder="••••••••" value={form.password} onChange={e => f('password', e.target.value)}
                     required={!isEdit}
                     style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', boxSizing:'border-box' }}
                     onFocus={e => e.target.style.borderColor='#2563eb'} onBlur={e => e.target.style.borderColor='#e2e8f0'}
                   />
+                  {/* Password status indicator */}
+                  {isEdit && pwStatus && (
+                    <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:8 }}>
+                      {pwStatus.has_password ? (
+                        <span style={{ fontSize:12, color:'#16a34a', display:'flex', alignItems:'center', gap:4 }}>
+                          ✅ Password saved ({pwStatus.length} chars) — leave blank to keep it
+                        </span>
+                      ) : (
+                        <span style={{ fontSize:12, color:'#dc2626', display:'flex', alignItems:'center', gap:4, fontWeight:600 }}>
+                          ⚠️ No password stored! Enter a new password and save.
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
                   {fld('From Name', 'from_name', 'text', { placeholder:'John Smith' })}
@@ -1196,7 +1311,14 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
                 </div>
                 {/* SMTP test */}
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:12, flexWrap:'wrap' }}>
-                  <button type="button" onClick={handleTestSmtp} disabled={smtpTest==='loading'}
+                  {/* Test with STORED password (no re-entry needed) */}
+                  {isEdit && pwStatus?.has_password && !form.password && (
+                    <button type="button" onClick={handleTestStoredSmtp} disabled={testingStored}
+                      style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:7, border:'1px solid #bfdbfe', background:'#eff6ff', fontSize:12, color:'#1d4ed8', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+                      {testingStored ? <Loader2 size={11} style={{ animation:'spin 1s linear infinite' }}/> : '🔄'} Test Saved Password
+                    </button>
+                  )}
+                  <button type="button" onClick={handleTestSmtp} disabled={smtpTest==='loading' || testingStored}
                     style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', fontSize:12, color:'#475569', cursor:'pointer', fontFamily:'inherit' }}>
                     {smtpTest==='loading' ? <Loader2 size={11} style={{ animation:'spin 1s linear infinite' }}/> : '🔌'} Test SMTP
                   </button>
