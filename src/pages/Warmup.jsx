@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { PageHeader, Card, Spinner, Btn } from '../components/UI';
-import { Flame, CheckCircle, AlertTriangle, Info, ChevronDown, ChevronUp, Play, Pause, RefreshCw, TrendingUp, Mail, Users, Shield } from 'lucide-react';
+import { Flame, CheckCircle, AlertTriangle, Info, ChevronDown, ChevronUp, Play, Pause, RefreshCw, TrendingUp, Mail, Users, Shield, KeyRound, Eye, EyeOff, Loader2, X } from 'lucide-react';
 
 // ── Warmup recommendations ───────────────────────
 const RAMP_PRESETS = [
@@ -68,12 +68,171 @@ function DayBar({ day, target, sent }) {
   );
 }
 
+// ── Update Password Modal ────────────────────────
+function UpdatePasswordModal({ account, open, onClose, onSaved }) {
+  const [smtpPassword, setSmtpPassword] = useState('');
+  const [imapPassword, setImapPassword] = useState('');
+  const [showSmtp, setShowSmtp] = useState(false);
+  const [showImap, setShowImap] = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [testing, setTesting]   = useState(false);
+  const [testResult, setTestResult] = useState(null); // null | 'ok' | 'error'
+  const [testError, setTestError]   = useState('');
+
+  useEffect(() => {
+    if (open) { setSmtpPassword(''); setImapPassword(''); setTestResult(null); setTestError(''); }
+  }, [open]);
+
+  const hasImap = !!account?.imap_host;
+
+  const handleTest = async () => {
+    if (!smtpPassword) return toast.error('Enter SMTP password first');
+    setTesting(true); setTestResult(null); setTestError('');
+    try {
+      await api.post('/email-accounts/test-settings', {
+        host: account.host, port: account.port, secure: account.secure,
+        username: account.username, password: smtpPassword,
+      });
+      setTestResult('ok');
+      toast.success('✅ SMTP connection successful!');
+    } catch (err) {
+      setTestResult('error');
+      setTestError(err.response?.data?.error || 'SMTP connection failed');
+      toast.error(err.response?.data?.error || 'SMTP connection failed');
+    }
+    setTesting(false);
+  };
+
+  const handleSave = async () => {
+    if (!smtpPassword && !imapPassword) return toast.error('Enter at least one password to update');
+    setSaving(true);
+    try {
+      const body = {};
+      if (smtpPassword) body.password = smtpPassword;
+      if (imapPassword && hasImap) body.imap_password = imapPassword;
+      await api.put(`/email-accounts/${account.id}`, body);
+      toast.success('✅ Password updated! Warmup will retry automatically.');
+      onSaved();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save password');
+    }
+    setSaving(false);
+  };
+
+  if (!open || !account) return null;
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, backdropFilter:'blur(3px)' }}/>
+      <div style={{
+        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+        width: Math.min(460, window.innerWidth - 32), background:'#fff',
+        borderRadius:16, boxShadow:'0 24px 80px rgba(0,0,0,0.25)', zIndex:1001,
+        overflow:'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ background:'linear-gradient(135deg,#991b1b,#dc2626)', padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:36, height:36, borderRadius:9, background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <KeyRound size={18} color="#fff"/>
+            </div>
+            <div>
+              <div style={{ fontSize:15, fontWeight:800, color:'#fff' }}>Update Credentials</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)' }}>{account.from_email}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', cursor:'pointer', borderRadius:7, padding:'5px 7px', display:'flex' }}>
+            <X size={14}/>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding:'20px' }}>
+          <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, padding:'10px 14px', fontSize:12, color:'#991b1b', marginBottom:18, lineHeight:1.5 }}>
+            ⚠️ Warmup stopped because SMTP authentication failed. Update the password below and save — the warmup will retry on the next cycle.
+          </div>
+
+          {/* SMTP Password */}
+          <div style={{ marginBottom:16 }}>
+            <label style={{ display:'block', fontSize:12, fontWeight:700, color:'#374151', marginBottom:6 }}>
+              📧 SMTP Password <span style={{ color:'#dc2626' }}>*</span>
+            </label>
+            <div style={{ position:'relative' }}>
+              <input
+                type={showSmtp ? 'text' : 'password'}
+                placeholder="Enter new SMTP / App Password"
+                value={smtpPassword}
+                onChange={e => { setSmtpPassword(e.target.value); setTestResult(null); }}
+                style={{ width:'100%', border:`1.5px solid ${testResult==='ok'?'#16a34a':testResult==='error'?'#dc2626':'#d1d5db'}`, borderRadius:9, padding:'10px 40px 10px 12px', fontSize:13, outline:'none', boxSizing:'border-box', fontFamily:'inherit' }}
+                onFocus={e => e.target.style.borderColor='#2563eb'} onBlur={e => e.target.style.borderColor=testResult==='ok'?'#16a34a':testResult==='error'?'#dc2626':'#d1d5db'}
+              />
+              <button onClick={() => setShowSmtp(s => !s)} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#9ca3af', padding:2 }}>
+                {showSmtp ? <EyeOff size={15}/> : <Eye size={15}/>}
+              </button>
+            </div>
+            {testResult === 'ok' && <div style={{ fontSize:11, color:'#16a34a', marginTop:4 }}>✅ Connection verified</div>}
+            {testResult === 'error' && <div style={{ fontSize:11, color:'#dc2626', marginTop:4 }}>❌ {testError}</div>}
+            <div style={{ fontSize:11, color:'#6b7280', marginTop:4 }}>
+              {account.host?.includes('gmail') && '💡 Gmail users: use an App Password from myaccount.google.com → Security → App passwords'}
+              {account.host?.includes('yahoo') && '💡 Yahoo: generate an App Password in Yahoo Account Security settings'}
+              {account.host?.includes('hostinger') && '💡 Hostinger: use your Hostinger email account password'}
+            </div>
+          </div>
+
+          {/* IMAP Password (only if account has IMAP configured) */}
+          {hasImap && (
+            <div style={{ marginBottom:16 }}>
+              <label style={{ display:'block', fontSize:12, fontWeight:700, color:'#374151', marginBottom:6 }}>
+                📥 IMAP Password <span style={{ fontSize:11, color:'#9ca3af', fontWeight:400 }}>(for inbox sync & auto-reply)</span>
+              </label>
+              <div style={{ position:'relative' }}>
+                <input
+                  type={showImap ? 'text' : 'password'}
+                  placeholder="Same as SMTP password (usually)"
+                  value={imapPassword}
+                  onChange={e => setImapPassword(e.target.value)}
+                  style={{ width:'100%', border:'1.5px solid #d1d5db', borderRadius:9, padding:'10px 40px 10px 12px', fontSize:13, outline:'none', boxSizing:'border-box', fontFamily:'inherit' }}
+                  onFocus={e => e.target.style.borderColor='#2563eb'} onBlur={e => e.target.style.borderColor='#d1d5db'}
+                />
+                <button onClick={() => setShowImap(s => !s)} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#9ca3af', padding:2 }}>
+                  {showImap ? <EyeOff size={15}/> : <Eye size={15}/>}
+                </button>
+              </div>
+              <div style={{ fontSize:11, color:'#6b7280', marginTop:4 }}>
+                IMAP server: <strong>{account.imap_host}:{account.imap_port}</strong>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
+            <button onClick={onClose} style={{ padding:'9px 16px', background:'none', border:'1px solid #e5e7eb', borderRadius:8, fontSize:13, color:'#6b7280', cursor:'pointer', fontFamily:'inherit' }}>
+              Cancel
+            </button>
+            <button onClick={handleTest} disabled={testing || !smtpPassword}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 16px', background: !smtpPassword?'#e5e7eb':'#eff6ff', border:`1px solid ${!smtpPassword?'#e5e7eb':'#93c5fd'}`, borderRadius:8, fontSize:13, color:!smtpPassword?'#9ca3af':'#1d4ed8', cursor:!smtpPassword?'not-allowed':'pointer', fontFamily:'inherit', fontWeight:600 }}>
+              {testing ? <Loader2 size={13} style={{ animation:'spin 1s linear infinite' }}/> : <CheckCircle size={13}/>}
+              Test SMTP
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 18px', background:saving?'#94a3b8':'linear-gradient(135deg,#16a34a,#15803d)', color:'#fff', border:'none', borderRadius:8, fontSize:13, fontWeight:700, cursor:saving?'not-allowed':'pointer', fontFamily:'inherit', boxShadow:'0 2px 8px rgba(22,163,74,0.35)' }}>
+              {saving ? <Loader2 size={13} style={{ animation:'spin 1s linear infinite' }}/> : <KeyRound size={13}/>}
+              Save Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Warmup Account Card ──────────────────────────
 function WarmupCard({ account, poolSize, onUpdate }) {
   const [expanded, setExpanded]   = useState(false);
   const [saving, setSaving]       = useState(false);
   const [logs, setLogs]           = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Detect which preset matches the account's current saved settings (if any)
   const detectPreset = (start, inc, max) => {
@@ -203,15 +362,28 @@ function WarmupCard({ account, poolSize, onUpdate }) {
             <div style={{ fontWeight: 700, fontSize: 13, color: '#991b1b', marginBottom: 2 }}>
               SMTP Authentication Failed — Warmup Stopped
             </div>
-            <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5, marginBottom: 8 }}>
               All {account.failed_today} warmup email attempt{account.failed_today !== 1 ? 's' : ''} failed for <strong>{account.from_email}</strong>.
               This is usually caused by a wrong password, changed credentials, or blocked port.
-              <br/>
-              <strong>Fix:</strong> Go to <em>Email Accounts</em> → edit this account → update the SMTP password → click <em>Test Connection</em>.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowPasswordModal(true)}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#dc2626', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                <KeyRound size={12}/> Update Password
+              </button>
+              <span style={{ fontSize:11, color:'#9ca3af', alignSelf:'center' }}>Uses your saved password — no re-entry needed for retry</span>
             </div>
           </div>
         </div>
       )}
+
+      <UpdatePasswordModal
+        account={account}
+        open={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSaved={() => { setShowPasswordModal(false); onUpdate(account.id, {}); }}
+      />
       {form.warmup_enabled && account.failed_today > 0 && account.sent_today > 0 && (
         <div style={{ background: '#fffbeb', borderTop: '1px solid #fcd34d', borderBottom: expanded ? '1px solid #fcd34d' : 'none', padding: '10px 18px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
@@ -459,6 +631,7 @@ export default function Warmup() {
 
   return (
     <div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <PageHeader
         title="Email Warmup"
         subtitle="Build sender reputation with the AdoBoost Community Warmup Network"
