@@ -27,6 +27,7 @@ const NAV = [
   {
     label: 'Messages', icon: MessageSquare, children: [
       { label: 'Inbox', to: '/messages/inbox' },
+      { label: 'Warmer Inbox 🔥', to: '/messages/warmer-inbox' },
       { label: 'Auto Response', to: '/messages/auto-replies' },
       { label: 'Archive', to: '/messages/archive' },
     ]

@@ -52,6 +52,7 @@ import VAUpsell from './pages/VAUpsell';
 import SupportEntry from './pages/SupportEntry';
 import ImpersonateEntry from './pages/ImpersonateEntry';
 import LinkedIn from './pages/LinkedIn';
+import WarmerInbox from './pages/WarmerInbox';
 const BookingCalendarPage = React.lazy(() => import('./pages/BookingCalendar'));
 const PublicBooking        = React.lazy(() => import('./pages/PublicBooking'));
 
@@ -127,9 +128,10 @@ export default function App() {
           <Route path="/campaigns/reports"   element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/email-accounts"      element={<ProtectedRoute><EmailAccounts /></ProtectedRoute>} />
           <Route path="/contacts"            element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
-          <Route path="/messages/inbox"      element={<ProtectedRoute><Messages type="inbox" /></ProtectedRoute>} />
+          <Route path="/messages/inbox"        element={<ProtectedRoute><Messages type="inbox" /></ProtectedRoute>} />
           <Route path="/messages/auto-replies" element={<ProtectedRoute><Messages type="auto-replies" /></ProtectedRoute>} />
-          <Route path="/messages/archive"    element={<ProtectedRoute><Messages type="archive" /></ProtectedRoute>} />
+          <Route path="/messages/archive"      element={<ProtectedRoute><Messages type="archive" /></ProtectedRoute>} />
+          <Route path="/messages/warmer-inbox" element={<ProtectedRoute><WarmerInbox /></ProtectedRoute>} />
           <Route path="/pipeline"            element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
           <Route path="/booking-calendar"   element={<ProtectedRoute><Suspense fallback={null}><BookingCalendarPage /></Suspense></ProtectedRoute>} />
           <Route path="/linkedin"            element={<ProtectedRoute><LinkedIn /></ProtectedRoute>} />
