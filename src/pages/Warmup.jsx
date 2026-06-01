@@ -390,6 +390,7 @@ function WarmupCard({ account, poolSize, onUpdate }) {
                 <KeyRound size={12}/> Update Password
               </button>
               <span style={{ fontSize:11, color:'#b91c1c' }}>Uses your saved password — no re-entry needed</span>
+            </div>
           </div>
         </div>
       )}
