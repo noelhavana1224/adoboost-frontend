@@ -875,7 +875,7 @@ function BulkImportModal({ open, onClose, onImported }) {
               )}
 
               <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:9, padding:'10px 14px', fontSize:12, color:'#1e40af' }}>
-                💡 <strong>Smart import:</strong> New accounts will be added. Existing accounts will have their password &amp; SMTP settings updated from the file — no need to edit one by one.
+                💡 <strong>Smart import:</strong> New accounts will be added. Existing accounts will have their <strong>name, from name, password &amp; SMTP settings</strong> updated from the file — re-upload your sheet anytime to fix mismatched names or credentials.
               </div>
             </>
             );
@@ -899,7 +899,7 @@ function BulkImportModal({ open, onClose, onImported }) {
                   {result.updated > 0 && (
                     <div style={{ background:'#fefce8', border:'1px solid #fde68a', borderRadius:10, padding:'10px 20px', textAlign:'center' }}>
                       <div style={{ fontSize:28, fontWeight:800, color:'#ca8a04' }}>{result.updated}</div>
-                      <div style={{ fontSize:12, color:'#92400e' }}>🔄 Passwords updated</div>
+                      <div style={{ fontSize:12, color:'#92400e' }}>🔄 Names &amp; settings updated</div>
                     </div>
                   )}
                   {result.errors.length > 0 && (
