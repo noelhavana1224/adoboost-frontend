@@ -1004,7 +1004,9 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
   const [imapTest, setImapTest] = useState(null);
   const [smtpError, setSmtpError] = useState('');
   const [imapError, setImapError] = useState('');
-  const [showSig, setShowSig]   = useState(false);
+  const [showSig, setShowSig]           = useState(false);
+  const [pwStatus, setPwStatus]         = useState(null); // null | {has_password, length}
+  const [testingStored, setTestingStored] = useState(false);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -1014,6 +1016,13 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
     setSmtpTest(null); setImapTest(null);
     setSmtpError(''); setImapError('');
     setImapPassword('');
+    setPwStatus(null);
+    if (account?.id) {
+      // Fetch password status (not the actual password)
+      api.get(`/email-accounts/${account.id}/password-status`)
+        .then(r => setPwStatus(r.data))
+        .catch(() => {});
+    }
     if (account?.id) {
       const smtpSecure = account.secure === 1 || account.secure === true || account.port === 465;
       const imapPort   = account.imap_port || 993;
@@ -1087,8 +1096,27 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
     setSmtpTest(null); setImapTest(null);
   };
 
+  // Test using SAVED password in DB (no need to re-enter)
+  const handleTestStoredSmtp = async () => {
+    if (!account?.id) return;
+    setTestingStored(true); setSmtpTest(null); setSmtpError('');
+    try {
+      await api.post(`/email-accounts/${account.id}/retry-smtp`);
+      setSmtpTest('ok');
+      toast.success('✅ Stored password works! Connection verified.');
+    } catch (e) {
+      setSmtpTest('error');
+      setSmtpError(e.response?.data?.error || 'Connection failed with stored password');
+      toast.error('❌ Stored password failed — enter a new password below');
+    } finally { setTestingStored(false); }
+  };
+
   const handleTestSmtp = async () => {
-    if (!form.host || !form.username || !form.password) return toast.error('Enter SMTP host, username and password first');
+    if (!form.host || !form.username || !form.password) {
+      // If editing and no new password entered, test the stored one
+      if (account?.id && pwStatus?.has_password) return handleTestStoredSmtp();
+      return toast.error('Enter SMTP host, username and password first');
+    }
     setSmtpTest('loading'); setSmtpError('');
     try {
       const { data } = await api.post('/smtp-test/full-test', { host:form.host, username:form.username, password:form.password });
@@ -1255,13 +1283,27 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
                 {fld('Username / Email', 'username', 'email', { required:true })}
                 <div style={{ marginTop:10 }}>
                   <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>
-                    SMTP Password {isEdit && <span style={{ fontWeight:400, textTransform:'none' }}>(leave blank to keep)</span>}
+                    SMTP Password {isEdit && <span style={{ fontWeight:400, textTransform:'none' }}>(leave blank to keep existing)</span>}
                   </label>
                   <input type="password" placeholder="••••••••" value={form.password} onChange={e => f('password', e.target.value)}
                     required={!isEdit}
                     style={{ width:'100%', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, outline:'none', fontFamily:'inherit', background:'#fff', boxSizing:'border-box' }}
                     onFocus={e => e.target.style.borderColor='#2563eb'} onBlur={e => e.target.style.borderColor='#e2e8f0'}
                   />
+                  {/* Password status indicator */}
+                  {isEdit && pwStatus && (
+                    <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:8 }}>
+                      {pwStatus.has_password ? (
+                        <span style={{ fontSize:12, color:'#16a34a', display:'flex', alignItems:'center', gap:4 }}>
+                          ✅ Password saved ({pwStatus.length} chars) — leave blank to keep it
+                        </span>
+                      ) : (
+                        <span style={{ fontSize:12, color:'#dc2626', display:'flex', alignItems:'center', gap:4, fontWeight:600 }}>
+                          ⚠️ No password stored! Enter a new password and save.
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:10 }}>
                   {fld('From Name', 'from_name', 'text', { placeholder:'John Smith' })}
@@ -1269,7 +1311,14 @@ function AccountDrawer({ open, account, onClose, onSaved }) {
                 </div>
                 {/* SMTP test */}
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:12, flexWrap:'wrap' }}>
-                  <button type="button" onClick={handleTestSmtp} disabled={smtpTest==='loading'}
+                  {/* Test with STORED password (no re-entry needed) */}
+                  {isEdit && pwStatus?.has_password && !form.password && (
+                    <button type="button" onClick={handleTestStoredSmtp} disabled={testingStored}
+                      style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:7, border:'1px solid #bfdbfe', background:'#eff6ff', fontSize:12, color:'#1d4ed8', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+                      {testingStored ? <Loader2 size={11} style={{ animation:'spin 1s linear infinite' }}/> : '🔄'} Test Saved Password
+                    </button>
+                  )}
+                  <button type="button" onClick={handleTestSmtp} disabled={smtpTest==='loading' || testingStored}
                     style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', fontSize:12, color:'#475569', cursor:'pointer', fontFamily:'inherit' }}>
                     {smtpTest==='loading' ? <Loader2 size={11} style={{ animation:'spin 1s linear infinite' }}/> : '🔌'} Test SMTP
                   </button>
