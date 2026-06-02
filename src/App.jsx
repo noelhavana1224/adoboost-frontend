@@ -53,6 +53,7 @@ import SupportEntry from './pages/SupportEntry';
 import ImpersonateEntry from './pages/ImpersonateEntry';
 import LinkedIn from './pages/LinkedIn';
 import WarmerInbox from './pages/WarmerInbox';
+import Deliverability from './pages/Deliverability';
 const BookingCalendarPage = React.lazy(() => import('./pages/BookingCalendar'));
 const PublicBooking        = React.lazy(() => import('./pages/PublicBooking'));
 
@@ -141,6 +142,7 @@ export default function App() {
           <Route path="/settings/billing"    element={<ProtectedRoute><Billing /></ProtectedRoute>} />
           <Route path="/settings/sending-speed" element={<ProtectedRoute><SendingSpeed /></ProtectedRoute>} />
           <Route path="/settings/warmup"        element={<ProtectedRoute><Warmup /></ProtectedRoute>} />
+          <Route path="/settings/deliverability" element={<ProtectedRoute><Deliverability /></ProtectedRoute>} />
           <Route path="/settings/user"       element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path="/settings/preferences" element={<ProtectedRoute><UserPreferences /></ProtectedRoute>} />
           <Route path="/settings/team-members" element={<ProtectedRoute><TeamMembers /></ProtectedRoute>} />

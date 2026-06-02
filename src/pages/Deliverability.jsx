@@ -1,0 +1,173 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
+import { Spinner } from '../components/UI';
+import { Shield, ShieldCheck, ShieldAlert, RefreshCw, Globe, Server, HelpCircle } from 'lucide-react';
+
+function StatusPill({ status }) {
+  const map = {
+    listed:  { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: '⛔ Listed' },
+    clean:   { bg: '#f0fdf4', color: '#16a34a', border: '#86efac', label: '✓ Clean' },
+    unknown: { bg: '#f8fafc', color: '#94a3b8', border: '#e2e8f0', label: '— Unknown' },
+  };
+  const s = map[status] || map.unknown;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: 'nowrap' }}>
+      {s.label}
+    </span>
+  );
+}
+
+function DomainCard({ d }) {
+  const clean    = d.listedCount === 0 && d.totalLists > 0;
+  const listed   = d.listedCount > 0;
+  const unchecked = d.totalLists === 0 || d.checkedAt == null;
+
+  const headColor = listed ? '#dc2626' : clean ? '#16a34a' : '#94a3b8';
+  const HeadIcon  = listed ? ShieldAlert : clean ? ShieldCheck : Shield;
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${listed ? '#fecaca' : '#e2e8f0'}`, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      {/* Header */}
+      <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid #f1f5f9', background: listed ? '#fff5f5' : clean ? '#f7fef9' : '#fafafa' }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: '#fff', border: `1px solid ${headColor}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <HeadIcon size={19} color={headColor} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Globe size={12} color="#94a3b8" /> {d.domain}
+          </div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+            {d.ip ? <><Server size={10} style={{ verticalAlign: -1 }} /> {d.ip}</> : 'no A record'}
+            {d.checkedAt && <> · checked {new Date(d.checkedAt).toLocaleString()}</>}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          {unchecked ? (
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>Not scanned yet</span>
+          ) : listed ? (
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#dc2626' }}>{d.listedCount} / {d.totalLists} listed</span>
+          ) : (
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#16a34a' }}>All clear</span>
+          )}
+        </div>
+      </div>
+
+      {/* List breakdown */}
+      {d.results.length > 0 && (
+        <div style={{ padding: '12px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+          {d.results.map(r => (
+            <div key={r.list} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 10px', background: '#f8fafc', borderRadius: 8 }}>
+              <span style={{ fontSize: 12, color: '#475569' }}>
+                {r.list} <span style={{ fontSize: 10, color: '#94a3b8' }}>({r.type})</span>
+              </span>
+              <StatusPill status={r.status} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Listed warning + remediation */}
+      {listed && (
+        <div style={{ margin: '0 18px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#991b1b', lineHeight: 1.6 }}>
+          <strong>Action needed:</strong> This domain is on a blocklist, which can send your emails straight to spam. Pause campaigns on this domain, request delisting at the blocklist's site (e.g. spamhaus.org/lookup), check for compromised accounts or spammy content, and let it cool down before resuming.
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Deliverability() {
+  const [domains, setDomains] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/blacklist');
+      setDomains(data.domains || []);
+    } catch { toast.error('Failed to load deliverability data'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleScan = async () => {
+    setScanning(true);
+    toast.loading('Scanning blocklists…', { id: 'scan' });
+    try {
+      const { data } = await api.post('/blacklist/check');
+      setDomains((data.domains || []).map(d => ({ ...d, checkedAt: d.checkedAt || new Date().toISOString() })));
+      const listed = (data.domains || []).reduce((s, d) => s + (d.listedCount || 0), 0);
+      toast.success(listed > 0 ? `Scan done — ${listed} blocklist hit(s) found` : 'Scan done — all domains clean ✓', { id: 'scan' });
+    } catch { toast.error('Scan failed', { id: 'scan' }); }
+    finally { setScanning(false); }
+  };
+
+  const totalListed = domains.reduce((s, d) => s + (d.listedCount || 0), 0);
+  const anyChecked  = domains.some(d => d.checkedAt);
+
+  return (
+    <div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Shield size={20} color="#2563eb" /> Deliverability — Blacklist Monitor
+          </h1>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
+            Checks your sending domains against the major DNS blocklists. Auto-scans every 12 hours.
+          </p>
+        </div>
+        <button onClick={handleScan} disabled={scanning}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: scanning ? '#94a3b8' : 'linear-gradient(135deg,#2563eb,#7c3aed)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: scanning ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+          <RefreshCw size={14} style={scanning ? { animation: 'spin 1s linear infinite' } : {}} />
+          {scanning ? 'Scanning…' : 'Scan Now'}
+        </button>
+      </div>
+
+      {/* Summary banner */}
+      {anyChecked && (
+        <div style={{ background: totalListed > 0 ? '#fef2f2' : '#f0fdf4', border: `1px solid ${totalListed > 0 ? '#fecaca' : '#86efac'}`, borderRadius: 12, padding: '12px 18px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
+          {totalListed > 0 ? <ShieldAlert size={20} color="#dc2626" /> : <ShieldCheck size={20} color="#16a34a" />}
+          <div style={{ fontSize: 13, color: totalListed > 0 ? '#991b1b' : '#166534', fontWeight: 600 }}>
+            {totalListed > 0
+              ? `${totalListed} blocklist hit(s) across your domains — review the flagged domains below.`
+              : `All ${domains.length} domain(s) are clean across every blocklist checked. 🎉`}
+          </div>
+        </div>
+      )}
+
+      {/* What this means */}
+      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '11px 16px', marginBottom: 18, fontSize: 12, color: '#1d4ed8', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <HelpCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>
+          Being on a blocklist (Spamhaus, Barracuda, SpamCop, SORBS, SURBL) means receiving servers may route your emails to spam or reject them. Catching it early lets you pause, fix the cause, and request delisting before reply rates tank.
+        </span>
+      </div>
+
+      {/* Domain list */}
+      {loading ? (
+        <Spinner />
+      ) : domains.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 14, border: '2px dashed #e2e8f0' }}>
+          <Shield size={40} style={{ opacity: 0.25, display: 'block', margin: '0 auto 12px' }} />
+          <div style={{ fontWeight: 600, color: '#374151', marginBottom: 6 }}>No sending domains yet</div>
+          <div style={{ fontSize: 13, color: '#94a3b8' }}>Add email accounts first — their domains will be monitored here.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {!anyChecked && (
+            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '11px 16px', fontSize: 12.5, color: '#92400e' }}>
+              These domains haven't been scanned yet. Click <strong>Scan Now</strong> to run the first check (the automatic scan also runs every 12 hours).
+            </div>
+          )}
+          {domains.map(d => <DomainCard key={d.domain} d={d} />)}
+        </div>
+      )}
+    </div>
+  );
+}

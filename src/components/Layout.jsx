@@ -47,6 +47,7 @@ const NAV = [
       { label: 'Billing', to: '/settings/billing' },
       { label: 'Sending Speed', to: '/settings/sending-speed' },
       { label: 'Email Warmup 🔥', to: '/settings/warmup' },
+      { label: 'Deliverability 🛡️', to: '/settings/deliverability' },
       { label: 'User Settings', to: '/settings/user' },
       { label: 'User Preferences', to: '/settings/preferences' },
       { label: 'API Key', to: '/settings/api-key' },
