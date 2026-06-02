@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Select, Table, TR, TD } from '../components/UI';
-import { Send, Plus, Play, Pause, Trash2, Edit2, Eye, X, Copy, ChevronDown, Sparkles, Shield } from 'lucide-react';
+import { Send, Plus, Play, Pause, Trash2, Edit2, Eye, X, Copy, ChevronDown, Sparkles, Shield, Linkedin } from 'lucide-react';
 
 const STATUS_COLOR = { draft:'default', active:'green', paused:'yellow', completed:'blue' };
 const pct = (n,d) => d>0?((n/d)*100).toFixed(1)+'%':'—';
@@ -1113,17 +1114,87 @@ const DEFAULT_FORM = {
   send_days: ['mon','tue','wed','thu','fri'],
   timezone: 'America/New_York',
   send_time_start: '08:00', send_time_end: '18:00',
+  linkedin_account_id: '',
   all_hours: false, start_immediately: false,
   email_account_id: '', rotation_ids: [], list_id: '',
   daily_limit: 50, track_opens: true, track_clicks: true,
 };
 
+// ── LinkedIn Account Rotation Selector ──────────
+function LinkedInRotationSelect({ accounts, value, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  const vals = Array.isArray(value) ? value : (value ? [value] : []);
+
+  React.useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const toggle = (id) => {
+    const next = vals.includes(id) ? vals.filter(v => v !== id) : [...vals, id];
+    onChange(next);
+  };
+
+  const selected = accounts.filter(a => vals.includes(a.id));
+
+  return (
+    <div ref={ref} style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:9, padding:'12px 14px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+        <Linkedin size={14} color="#2563eb" />
+        <label style={{ fontSize:12, fontWeight:700, color:'#1e40af' }}>
+          LinkedIn Account(s)
+          {vals.length > 1 && <span style={{ marginLeft:8, fontSize:11, padding:'2px 7px', borderRadius:10, background:'#dbeafe', color:'#2563eb', fontWeight:700 }}>🔄 Rotation: {vals.length} accounts</span>}
+        </label>
+      </div>
+      <div style={{ position:'relative' }}>
+        <button type="button" onClick={() => setOpen(p => !p)}
+          style={{ width:'100%', border:'1px solid #93c5fd', borderRadius:7, padding:'8px 12px', fontSize:13, background:'#fff', outline:'none', color:'var(--text)', cursor:'pointer', textAlign:'left', display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:'inherit' }}>
+          <span>{selected.length === 0 ? 'Select LinkedIn account(s)…' : selected.map(a => a.name).join(', ')}</span>
+          <ChevronDown size={13} color="#94a3b8"/>
+        </button>
+        {open && (
+          <>
+            <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:99 }}/>
+            <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:100, background:'#fff', border:'1px solid #93c5fd', borderRadius:9, boxShadow:'0 4px 20px rgba(0,0,0,0.12)', overflow:'hidden' }}>
+              {accounts.length === 0 ? (
+                <div style={{ padding:'12px 14px', fontSize:12, color:'var(--text3)' }}>No LinkedIn accounts yet — add one in the LinkedIn tab.</div>
+              ) : accounts.map(a => {
+                const sel = vals.includes(a.id);
+                return (
+                  <button key={a.id} type="button" onClick={() => toggle(a.id)}
+                    style={{ width:'100%', padding:'10px 14px', border:'none', background: sel?'#eff6ff':'#fff', textAlign:'left', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:'inherit', borderBottom:'1px solid var(--border)' }}
+                    onMouseEnter={e => { if (!sel) e.currentTarget.style.background='#f8fafc'; }}
+                    onMouseLeave={e => { if (!sel) e.currentTarget.style.background='#fff'; }}>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600, color: sel?'#1d4ed8':'var(--text)' }}>{a.name}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)' }}>{a.daily_limit}/day · {a.status}</div>
+                    </div>
+                    {sel && <span style={{ color:'#2563eb', fontWeight:700, fontSize:14 }}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+      {accounts.length === 0 && (
+        <div style={{ fontSize:11, color:'#2563eb', marginTop:4 }}>Add a LinkedIn account in the LinkedIn tab first.</div>
+      )}
+    </div>
+  );
+}
+
 // ── Create/Edit Campaign Modal (2-step wizard) ───
 function CampaignModal({ open, campaign, onClose, onSaved }) {
+  const { user } = useAuth();
+  const canUseLinkedIn = ['professional', 'unlimited'].includes(user?.plan);
   const [wizardStep, setWizardStep] = useState('schedule'); // 'schedule' | 'emails'
   const [form, setForm]       = useState(DEFAULT_FORM);
-  const [sequences, setSequences] = useState([{ subject: '', body: '', delay_days: 0, delay_hours: 0 }]);
-  const [accounts, setAccounts]   = useState([]);
+  const [sequences, setSequences] = useState([{ subject: '', body: '', delay_days: 0, delay_hours: 0, step_type: 'email', linkedin_note: '' }]);
+  const [accounts, setAccounts]         = useState([]);
+  const [linkedinAccounts, setLinkedinAccounts] = useState([]);
   const [lists, setLists]         = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading]     = useState(false);
@@ -1138,6 +1209,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
     api.get('/email-accounts').then(r => setAccounts(r.data));
     api.get('/contacts/lists').then(r => setLists(r.data));
     api.get('/templates').then(r => setTemplates(r.data));
+    if (canUseLinkedIn) api.get('/linkedin/accounts').then(r => setLinkedinAccounts(r.data)).catch(() => {});
     if (campaign) {
       let rotationIds = [];
       try { rotationIds = JSON.parse(campaign.rotation_account_ids || '[]'); } catch {}
@@ -1159,11 +1231,16 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         daily_limit: campaign.daily_limit,
         track_opens: !!campaign.track_opens,
         track_clicks: !!campaign.track_clicks,
+        linkedin_account_id: (() => { try { const r = JSON.parse(campaign.rotation_linkedin_ids || '[]'); return r.length ? r : (campaign.linkedin_account_id ? [campaign.linkedin_account_id] : []); } catch { return campaign.linkedin_account_id ? [campaign.linkedin_account_id] : []; } })(),
       });
-      api.get(`/campaigns/${campaign.id}`).then(r => { if (r.data.sequences?.length) setSequences(r.data.sequences); });
+      api.get(`/campaigns/${campaign.id}`).then(r => {
+        if (r.data.sequences?.length) setSequences(r.data.sequences.map(s => ({
+          ...s, step_type: s.step_type || 'email', linkedin_note: s.linkedin_note || '',
+        })));
+      });
     } else {
       setForm(DEFAULT_FORM);
-      setSequences([{ subject: '', body: '', delay_days: 0, delay_hours: 0 }]);
+      setSequences([{ subject: '', body: '', delay_days: 0, delay_hours: 0, step_type: 'email', linkedin_note: '' }]);
     }
   }, [open, campaign]);
 
@@ -1179,7 +1256,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isActive && sequences.some(s => !s.subject)) return toast.error('All steps need a subject');
+    if (!isActive && sequences.some(s => (!s.step_type || s.step_type === 'email') && !s.subject)) return toast.error('All email steps need a subject');
     setLoading(true);
     try {
       const payload = {
@@ -1187,6 +1264,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         send_days: (form.send_days||[]).join(','),
         email_account_id: (form.rotation_ids||[]).length > 0 ? form.rotation_ids[0] : form.email_account_id,
         rotation_account_ids: JSON.stringify(form.rotation_ids || []),
+        linkedin_account_id: Array.isArray(form.linkedin_account_id) ? form.linkedin_account_id : (form.linkedin_account_id ? [form.linkedin_account_id] : []),
         sequences: isActive ? undefined : sequences,
       };
       campaign
@@ -1369,10 +1447,19 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
             );
           })()}
 
+          {/* LinkedIn rotation selector — shown when plan allows and LinkedIn steps exist */}
+          {canUseLinkedIn && sequences.some(s => s.step_type && s.step_type !== 'email') && (
+            <LinkedInRotationSelect
+              accounts={linkedinAccounts}
+              value={form.linkedin_account_id || []}
+              onChange={ids => f('linkedin_account_id', ids)}
+            />
+          )}
+
           {!isActive && (
             <div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-                <label style={{ fontSize:13, fontWeight:700 }}>Email Sequences ({sequences.length} step{sequences.length!==1?'s':''})</label>
+                <label style={{ fontSize:13, fontWeight:700 }}>Campaign Sequence ({sequences.length} step{sequences.length!==1?'s':''})</label>
                 <div style={{ display:'flex', gap:6 }}>
                   <button type="button" onClick={() => setShowAISeq(true)}
                     style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none', borderRadius:7, fontSize:12, color:'#fff', cursor:'pointer', fontFamily:'inherit', fontWeight:700, boxShadow:'0 2px 6px rgba(124,58,237,0.35)' }}>
@@ -1383,42 +1470,106 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                     <Eye size={12}/>Preview
                   </button>
                   <Btn type="button" size="sm" variant="secondary"
-                    onClick={() => setSequences(s => [...s, { subject:'', body:'', delay_days: s.length>0?3:0, delay_hours:0 }])}>
+                    onClick={() => setSequences(s => [...s, { subject:'', body:'', delay_days: s.length>0?3:0, delay_hours:0, step_type:'email', linkedin_note:'' }])}>
                     <Plus size={12}/> Add Follow-up
                   </Btn>
+                  {canUseLinkedIn ? (
+                    <Btn type="button" size="sm" variant="ghost"
+                      style={{ borderColor:'#2563eb', color:'#2563eb', background:'#eff6ff' }}
+                      onClick={() => setSequences(s => [...s, { subject:'', body:'', delay_days: s.length>0?1:0, delay_hours:0, step_type:'linkedin_connect', linkedin_note:'' }])}>
+                      <Linkedin size={12}/> LinkedIn Step
+                    </Btn>
+                  ) : (
+                    <Btn type="button" size="sm" variant="ghost" disabled title="Requires Professional or Agency plan">
+                      <Linkedin size={12}/> LinkedIn Step 🔒
+                    </Btn>
+                  )}
                 </div>
               </div>
               <AICreditsBar refreshKey={creditsKey}/>
-              {sequences.map((seq, i) => (
-                <div key={i} style={{ border:'1px solid var(--border2)', borderRadius:10, padding:16, marginBottom:12, background:'var(--bg3)' }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color: i===0?'var(--primary)':'var(--orange)' }}>
-                      {i===0?'📧 Initial Email':`🔄 Follow-up ${i}`}
-                    </span>
-                    {i>0 && <button type="button" onClick={() => setSequences(s => s.filter((_,idx)=>idx!==i))} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer' }}><X size={14}/></button>}
-                  </div>
-                  <div style={{ marginBottom:10 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <span style={{ fontSize:12, color:'var(--text3)', fontWeight:600 }}>Load from template:</span>
-                      <select onChange={e => { const tpl=templates.find(t=>t.id===e.target.value); if(!tpl)return; updateSeq(i,'subject',tpl.subject||''); updateSeq(i,'body',tpl.body||''); e.target.value=''; toast.success(`Template "${tpl.name}" loaded!`); }}
-                        style={{ border:'1px solid var(--border2)', borderRadius:6, padding:'4px 8px', fontSize:12, background:'#fff', outline:'none', color:'var(--text2)', cursor:'pointer' }}>
-                        <option value="">— Select a template —</option>
-                        {templates.map(t=><option key={t.id} value={t.id}>{t.name} ({t.category})</option>)}
-                      </select>
+              {sequences.map((seq, i) => {
+                const isLiStep = seq.step_type && seq.step_type !== 'email';
+                const stepLabel = isLiStep
+                  ? (seq.step_type === 'linkedin_view' ? '👁 View LinkedIn Profile' : '🔗 LinkedIn Connection Request')
+                  : (i === 0 ? '📧 Initial Email' : `🔄 Follow-up ${i}`);
+                const stepColor = isLiStep ? '#2563eb' : (i === 0 ? 'var(--primary)' : 'var(--orange)');
+                return (
+                  <div key={i} style={{ border:`1.5px solid ${isLiStep?'#bfdbfe':'var(--border2)'}`, borderRadius:10, padding:16, marginBottom:12, background: isLiStep?'#f8faff':'var(--bg3)' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color: stepColor }}>{stepLabel}</span>
+                      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                        {i > 0 && (
+                          <div style={{ display:'flex', gap:6 }}>
+                            <input type="number" min={0} value={seq.delay_days} onChange={e=>updateSeq(i,'delay_days',+e.target.value)}
+                              style={{ width:54, border:'1px solid var(--border2)', borderRadius:6, padding:'4px 6px', fontSize:12, textAlign:'center' }} title="Delay days"/>
+                            <span style={{ fontSize:11, color:'var(--text3)', alignSelf:'center' }}>d</span>
+                            <input type="number" min={0} max={23} value={seq.delay_hours} onChange={e=>updateSeq(i,'delay_hours',+e.target.value)}
+                              style={{ width:54, border:'1px solid var(--border2)', borderRadius:6, padding:'4px 6px', fontSize:12, textAlign:'center' }} title="Delay hours"/>
+                            <span style={{ fontSize:11, color:'var(--text3)', alignSelf:'center' }}>h</span>
+                          </div>
+                        )}
+                        <button type="button" onClick={() => setSequences(s => s.filter((_,idx)=>idx!==i))} style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer' }}><X size={14}/></button>
+                      </div>
                     </div>
+
+                    {isLiStep ? (
+                      /* LinkedIn step card */
+                      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        <div style={{ display:'flex', gap:8 }}>
+                          {[
+                            { v:'linkedin_view',    label:'👁 View Profile',       desc:'Warms up the contact before connecting' },
+                            { v:'linkedin_connect', label:'🔗 Send Connection',    desc:'Sends a connection request (with optional note)' },
+                          ].map(opt => (
+                            <button key={opt.v} type="button" onClick={() => updateSeq(i,'step_type',opt.v)}
+                              style={{ flex:1, padding:'8px 10px', borderRadius:8, border:`2px solid ${seq.step_type===opt.v?'#2563eb':'#e2e8f0'}`, background:seq.step_type===opt.v?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all 0.15s' }}>
+                              <div style={{ fontSize:12, fontWeight:700, color:seq.step_type===opt.v?'#1d4ed8':'#0f172a', marginBottom:2 }}>{opt.label}</div>
+                              <div style={{ fontSize:10, color:'#64748b' }}>{opt.desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                        {seq.step_type === 'linkedin_connect' && (
+                          <div>
+                            <label style={{ fontSize:12, fontWeight:600, color:'var(--text2)', display:'block', marginBottom:4 }}>
+                              Connection Note <span style={{ fontWeight:400, color:'var(--text3)' }}>(optional · max 300 chars)</span>
+                            </label>
+                            <textarea value={seq.linkedin_note||''} onChange={e=>updateSeq(i,'linkedin_note',e.target.value.slice(0,300))}
+                              placeholder="Hi {{first_name}}, I'd love to connect! I noticed you work at {{company}}…"
+                              style={{ width:'100%', border:'1px solid var(--border2)', borderRadius:8, padding:'9px 12px', fontSize:13, boxSizing:'border-box', resize:'vertical', minHeight:70, fontFamily:'inherit', outline:'none' }}/>
+                            <div style={{ fontSize:11, color:'var(--text3)', marginTop:2, display:'flex', justifyContent:'space-between' }}>
+                              <span>Variables: <code style={{ background:'var(--bg3)', padding:'1px 4px', borderRadius:3 }}>{'{{first_name}}'}</code> <code style={{ background:'var(--bg3)', padding:'1px 4px', borderRadius:3 }}>{'{{company}}'}</code></span>
+                              <span style={{ color:(seq.linkedin_note||'').length>280?'#dc2626':'inherit' }}>{(seq.linkedin_note||'').length}/300</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Email step card */
+                      <>
+                        <div style={{ marginBottom:10 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ fontSize:12, color:'var(--text3)', fontWeight:600 }}>Load from template:</span>
+                            <select onChange={e => { const tpl=templates.find(t=>t.id===e.target.value); if(!tpl)return; updateSeq(i,'subject',tpl.subject||''); updateSeq(i,'body',tpl.body||''); e.target.value=''; toast.success(`Template "${tpl.name}" loaded!`); }}
+                              style={{ border:'1px solid var(--border2)', borderRadius:6, padding:'4px 8px', fontSize:12, background:'#fff', outline:'none', color:'var(--text2)', cursor:'pointer' }}>
+                              <option value="">— Select a template —</option>
+                              {templates.map(t=><option key={t.id} value={t.id}>{t.name} ({t.category})</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div style={{ marginBottom:12 }}>
+                          <SubjectInput value={seq.subject} onChange={val=>updateSeq(i,'subject',val)} emailBody={seq.body} onCreditUsed={onCreditUsed}/>
+                        </div>
+                        <RichBodyEditor key={`seq-body-${i}-${seq.subject}`} value={seq.body} onChange={val=>updateSeq(i,'body',val)} subject={seq.subject} onCreditUsed={onCreditUsed} placeholder={`Hi {{first_name}},\n\nI noticed {{company}} is...`}/>
+                      </>
+                    )}
                   </div>
-                  {i>0 && (
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
-                      <Input label="Delay (days)" type="number" min={0} value={seq.delay_days} onChange={e=>updateSeq(i,'delay_days',+e.target.value)}/>
-                      <Input label="Delay (hours)" type="number" min={0} max={23} value={seq.delay_hours} onChange={e=>updateSeq(i,'delay_hours',+e.target.value)}/>
-                    </div>
-                  )}
-                  <div style={{ marginBottom:12 }}>
-                    <SubjectInput value={seq.subject} onChange={val=>updateSeq(i,'subject',val)} emailBody={seq.body} onCreditUsed={onCreditUsed}/>
-                  </div>
-                  <RichBodyEditor key={`seq-body-${i}-${seq.subject}`} value={seq.body} onChange={val=>updateSeq(i,'body',val)} subject={seq.subject} onCreditUsed={onCreditUsed} placeholder={`Hi {{first_name}},\n\nI noticed {{company}} is...`}/>
+                );
+              })}
+              {!canUseLinkedIn && (
+                <div style={{ background:'#f8fafc', border:'1px solid var(--border)', borderRadius:9, padding:'10px 14px', fontSize:12, color:'var(--text3)', display:'flex', gap:8, alignItems:'center' }}>
+                  <Linkedin size={14} color="#94a3b8"/>
+                  <span>LinkedIn steps are available on <strong>Professional</strong> and <strong>Agency</strong> plans. <a href="/settings/billing" style={{ color:'#2563eb' }}>Upgrade</a> to unlock multi-channel cadences.</span>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -1438,7 +1589,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
       {/* Sub-modals (always mounted so they don't lose state) */}
       <AISequenceModal open={showAISeq} onClose={() => setShowAISeq(false)}
         onApply={(steps) => {
-          setSequences(steps.map((s,i) => ({ subject:s.subject, body:s.body, delay_days:s.delay_days??(i===0?0:i*3), delay_hours:s.delay_hours??0 })));
+          setSequences(steps.map((s,i) => ({ subject:s.subject||'', body:s.body||'', delay_days:s.delay_days??(i===0?0:i*3), delay_hours:s.delay_hours??0, step_type:s.step_type||'email', linkedin_note:s.linkedin_note||'' })));
           setShowAISeq(false); onCreditUsed(); toast.success('✨ AI sequence applied!');
         }}/>
       <EmailPreviewModal open={showPreview} onClose={() => setShowPreview(false)}

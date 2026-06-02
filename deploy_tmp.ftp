@@ -1,0 +1,11 @@
+
+option batch abort
+option confirm off
+open sftp://u346663333:AdoBoost2026!@156.67.72.124:65002
+lcd dist
+cd /home/u346663333/domains/app.adobosolutions.com/public_html
+put index.html
+cd assets
+lcd assets
+synchronize remote . .
+exit

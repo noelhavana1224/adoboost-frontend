@@ -59,17 +59,47 @@ function useScopedUser() {
   return { user: data, loading };
 }
 
+// Map a plan's display name → billing slug used by the checkout endpoint
+function planSlug(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('starter')) return 'starter';
+  if (n.includes('pro'))     return 'professional';
+  if (n.includes('unlimited') || n.includes('agency')) return 'unlimited';
+  return null; // trial / unknown → not purchasable
+}
+
 export function Billing() {
   const { user, loading: userLoading } = useScopedUser();
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
+  const [billingConfigured, setBillingConfigured] = useState(false);
+  const [upgrading, setUpgrading] = useState(null);
 
   useEffect(() => {
     api.get('/plans')
       .then(r => setPlans(r.data || []))
       .catch(() => {})
       .finally(() => setPlansLoading(false));
+    api.get('/billing/status')
+      .then(r => setBillingConfigured(!!r.data?.configured))
+      .catch(() => setBillingConfigured(false));
   }, []);
+
+  const handleUpgrade = async (plan) => {
+    const slug = planSlug(plan.name);
+    if (!billingConfigured || !slug) {
+      toast('Contact AdoBoost support to upgrade your plan.', { icon: '💬' });
+      return;
+    }
+    setUpgrading(plan.id);
+    try {
+      const { data } = await api.get(`/billing/checkout/${slug}`);
+      if (data?.url) { window.location.href = data.url; return; } // → hosted checkout
+      toast.error('Could not start checkout. Please contact support.');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not start checkout.');
+    } finally { setUpgrading(null); }
+  };
 
   if (userLoading || plansLoading) return null;
 
@@ -217,15 +247,19 @@ export function Billing() {
                     <Check size={13} /> Current Plan
                   </div>
                 ) : (
-                  <button style={{
+                  <button
+                    onClick={() => handleUpgrade(p)}
+                    disabled={upgrading === p.id || user?.role === 'team_member'}
+                    style={{
                     width:'100%', padding:'8px 12px', borderRadius:8, border:`1.5px solid ${style.color}`,
                     background:'transparent', color:style.color, fontSize:12.5, fontWeight:700,
-                    cursor:'pointer', transition:'all 0.18s', fontFamily:'inherit',
+                    cursor: user?.role === 'team_member' ? 'not-allowed' : 'pointer', transition:'all 0.18s', fontFamily:'inherit',
+                    opacity: upgrading === p.id ? 0.6 : 1,
                   }}
-                    onMouseEnter={e => { e.currentTarget.style.background=`linear-gradient(135deg,${style.gradA},${style.gradB})`; e.currentTarget.style.color='#fff'; e.currentTarget.style.border='1.5px solid transparent'; }}
+                    onMouseEnter={e => { if (user?.role === 'team_member') return; e.currentTarget.style.background=`linear-gradient(135deg,${style.gradA},${style.gradB})`; e.currentTarget.style.color='#fff'; e.currentTarget.style.border='1.5px solid transparent'; }}
                     onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color=style.color; e.currentTarget.style.border=`1.5px solid ${style.color}`; }}
                   >
-                    Upgrade
+                    {upgrading === p.id ? 'Starting checkout…' : (billingConfigured ? 'Upgrade' : 'Contact to Upgrade')}
                   </button>
                 )}
               </div>

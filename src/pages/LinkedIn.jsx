@@ -99,18 +99,20 @@ export default function LinkedIn() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
-        {['accounts', 'campaigns'].map(t => (
+        {[['accounts', 'Accounts'], ['campaigns', 'Campaigns'], ['inbox', 'Connection Activity']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: '8px 18px', background: 'none', border: 'none', cursor: 'pointer',
             fontSize: 13, fontWeight: tab === t ? 700 : 500, fontFamily: 'inherit',
             color: tab === t ? '#2563eb' : 'var(--text2)',
             borderBottom: tab === t ? '2px solid #2563eb' : '2px solid transparent',
-            marginBottom: -1, transition: 'all 0.15s', textTransform: 'capitalize',
-          }}>{t}</button>
+            marginBottom: -1, transition: 'all 0.15s',
+          }}>{label}</button>
         ))}
       </div>
 
-      {tab === 'accounts' ? <AccountsTab /> : <CampaignsTab />}
+      {tab === 'accounts' && <AccountsTab />}
+      {tab === 'campaigns' && <CampaignsTab />}
+      {tab === 'inbox' && <InboxTab />}
     </div>
   );
 }
@@ -167,7 +169,7 @@ function AccountsTab() {
             >
               Copy Cookies Chrome Extension
             </a>
-            , then log into LinkedIn, click the extension, and copy the <code style={{ background: '#dbeafe', padding: '1px 5px', borderRadius: 3 }}>li_at</code> and <code style={{ background: '#dbeafe', padding: '1px 5px', borderRadius: 3 }}>JSESSIONID</code> cookie values from the list.
+            , log into LinkedIn, click the extension icon, then click <strong>Copy</strong> to copy all cookies as JSON. Paste the full JSON in the form — we extract the cookies automatically.
           </div>
         </div>
       </Card>
@@ -222,12 +224,36 @@ function AccountsTab() {
 }
 
 function AddAccountModal({ onClose, onSaved }) {
+  const [jsonRaw, setJsonRaw] = useState('');
+  const [parsed, setParsed] = useState(null);
   const [form, setForm] = useState({ name: '', li_at: '', jsessionid: '', daily_limit: 15 });
   const [loading, setLoading] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  const handleJsonChange = (raw) => {
+    setJsonRaw(raw);
+    if (!raw.trim()) { setParsed(null); return; }
+    try {
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) { setParsed({ ok: false, err: 'Expected a JSON array — click the "Copy" button in the extension' }); return; }
+      const find = name => (arr.find(c => c.name === name) || {}).value || '';
+      const liAt = find('li_at');
+      const jsessionid = find('JSESSIONID');
+      if (!liAt) { setParsed({ ok: false, err: 'Session not found — make sure you are logged into LinkedIn when copying' }); return; }
+      if (!jsessionid) { setParsed({ ok: false, err: 'Session token not found — try copying again from the extension' }); return; }
+      setParsed({ ok: true, liAt, jsessionid });
+      setForm(p => ({ ...p, li_at: liAt, jsessionid }));
+    } catch {
+      setParsed({ ok: false, err: 'Could not read this — make sure you clicked "Copy" in the extension and paste the full result' });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.li_at || !form.jsessionid) {
+      toast.error('Paste your session data first');
+      return;
+    }
     setLoading(true);
     try {
       await api.post('/linkedin/accounts', form);
@@ -237,9 +263,11 @@ function AddAccountModal({ onClose, onSaved }) {
     finally { setLoading(false); }
   };
 
+  const canSubmit = !!(form.name && form.li_at && form.jsessionid);
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 480, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 500, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ fontSize: 16, fontWeight: 700 }}>Add LinkedIn Account</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 18 }}>×</button>
@@ -248,22 +276,28 @@ function AddAccountModal({ onClose, onSaved }) {
           <Field label="Account Label">
             <input value={form.name} onChange={e => f('name', e.target.value)} placeholder="e.g. My LinkedIn" required style={inputStyle} />
           </Field>
-          <Field label="li_at Cookie">
-            <textarea value={form.li_at} onChange={e => f('li_at', e.target.value.trim())}
-              placeholder="Paste li_at cookie value..." required
-              style={{ ...inputStyle, minHeight: 72, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
+
+          <Field label="Paste your session here">
+            <textarea
+              value={jsonRaw}
+              onChange={e => handleJsonChange(e.target.value)}
+              placeholder="Paste here after copying from the extension..."
+              style={{ ...inputStyle, minHeight: 130, resize: 'vertical', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5 }}
+            />
+            {parsed && !parsed.ok && (
+              <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>⚠ {parsed.err}</div>
+            )}
+            {parsed?.ok && (
+              <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 4 }}>✓ Session ready</div>
+            )}
           </Field>
-          <Field label="JSESSIONID Cookie">
-            <input value={form.jsessionid} onChange={e => f('jsessionid', e.target.value.trim())}
-              placeholder='ajax:1234567890123456789' required
-              style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 12 }} />
-          </Field>
+
           <Field label="Daily Limit" hint="Keep low (10–20/day) to reduce ban risk">
             <input type="number" min={1} max={50} value={form.daily_limit} onChange={e => f('daily_limit', +e.target.value)} style={inputStyle} />
           </Field>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
             <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-            <Btn type="submit" loading={loading}>Add Account</Btn>
+            <Btn type="submit" loading={loading} disabled={!canSubmit}>Add Account</Btn>
           </div>
         </form>
       </div>
@@ -446,7 +480,7 @@ function CampaignModal({ campaign, onClose, onSaved }) {
             <Field label="Contact List">
               <select value={form.list_id} onChange={e => f('list_id', e.target.value)} style={inputStyle}>
                 <option value="">Select list...</option>
-                {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.contact_count})</option>)}
+                {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_contacts || 0})</option>)}
               </select>
             </Field>
           </div>
@@ -471,6 +505,121 @@ function CampaignModal({ campaign, onClose, onSaved }) {
         </form>
       </div>
     </div>
+  );
+}
+
+// ── Connection Activity (Inbox) Tab ───────────────────────────────────────
+
+function InboxTab() {
+  const [sends, setSends] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState([]);
+  const [filterAcct, setFilterAcct] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = {};
+    if (filterAcct) params.account_id = filterAcct;
+    if (filterStatus) params.status = filterStatus;
+    Promise.all([
+      api.get('/linkedin/inbox', { params }),
+      api.get('/linkedin/accounts'),
+    ]).then(([r, ar]) => {
+      setSends(r.data);
+      setAccounts(ar.data);
+    }).finally(() => setLoading(false));
+  }, [filterAcct, filterStatus]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const statusColor = { sent: 'green', pending: 'yellow', failed: 'red', skipped: 'default' };
+
+  const stats = sends.reduce((acc, s) => {
+    acc[s.status] = (acc[s.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  if (loading) return <Spinner />;
+
+  return (
+    <>
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        {[['sent', '✅ Sent', '#f0fdf4', '#16a34a'], ['pending', '⏳ Pending', '#fefce8', '#ca8a04'], ['failed', '❌ Failed', '#fff1f2', '#dc2626'], ['skipped', '⏭ Skipped', 'var(--bg3)', 'var(--text2)']].map(([k, label, bg, color]) => (
+          <div key={k} onClick={() => setFilterStatus(filterStatus === k ? '' : k)}
+            style={{ flex: 1, minWidth: 90, background: bg, border: `1px solid ${filterStatus === k ? color : 'var(--border)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color }}>{stats[k] || 0}</div>
+            <div style={{ fontSize: 11, color, fontWeight: 600 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
+        <select value={filterAcct} onChange={e => setFilterAcct(e.target.value)}
+          style={{ border: '1px solid var(--border2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, background: '#fff', outline: 'none', color: 'var(--text)' }}>
+          <option value="">All LinkedIn accounts</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ border: '1px solid var(--border2)', borderRadius: 8, padding: '7px 10px', fontSize: 13, background: '#fff', outline: 'none', color: 'var(--text)' }}>
+          <option value="">All statuses</option>
+          {['sent', 'pending', 'failed', 'skipped'].map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 'auto' }}>{sends.length} records</div>
+      </div>
+
+      {sends.length === 0 ? (
+        <Card style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <Linkedin size={40} color="#cbd5e1" style={{ marginBottom: 12 }} />
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>No connection activity yet</div>
+          <div style={{ fontSize: 13, color: 'var(--text3)' }}>Connection requests will appear here once campaigns are launched</div>
+        </Card>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {sends.map(s => {
+            const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || 'Unknown';
+            const isConnect = !s.step_type || s.step_type === 'linkedin_connect';
+            const stepIcon = s.step_type === 'linkedin_view' ? '👁' : '🔗';
+            return (
+              <Card key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 18 }}>
+                  {stepIcon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{name}</span>
+                    {s.company && <span style={{ fontSize: 12, color: 'var(--text3)' }}>· {s.company}</span>}
+                    <Badge color={statusColor[s.status] || 'default'}>{s.status}</Badge>
+                    {s.linkedin_connected_via && (
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: '#dbeafe', color: '#1e40af', border: '1px solid #93c5fd' }}>
+                        Connected · {s.linkedin_connected_via}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <span>via <strong>{s.account_name}</strong></span>
+                    {s.campaign_name && <span>· {s.campaign_name}</span>}
+                    {s.sent_at && <span>· Sent {new Date(s.sent_at).toLocaleDateString()}</span>}
+                    {!s.sent_at && s.scheduled_at && <span>· Scheduled {new Date(s.scheduled_at).toLocaleDateString()}</span>}
+                  </div>
+                  {s.error_message && (
+                    <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>{s.error_message}</div>
+                  )}
+                </div>
+                {s.linkedin && (
+                  <a href={s.linkedin} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: '#2563eb', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
+                    View ↗
+                  </a>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 }
 
