@@ -263,9 +263,11 @@ function WarmupCard({ account, poolSize, onUpdate }) {
     (form.warmup_start_count) + (form.warmup_increment * warmupDays),
     form.warmup_max_count
   );
-  const daysToFull = form.warmup_max_count > form.warmup_start_count
+  // How many days to reach the max (ramp period only — warmup continues forever after)
+  const daysToMax = form.warmup_max_count > form.warmup_start_count
     ? Math.ceil((form.warmup_max_count - form.warmup_start_count) / form.warmup_increment)
     : 0;
+  const reachedMax = warmupDays >= daysToMax;
 
   const applyPreset = (p) => {
     setPreset(p.id);
@@ -345,7 +347,12 @@ function WarmupCard({ account, poolSize, onUpdate }) {
             {account.last_warmup_at && (
               <span style={{ fontSize: 12, color: 'var(--text3)' }}>🕐 Last run: <strong>{new Date(account.last_warmup_at).toLocaleDateString()}</strong></span>
             )}
-            <span style={{ fontSize: 12, color: 'var(--text2)' }}>🎯 Max: <strong>{form.warmup_max_count}/day</strong></span>
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              🎯 {reachedMax
+                ? <><strong style={{ color: '#16a34a' }}>{form.warmup_max_count}/day ♾️</strong> <span style={{ fontSize: 11, color: '#16a34a' }}>ongoing</span></>
+                : <>Ramp to <strong>{form.warmup_max_count}/day</strong></>
+              }
+            </span>
           </div>
         </div>
 
@@ -513,7 +520,7 @@ function WarmupCard({ account, poolSize, onUpdate }) {
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: p.badgeBg, color: p.badgeColor }}>{p.badge}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>{p.desc}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text2)' }}>Start: {p.start} · +{p.increment}/day · Max: {p.max}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text2)' }}>Start: {p.start} · +{p.increment}/day · Cap: {p.max} · ♾️ runs forever</div>
                 </button>
               ))}
             </div>
@@ -527,8 +534,8 @@ function WarmupCard({ account, poolSize, onUpdate }) {
                     tip: 'How many warmup emails to send on day 1. Keep low for new domains.' },
                   { label: 'Daily increment', key: 'warmup_increment', min: 1, max: 20,
                     tip: 'How many more emails to add each day. Lower = safer ramp.' },
-                  { label: 'Maximum (emails/day)', key: 'warmup_max_count', min: 10, max: 200,
-                    tip: 'The maximum warmup emails to send per day. 40-50 is ideal.' },
+                  { label: 'Daily cap (emails/day) ♾️', key: 'warmup_max_count', min: 10, max: 200,
+                    tip: 'Warmup emails per day once fully ramped. Runs at this level every day until you pause.' },
                 ].map(ctrl => (
                   <div key={ctrl.key}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>
@@ -553,10 +560,11 @@ function WarmupCard({ account, poolSize, onUpdate }) {
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>📅 Warmup Schedule Preview</div>
             <div style={{ background: 'var(--bg3)', borderRadius: 10, padding: '12px 16px' }}>
-              {Array.from({ length: Math.min(10, daysToFull + 1) }, (_, i) => {
-                const target = Math.min(form.warmup_start_count + form.warmup_increment * i, form.warmup_max_count);
-                const isCurrent = i === warmupDays;
-                const isPast = i < warmupDays;
+              {/* Ramp-up phase */}
+              {Array.from({ length: Math.min(10, daysToMax) }, (_, i) => {
+                const target    = Math.min(form.warmup_start_count + form.warmup_increment * i, form.warmup_max_count);
+                const isCurrent = i === warmupDays && !reachedMax;
+                const isPast    = i < warmupDays;
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, opacity: isPast ? 0.5 : 1 }}>
                     <span style={{ fontSize: 11, color: isCurrent ? 'var(--primary)' : 'var(--text3)', width: 48, fontWeight: isCurrent ? 700 : 400 }}>
@@ -571,11 +579,28 @@ function WarmupCard({ account, poolSize, onUpdate }) {
                   </div>
                 );
               })}
-              {daysToFull > 10 && (
-                <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: '4px 0' }}>
-                  ... and {daysToFull - 10} more days to reach {form.warmup_max_count}/day
+              {daysToMax > 10 && (
+                <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: '4px 0 6px' }}>
+                  … {daysToMax - 10} more ramp days to reach {form.warmup_max_count}/day
                 </div>
               )}
+              {/* Infinite ongoing phase */}
+              <div style={{ marginTop: 8, padding: '10px 12px', background: 'linear-gradient(135deg,#f0fff4,#f0f9ff)', border: '1px solid #86efac', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>♾️</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>
+                    Day {daysToMax + 1}+ — Runs at {form.warmup_max_count} emails/day forever
+                  </div>
+                  <div style={{ fontSize: 11, color: '#166534', marginTop: 2 }}>
+                    Warmup never stops automatically — it continues until you hit <strong>Pause</strong>.
+                  </div>
+                </div>
+                {reachedMax && (
+                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, background: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
+                    ✅ At max now
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
