@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { StatCard, Card, Badge, Spinner } from '../components/UI';
-import { Send, Mail, MousePointer, Reply, AlertCircle, TrendingUp, Zap, BarChart2 } from 'lucide-react';
+import { Send, Mail, MousePointer, Reply, AlertCircle, TrendingUp, Zap, BarChart2, Check, ArrowRight, X, Rocket, Users, Inbox } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import api from '../utils/api';
 import VAUpsellBanner from '../components/VAUpsellBanner';
@@ -68,6 +68,101 @@ function WelcomeBanner({ user, totalSent }) {
   );
 }
 
+// ── Onboarding getting-started checklist ─────────────────────────────────────
+const STEP_ICONS = { inbox: Inbox, contacts: Users, campaign: Send, launch: Rocket };
+
+function OnboardingChecklist() {
+  const [data, setData] = useState(null);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    api.get('/onboarding/status').then(r => setData(r.data)).catch(() => {});
+  }, []);
+
+  if (!data || hidden || data.dismissed || data.completed) return null;
+
+  const dismiss = async () => {
+    setHidden(true);
+    try { await api.post('/onboarding/dismiss'); } catch {}
+  };
+
+  const pctDone = Math.round((data.doneCount / data.total) * 100);
+  // The first not-done step is the "current" highlighted action
+  const currentIdx = data.steps.findIndex(s => !s.done);
+
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16,
+      padding: '22px 24px', marginBottom: 22, position: 'relative',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.04)', animation: 'fadeIn 0.4s ease',
+    }}>
+      <button onClick={dismiss} title="Dismiss"
+        style={{ position: 'absolute', top: 14, right: 14, background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: 4, display: 'flex' }}
+        onMouseEnter={e => e.currentTarget.style.color = '#64748b'}
+        onMouseLeave={e => e.currentTarget.style.color = '#cbd5e1'}>
+        <X size={16} />
+      </button>
+
+      {/* Header + progress */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2563eb,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Rocket size={18} color="#fff" />
+        </div>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Get started with AdoBoost</div>
+          <div style={{ fontSize: 12.5, color: '#64748b' }}>{data.doneCount} of {data.total} steps complete — finish setup to send your first campaign.</div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: 6, background: '#eef2ff', borderRadius: 99, overflow: 'hidden', margin: '14px 0 18px' }}>
+        <div style={{ width: `${pctDone}%`, height: '100%', background: 'linear-gradient(90deg,#2563eb,#7c3aed)', borderRadius: 99, transition: 'width 0.5s ease' }} />
+      </div>
+
+      {/* Steps */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {data.steps.map((s, i) => {
+          const Icon = STEP_ICONS[s.key] || Check;
+          const isCurrent = i === currentIdx;
+          return (
+            <div key={s.key} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 11,
+              background: s.done ? '#f0fdf4' : isCurrent ? '#eff6ff' : '#f8fafc',
+              border: `1px solid ${s.done ? '#bbf7d0' : isCurrent ? '#bfdbfe' : '#eef2f7'}`,
+            }}>
+              {/* Status circle */}
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: s.done ? '#16a34a' : isCurrent ? '#2563eb' : '#e2e8f0',
+                color: '#fff',
+              }}>
+                {s.done ? <Check size={14} strokeWidth={3} /> : <Icon size={13} color={isCurrent ? '#fff' : '#94a3b8'} />}
+              </div>
+              <span style={{ flex: 1, fontSize: 13.5, fontWeight: s.done ? 500 : 600, color: s.done ? '#15803d' : '#0f172a', textDecoration: s.done ? 'none' : 'none' }}>
+                {s.label}
+              </span>
+              {s.done ? (
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>Done</span>
+              ) : (
+                <Link to={s.link} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5, textDecoration: 'none',
+                  background: isCurrent ? 'linear-gradient(135deg,#2563eb,#7c3aed)' : '#fff',
+                  color: isCurrent ? '#fff' : '#2563eb',
+                  border: isCurrent ? 'none' : '1px solid #bfdbfe',
+                  borderRadius: 8, padding: '6px 13px', fontSize: 12, fontWeight: 700,
+                }}>
+                  {s.cta} <ArrowRight size={12} />
+                </Link>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const RANGE_OPTS = [
   { key:'7',  label:'7 days' },
   { key:'14', label:'14 days' },
@@ -92,6 +187,7 @@ export default function Dashboard() {
     <div style={{ animation:'fadeIn 0.3s ease' }}>
       <VAUpsellBanner />
       <WelcomeBanner user={user} totalSent={sent} />
+      <OnboardingChecklist />
 
       {/* Range selector + section title */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
