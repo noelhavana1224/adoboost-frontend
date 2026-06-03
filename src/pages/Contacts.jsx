@@ -162,6 +162,21 @@ function EditableListName({ list, onRename }) {
   );
 }
 
+// ── Email verification status dot ────────────────
+function EmailStatusDot({ status, reason }) {
+  if (!status || status === 'unverified') return null;
+  const map = {
+    valid:   { c: '#16a34a', t: 'Valid — deliverable' },
+    risky:   { c: '#d97706', t: 'Risky' },
+    invalid: { c: '#dc2626', t: 'Invalid — will not be sent' },
+  };
+  const m = map[status]; if (!m) return null;
+  return (
+    <span title={`${m.t}${reason ? ' · ' + reason : ''}`}
+      style={{ width: 7, height: 7, borderRadius: '50%', background: m.c, flexShrink: 0, display: 'inline-block' }} />
+  );
+}
+
 // ── Main Contacts Component ──────────────────────
 export default function Contacts() {
   const [contacts, setContacts]         = useState([]);
@@ -180,6 +195,16 @@ export default function Contacts() {
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [dragOverList, setDragOverList] = useState(null);
   const [draggingContact, setDraggingContact] = useState(null);
+  const [verifying, setVerifying]       = useState(false);
+  const [verifyProgress, setVerifyProgress] = useState(null);
+  const [summary, setSummary]           = useState(null);
+
+  const loadSummary = useCallback(async () => {
+    try {
+      const { data } = await api.get('/contacts/verify-summary', { params: { list_id: selectedList || undefined } });
+      setSummary(data);
+    } catch {}
+  }, [selectedList]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -198,6 +223,38 @@ export default function Contacts() {
   }, [page, search, selectedList]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadSummary(); }, [loadSummary]);
+
+  const handleVerify = async () => {
+    setVerifying(true); setVerifyProgress({ done: 0, total: 0 });
+    try {
+      const { data } = await api.post('/contacts/verify', { list_id: selectedList || undefined });
+      const jobId = data.jobId;
+      const poll = setInterval(async () => {
+        try {
+          const { data: job } = await api.get(`/contacts/verify-status/${jobId}`);
+          setVerifyProgress(job);
+          if (job.status === 'done' || job.status === 'error') {
+            clearInterval(poll);
+            setVerifying(false);
+            if (job.status === 'done') {
+              toast.success(`Verified ${job.total}: ${job.valid} valid · ${job.risky} risky · ${job.invalid} invalid`);
+              loadSummary(); load();
+            } else { toast.error('Verification failed'); }
+          }
+        } catch { clearInterval(poll); setVerifying(false); }
+      }, 1500);
+    } catch { setVerifying(false); toast.error('Could not start verification'); }
+  };
+
+  const handleDeleteInvalid = async () => {
+    if (!confirm('Delete all INVALID contacts? These addresses cannot receive email (would bounce).')) return;
+    try {
+      const { data } = await api.post('/contacts/delete-invalid', { list_id: selectedList || undefined });
+      toast.success(`Removed ${data.deleted} invalid contact${data.deleted !== 1 ? 's' : ''}`);
+      loadSummary(); load();
+    } catch { toast.error('Failed'); }
+  };
 
   // Update a single contact in state without full reload
   const updateContact = (id, updates) => {
@@ -292,12 +349,32 @@ export default function Contacts() {
       <PageHeader title="Contacts" subtitle={`${allTotal.toLocaleString()} total contacts`}
         action={
           <div style={{ display: 'flex', gap: 8 }}>
+            <Btn variant="secondary" onClick={handleVerify} loading={verifying}>
+              <Check size={14}/> {verifying ? `Verifying ${verifyProgress?.done || 0}/${verifyProgress?.total || 0}` : 'Verify Emails'}
+            </Btn>
             <Btn variant="secondary" onClick={() => setModal('list')}><List size={14}/> New List</Btn>
             <Btn variant="secondary" onClick={() => setModal('import')}><Upload size={14}/> Import CSV</Btn>
             <Btn onClick={() => setModal('add')}><Plus size={14}/> Add Contact</Btn>
           </div>
         }
       />
+
+      {/* Email verification summary */}
+      {summary && (summary.valid + summary.risky + summary.invalid) > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13 }}>
+          <span style={{ fontWeight: 700, color: 'var(--text2)' }}>📋 Email health{selectedList ? ' (this list)' : ''}:</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a' }} /> {summary.valid} valid</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d97706' }} /> {summary.risky} risky</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#dc2626' }} /> {summary.invalid} invalid</span>
+          {summary.unverified > 0 && <span style={{ color: 'var(--text3)' }}>· {summary.unverified} unverified</span>}
+          {summary.invalid > 0 && (
+            <button onClick={handleDeleteInvalid} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 7, color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <Trash2 size={12}/> Remove {summary.invalid} invalid
+            </button>
+          )}
+          <span style={{ fontSize: 11, color: 'var(--text3)', width: '100%' }}>Invalid emails are automatically skipped when you launch campaigns — protecting your sender reputation.</span>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20 }}>
         {/* Lists Sidebar */}
@@ -402,7 +479,10 @@ export default function Contacts() {
                                 <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
                                   {[c.first_name, c.last_name].filter(Boolean).join(' ') || <span style={{ color: 'var(--text3)', fontWeight: 400 }}>No name</span>}
                                 </div>
-                                <div style={{ fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{c.email}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email}</span>
+                                  <EmailStatusDot status={c.email_status} reason={c.email_check_reason} />
+                                </div>
                               </div>
                             </div>
                           </td>
