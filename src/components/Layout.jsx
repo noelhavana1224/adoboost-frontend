@@ -291,6 +291,47 @@ function ImpersonateBanner() {
   );
 }
 
+// ── Email verification banner — shown until the user verifies their email ──
+function VerifyEmailBanner() {
+  const { user } = useAuth();
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  // Only for real account owners who are unverified (team members inherit owner)
+  if (!user || user.role === 'team_member' || user.email_verified === 1 || user.email_verified === undefined) return null;
+
+  const resend = async () => {
+    setSending(true);
+    try {
+      await api.post('/auth/resend-verification');
+      setSent(true);
+      toast.success('Verification email sent — check your inbox.');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not send email. Try again shortly.');
+    } finally { setSending(false); }
+  };
+
+  return (
+    <div style={{
+      background: 'linear-gradient(90deg,#b45309 0%,#d97706 100%)', color: '#fff',
+      padding: '9px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      gap: 16, borderBottom: '2px solid #92400e', fontSize: 13, fontWeight: 600, flexWrap: 'wrap',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Mail size={16} />
+        <span>Please verify your email to launch campaigns. We sent a link to <strong>{user.email}</strong>.</span>
+      </div>
+      <button onClick={resend} disabled={sending || sent} style={{
+        background: '#fff', color: '#b45309', border: 'none', borderRadius: 6,
+        padding: '6px 14px', fontWeight: 700, fontSize: 12,
+        cursor: sending || sent ? 'default' : 'pointer', opacity: sending || sent ? 0.75 : 1,
+      }}>
+        {sent ? '✓ Email sent' : sending ? 'Sending…' : 'Resend verification'}
+      </button>
+    </div>
+  );
+}
+
 function SidebarUserFooter({ user, isAdmin }) {
   const support = useSupport();
   const displayName = support.isSupport ? support.target?.name : user?.name;
@@ -957,6 +998,7 @@ export default function Layout({ children }) {
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <SupportBanner />
         <ImpersonateBanner />
+        <VerifyEmailBanner />
 
         {/* Header */}
         <header style={{

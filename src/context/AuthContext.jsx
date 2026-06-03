@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('ab_token');
     if (token && user) {
       api.get('/auth/me').then(r => {
-        const fresh = { ...user, plan: r.data.plan, role: r.data.role, name: r.data.name, mustChangePassword: r.data.mustChangePassword || false };
+        const fresh = { ...user, plan: r.data.plan, role: r.data.role, name: r.data.name, email_verified: r.data.email_verified ?? 1, mustChangePassword: r.data.mustChangePassword || false };
         localStorage.setItem('ab_user', JSON.stringify(fresh));
         setUser(fresh);
       }).catch(() => {});
@@ -24,6 +24,7 @@ export function AuthProvider({ children }) {
       ...data.user,
       plan: profile.data.plan,
       role: profile.data.role,
+      email_verified: data.user?.email_verified ?? profile.data.email_verified ?? 1,
       mustChangePassword: data.mustChangePassword || profile.data.mustChangePassword || false,
     };
     localStorage.setItem('ab_user', JSON.stringify(user));
@@ -33,7 +34,7 @@ export function AuthProvider({ children }) {
     const { data } = await api.post('/auth/register', { name, email, password });
     localStorage.setItem('ab_token', data.token);
     const profile = await api.get('/auth/me');
-    const user = { ...data.user, plan: profile.data.plan, role: profile.data.role };
+    const user = { ...data.user, plan: profile.data.plan, role: profile.data.role, email_verified: data.user?.email_verified ?? profile.data.email_verified ?? 1 };
     localStorage.setItem('ab_user', JSON.stringify(user));
     setUser(user); return data;
   };

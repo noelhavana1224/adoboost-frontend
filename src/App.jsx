@@ -41,6 +41,7 @@ import TeamMembers from './pages/TeamMembers';
 import AdminTeam from './pages/admin/AdminTeam';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import Warmup from './pages/Warmup';
 import SendingCalendar from './pages/Calendar';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -116,6 +117,7 @@ export default function App() {
           <Route path="/register"        element={<Auth mode="register" />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password"  element={<ResetPassword />} />
+          <Route path="/verify-email"    element={<VerifyEmail />} />
           <Route path="/welcome-va"      element={<ProtectedRoute><VAUpsell /></ProtectedRoute>} />
           <Route path="/support/entry"     element={<SupportEntry />} />
           <Route path="/impersonate-entry" element={<ImpersonateEntry />} />
