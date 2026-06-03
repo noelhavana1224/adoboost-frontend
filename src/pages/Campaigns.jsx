@@ -828,7 +828,7 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
           {accounts.length === 0 && <div style={{ padding:'14px', fontSize:13, color:'var(--text3)', textAlign:'center' }}>No accounts connected</div>}
           {value.length > 1 && (
             <div style={{ padding:'8px 12px', background:'#f0f9ff', borderTop:'1px solid #bae6fd', fontSize:11, color:'#0284c7' }}>
-              🔄 Sends will rotate <strong>randomly</strong> across {value.length} accounts — each using its own signature & daily limit
+              🔄 Smart rotation across {value.length} accounts — volume is automatically <strong>weighted toward your healthiest inboxes</strong> with capacity left. Low-health or errored inboxes are throttled or skipped.
             </div>
           )}
         </div>
