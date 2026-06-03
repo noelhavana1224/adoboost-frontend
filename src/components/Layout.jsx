@@ -998,7 +998,6 @@ export default function Layout({ children }) {
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <SupportBanner />
         <ImpersonateBanner />
-        <VerifyEmailBanner />
 
         {/* Header */}
         <header style={{

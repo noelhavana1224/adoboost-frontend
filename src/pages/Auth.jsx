@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Mail, Lock, User, ArrowRight, Check, Zap, BarChart2, Shield, Users, Eye, EyeOff, Linkedin, CalendarCheck, RefreshCw, Bot } from 'lucide-react';
 
@@ -153,6 +154,8 @@ export default function Auth({ mode = 'login' }) {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState(null); // set after signup → "check your email"
+  const [resent, setResent] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e) => {
@@ -162,12 +165,20 @@ export default function Auth({ mode = 'login' }) {
         await login(form.email, form.password);
         navigate('/dashboard');
       } else {
-        await register(form.name, form.email, form.password);
-        toast.success(`Welcome to AdoBoost, ${form.name}! 🎉`);
-        navigate('/welcome-va');
+        const data = await register(form.name, form.email, form.password);
+        if (data?.token) { navigate('/dashboard'); return; } // admin bootstrap
+        setPendingEmail(data?.email || form.email);          // show verify screen
       }
     } catch (err) { toast.error(err.response?.data?.error || 'Something went wrong'); }
     finally { setLoading(false); }
+  };
+
+  const handleResend = async () => {
+    try {
+      await api.post('/auth/resend-verification', { email: pendingEmail });
+      setResent(true);
+      toast.success('Verification email re-sent.');
+    } catch { toast.error('Could not resend. Try again shortly.'); }
   };
 
   return (
@@ -355,6 +366,29 @@ export default function Auth({ mode = 'login' }) {
         }}>
           <div style={{ width: '100%', maxWidth: 400, animation: 'fadeUp 0.5s ease both' }}>
 
+            {pendingEmail ? (
+              /* ── Post-signup: check your email ── */
+              <div style={{ textAlign: 'center', animation: 'fadeUp 0.4s ease both' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 16, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                  <Mail size={28} color="#2563eb" />
+                </div>
+                <h2 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: '0 0 12px', letterSpacing: '-0.025em' }}>Check your email</h2>
+                <p style={{ color: '#64748b', fontSize: 15, lineHeight: 1.6, margin: '0 0 8px' }}>
+                  We sent a verification link to
+                </p>
+                <p style={{ color: '#0f172a', fontSize: 15, fontWeight: 700, margin: '0 0 20px' }}>{pendingEmail}</p>
+                <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6, margin: '0 0 28px' }}>
+                  Click the link to verify your address and <strong>set your password</strong>. Then you're in.
+                </p>
+                <button onClick={handleResend} disabled={resent} className="alt-link" style={{ cursor: resent ? 'default' : 'pointer', opacity: resent ? 0.7 : 1 }}>
+                  {resent ? '✓ Email re-sent' : "Didn't get it? Resend email"}
+                </button>
+                <Link to="/login" style={{ display: 'block', textAlign: 'center', marginTop: 18, fontSize: 13, color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}>
+                  ← Back to sign in
+                </Link>
+              </div>
+            ) : (
+            <>
             {/* Header */}
             <div style={{ marginBottom: 40 }}>
               <h2 style={{ fontSize: 30, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', letterSpacing: '-0.025em' }}>
@@ -375,7 +409,8 @@ export default function Auth({ mode = 'login' }) {
               )}
               <Field icon={Mail} label="Email Address" type="email" placeholder="you@company.com"
                 value={form.email} onChange={e => f('email', e.target.value)} required />
-              {/* Password with show/hide toggle — prevents silent autocorrect mangling on mobile */}
+              {/* Password only at login — on signup the password is set via the email link */}
+              {mode === 'login' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
                   Password
@@ -403,6 +438,7 @@ export default function Auth({ mode = 'login' }) {
                   </button>
                 </div>
               </div>
+              )}
 
               {mode === 'login' && (
                 <div style={{ textAlign: 'right', marginTop: -6 }}>
@@ -417,7 +453,10 @@ export default function Auth({ mode = 'login' }) {
                 {!loading && <ArrowRight size={16} />}
               </button>
             </form>
+            </>
+            )}
 
+            {!pendingEmail && (<>
             {/* Divider */}
             <div style={{ position: 'relative', textAlign: 'center', margin: '32px 0 24px' }}>
               <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: '#f1f5f9' }} />
@@ -438,6 +477,7 @@ export default function Auth({ mode = 'login' }) {
                 <a href="#" style={{ color: '#64748b', textDecoration: 'underline' }}>Privacy Policy</a>
               </p>
             )}
+            </>)}
 
             {/* Trust badge */}
             <div style={{ marginTop: 36, padding: '14px 18px', background: '#f8faff', border: '1px solid #e0e7ff', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
