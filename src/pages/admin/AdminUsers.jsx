@@ -38,9 +38,9 @@ export default function AdminUsers() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Permanently delete this user and ALL their data?')) return;
+    if (!confirm('Permanently delete this user and ALL their data? This cannot be undone.')) return;
     try { await api.delete(`/admin/users/${id}`); toast.success('User deleted'); load(); }
-    catch { toast.error('Failed'); }
+    catch (err) { toast.error(err.response?.data?.error || 'Failed to delete user'); }
   };
 
   const handleSupportView = async (user) => {
