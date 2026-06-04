@@ -810,6 +810,7 @@ function ImportModal({ open, onClose, lists, selectedList, onSaved }) {
       const { data } = await api.post('/contacts/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setResult(data); setStep(4);
       toast.success(`Import complete! ${data.imported} contacts added`);
+      if (data.limit_message) toast(data.limit_message, { icon: '⚠️', duration: 7000 });
     } catch (err) { toast.error(err.response?.data?.error || 'Import failed'); }
     finally { setLoading(false); }
   };
