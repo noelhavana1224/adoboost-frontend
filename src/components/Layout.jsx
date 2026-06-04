@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, Bell, Star, UserCog,
   CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare,
   ShieldAlert, Eye, EyeOff, Lock, CheckCircle2,
-  Zap, Database, BarChart, TrendingUp, LogIn, Linkedin, CalendarCheck, Flame,
+  Zap, Database, BarChart, TrendingUp, LogIn, Linkedin, CalendarCheck, Flame, ListChecks,
 } from 'lucide-react';
 
 const NAV = [
@@ -24,6 +24,7 @@ const NAV = [
   },
   { label: 'Email Accounts', to: '/email-accounts', icon: Mail },
   { label: 'Contacts', to: '/contacts', icon: Users },
+  { label: 'Request a List', to: '/request-list', icon: ListChecks },
   {
     label: 'Messages', icon: MessageSquare, children: [
       { label: 'Inbox', to: '/messages/inbox' },
@@ -67,6 +68,7 @@ const ADMIN_NAV = [
   { label: 'Users',            to: '/admin/users',    icon: UserCog },
   { label: 'Plans',            to: '/admin/plans',    icon: CreditCard },
   { label: 'Support Tickets',  to: '/admin/tickets',  icon: HelpCircle },
+  { label: 'Lead Requests',    to: '/admin/list-requests', icon: ListChecks },
   { label: 'Admin Team',       to: '/admin/team',     icon: ShieldCheck },
 ];
 
