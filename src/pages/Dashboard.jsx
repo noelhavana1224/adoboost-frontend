@@ -169,6 +169,101 @@ const RANGE_OPTS = [
   { key:'30', label:'30 days' },
 ];
 
+// ── Deliverability & Hot-Leads command center ────────────────────────────────
+function DeliverabilitySection() {
+  const [d, setD] = useState(null);
+  useEffect(() => { api.get('/analytics/deliverability').then(r => setD(r.data)).catch(() => {}); }, []);
+  if (!d) return null;
+
+  const totalLeads = (d.leads.interested || 0) + (d.leads.positive || 0);
+  const health = d.warmup.avgHealth || 0;
+  const healthColor = health >= 70 ? '#16a34a' : health >= 40 ? '#d97706' : '#dc2626';
+  const blClean = d.blacklist.listed === 0;
+  const rc = d.replyCategories;
+  const rcTotal = Math.max(1, rc.interested + rc.positive + rc.not_now + rc.not_interested);
+  const segs = [
+    { k: 'interested',     v: rc.interested,     c: '#dc2626', label: '🔥 Interested' },
+    { k: 'positive',       v: rc.positive,       c: '#16a34a', label: '👍 Positive' },
+    { k: 'not_now',        v: rc.not_now,        c: '#d97706', label: '⏳ Not now' },
+    { k: 'not_interested', v: rc.not_interested, c: '#94a3b8', label: '👎 Not interested' },
+  ];
+
+  const Tile = ({ children }) => (
+    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>{children}</div>
+  );
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+      {/* Hot Leads */}
+      <Tile>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>🔥 Hot Leads</span>
+          <Link to="/leads" style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>View all →</Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 36, fontWeight: 900, color: '#dc2626', letterSpacing: '-0.03em', lineHeight: 1 }}>{totalLeads}</span>
+          <span style={{ fontSize: 12, color: 'var(--text3)' }}>AI-flagged this account</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', gap: 12 }}>
+          <span><strong style={{ color: '#dc2626' }}>{d.leads.interested}</strong> interested</span>
+          <span><strong style={{ color: '#16a34a' }}>{d.leads.positive}</strong> positive</span>
+        </div>
+        {d.leads.interested_unread > 0 && (
+          <div style={{ marginTop: 10, fontSize: 11.5, fontWeight: 600, color: '#dc2626', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, padding: '6px 10px' }}>
+            ⚡ {d.leads.interested_unread} interested lead{d.leads.interested_unread !== 1 ? 's' : ''} unread — go reply!
+          </div>
+        )}
+      </Tile>
+
+      {/* Warmup health */}
+      <Tile>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>💪 Inbox Health</span>
+          <Link to="/settings/warmup" style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>Warmup →</Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 36, fontWeight: 900, color: healthColor, letterSpacing: '-0.03em', lineHeight: 1 }}>{health}<span style={{ fontSize: 18 }}>%</span></span>
+          <span style={{ fontSize: 12, color: 'var(--text3)' }}>avg warmup health</span>
+        </div>
+        <div style={{ height: 6, background: '#eef2f7', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ width: `${health}%`, height: '100%', background: healthColor, borderRadius: 99, transition: 'width 0.6s' }} />
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text2)' }}>
+          <strong>{d.warmup.active}</strong> of <strong>{d.warmup.accounts}</strong> inbox{d.warmup.accounts !== 1 ? 'es' : ''} warming up
+        </div>
+      </Tile>
+
+      {/* Blacklist / deliverability */}
+      <Tile>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>🛡️ Domain Reputation</span>
+          <Link to="/settings/deliverability" style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>Details →</Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: blClean ? '#f0fff4' : '#fff5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+            {blClean ? '✅' : '⛔'}
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: blClean ? '#16a34a' : '#dc2626' }}>
+              {d.blacklist.scanned === 0 ? 'Not scanned yet' : blClean ? 'All domains clean' : `${d.blacklist.listed} domain(s) listed`}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>{d.blacklist.domains} sending domain{d.blacklist.domains !== 1 ? 's' : ''} monitored</div>
+          </div>
+        </div>
+        {/* AI reply mix bar */}
+        {rcTotal > 1 && (
+          <div>
+            <div style={{ fontSize: 10.5, color: 'var(--text3)', fontWeight: 600, marginBottom: 5 }}>AI REPLY MIX</div>
+            <div style={{ display: 'flex', height: 8, borderRadius: 99, overflow: 'hidden', background: '#eef2f7' }}>
+              {segs.map(s => s.v > 0 && <div key={s.k} title={`${s.label}: ${s.v}`} style={{ width: `${(s.v / rcTotal) * 100}%`, background: s.c }} />)}
+            </div>
+          </div>
+        )}
+      </Tile>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
@@ -218,6 +313,9 @@ export default function Dashboard() {
         <StatCard icon={Reply}        label="Reply Rate"    value={pct(data?.total_replied, sent)}                     sub={`${(data?.total_replied||0).toLocaleString()} replies`} color="purple" />
         <StatCard icon={AlertCircle}  label="Bounce Rate"   value={pct(data?.total_bounced, sent)}                     sub={`${(data?.total_bounced||0).toLocaleString()} bounced`} color="red" />
       </div>
+
+      {/* Deliverability & Hot Leads command center */}
+      <DeliverabilitySection />
 
       <div style={{ display:'grid', gridTemplateColumns:'1.6fr 1fr', gap:14, marginBottom:14 }}>
         {/* Area chart */}
