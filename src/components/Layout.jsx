@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, Bell, Star, UserCog,
   CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare,
   ShieldAlert, Eye, EyeOff, Lock, CheckCircle2,
-  Zap, Database, BarChart, TrendingUp, LogIn, Linkedin, CalendarCheck, Flame, ListChecks,
+  Zap, Database, BarChart, TrendingUp, LogIn, Linkedin, CalendarCheck, Flame, ListChecks, Calculator, Server,
 } from 'lucide-react';
 
 const NAV = [
@@ -23,6 +23,7 @@ const NAV = [
     ]
   },
   { label: 'Email Accounts', to: '/email-accounts', icon: Mail },
+  { label: 'Pricing Calculator', to: '/pricing-calculator', icon: Calculator },
   { label: 'Contacts', to: '/contacts', icon: Users },
   { label: 'Request a List', to: '/request-list', icon: ListChecks },
   {
@@ -69,6 +70,7 @@ const ADMIN_NAV = [
   { label: 'Plans',            to: '/admin/plans',    icon: CreditCard },
   { label: 'Support Tickets',  to: '/admin/tickets',  icon: HelpCircle },
   { label: 'Lead Requests',    to: '/admin/list-requests', icon: ListChecks },
+  { label: 'Infra Orders',     to: '/admin/infra-orders',  icon: Server },
   { label: 'Admin Team',       to: '/admin/team',     icon: ShieldCheck },
 ];
 

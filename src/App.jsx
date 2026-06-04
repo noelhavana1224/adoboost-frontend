@@ -58,6 +58,8 @@ import Deliverability from './pages/Deliverability';
 import Leads from './pages/Leads';
 import RequestList from './pages/RequestList';
 import AdminListRequests from './pages/admin/AdminListRequests';
+import PricingCalculator from './pages/PricingCalculator';
+import AdminInfraOrders from './pages/admin/AdminInfraOrders';
 const BookingCalendarPage = React.lazy(() => import('./pages/BookingCalendar'));
 const PublicBooking        = React.lazy(() => import('./pages/PublicBooking'));
 
@@ -135,6 +137,7 @@ export default function App() {
           <Route path="/email-accounts"      element={<ProtectedRoute><EmailAccounts /></ProtectedRoute>} />
           <Route path="/contacts"            element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/request-list"        element={<ProtectedRoute><RequestList /></ProtectedRoute>} />
+          <Route path="/pricing-calculator"  element={<ProtectedRoute><PricingCalculator /></ProtectedRoute>} />
           <Route path="/messages/inbox"        element={<ProtectedRoute><Messages type="inbox" /></ProtectedRoute>} />
           <Route path="/messages/auto-replies" element={<ProtectedRoute><Messages type="auto-replies" /></ProtectedRoute>} />
           <Route path="/messages/archive"      element={<ProtectedRoute><Messages type="archive" /></ProtectedRoute>} />
@@ -162,6 +165,7 @@ export default function App() {
           <Route path="/admin/plans"     element={<ProtectedRoute adminOnly><AdminPlans /></ProtectedRoute>} />
           <Route path="/admin/tickets"   element={<ProtectedRoute adminOnly><AdminTickets /></ProtectedRoute>} />
           <Route path="/admin/list-requests" element={<ProtectedRoute adminOnly><AdminListRequests /></ProtectedRoute>} />
+          <Route path="/admin/infra-orders"  element={<ProtectedRoute adminOnly><AdminInfraOrders /></ProtectedRoute>} />
           <Route path="/admin/team"      element={<ProtectedRoute adminOnly><AdminTeam /></ProtectedRoute>} />
 
           {/* Public booking page — no auth required */}
