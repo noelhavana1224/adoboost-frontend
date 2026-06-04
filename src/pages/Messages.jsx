@@ -19,6 +19,18 @@ const TAGS = [
 ];
 const TAG_MAP = Object.fromEntries(TAGS.map(t => [t.key, t]));
 
+// ── AI reply categories (auto lead-flagging) ────────────
+const CATEGORY_META = {
+  interested:     { label: '🔥 Interested',     short: '🔥 Interested',  color: '#dc2626', bg: '#fff5f5', border: '#fca5a5' },
+  positive:       { label: '👍 Positive',        short: '👍 Positive',    color: '#16a34a', bg: '#f0fff4', border: '#86efac' },
+  not_now:        { label: '⏳ Not now',          short: '⏳ Not now',     color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
+  not_interested: { label: '👎 Not interested',  short: '👎 Not int.',    color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' },
+  ooo:            { label: '🤖 Auto / OOO',       short: '🤖 OOO',         color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' },
+  other:          { label: '✉️ Other',            short: '✉️ Other',       color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' },
+};
+// Order shown in the filter bar
+const CATEGORY_ORDER = ['interested', 'positive', 'not_now', 'not_interested', 'ooo'];
+
 const AUTO_REPLY_KEYWORDS = [
   'out of office','auto-reply','automatic reply','autoreply','i am away','i am out',
   'on vacation','on leave','on holiday','will be back','returning on','away from the office',
@@ -716,6 +728,8 @@ export default function Messages({ type = 'inbox' }) {
   const [filterTag, setFilterTag]       = useState('');
   const [filterCampaign, setFilterCampaign] = useState('');
   const [filterAccount, setFilterAccount]   = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');  // AI reply category
+  const [categories, setCategories]     = useState({});
   const [campaigns, setCampaigns]       = useState([]);
   const [emailAccounts, setEmailAccounts]   = useState([]);
   const [openThread, setOpenThread]     = useState(null);
@@ -741,13 +755,14 @@ export default function Messages({ type = 'inbox' }) {
       const ep = type === 'inbox' ? '/messages/inbox'
                : type === 'auto-replies' ? '/messages/auto-replies'
                : '/messages/archived';
-      const { data } = await api.get(ep, { params: { search: search || undefined, page, limit: 100 } });
+      const { data } = await api.get(ep, { params: { search: search || undefined, page, limit: 100, category: (type === 'inbox' && categoryFilter) ? categoryFilter : undefined } });
       setMessages(data.messages || []);
       setTotal(data.total || 0);
       setUnread(data.unread || 0);
+      if (data.categories) setCategories(data.categories);
     } catch { toast.error('Failed to load'); }
     finally { setLoading(false); }
-  }, [type, search, page]);
+  }, [type, search, page, categoryFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -915,6 +930,28 @@ export default function Messages({ type = 'inbox' }) {
             </div>
           )}
         </div>
+        {/* AI smart-filter chips (auto lead-flagging) — inbox only */}
+        {type === 'inbox' && (
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: '#7c3aed', fontWeight: 700, marginRight: 2, display: 'flex', alignItems: 'center', gap: 3 }}><Sparkles size={10}/> AI:</span>
+            <button onClick={() => { setCategoryFilter(''); setPage(1); }}
+              style={{ padding: '3px 10px', borderRadius: 20, border: `1px solid ${!categoryFilter ? '#7c3aed' : 'var(--border2)'}`, background: !categoryFilter ? '#f5f3ff' : 'transparent', color: !categoryFilter ? '#7c3aed' : '#64748b', fontSize: 10.5, cursor: 'pointer', fontFamily: 'inherit', fontWeight: !categoryFilter ? 700 : 400 }}>
+              All
+            </button>
+            {CATEGORY_ORDER.map(key => {
+              const m = CATEGORY_META[key];
+              const count = categories[key] || 0;
+              const active = categoryFilter === key;
+              return (
+                <button key={key} onClick={() => { setCategoryFilter(active ? '' : key); setPage(1); }}
+                  style={{ padding: '3px 10px', borderRadius: 20, border: `1px solid ${active ? m.color : 'var(--border2)'}`, background: active ? m.bg : 'transparent', color: active ? m.color : '#64748b', fontSize: 10.5, cursor: 'pointer', fontFamily: 'inherit', fontWeight: active ? 700 : 400, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {m.short}
+                  {count > 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 5px', borderRadius: 9, background: active ? m.color : '#e2e8f0', color: active ? '#fff' : '#64748b' }}>{count}</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {/* Tag chips */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginRight: 2 }}>Tags:</span>
@@ -1037,12 +1074,17 @@ export default function Messages({ type = 'inbox' }) {
                           <div style={{ fontSize: 12, fontWeight: hasUnread ? 600 : 400, color: hasUnread ? '#1e293b' : '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
                             {(latest.subject || '(no subject)').replace(/^(Re:\s*)+/i, '')}
                           </div>
-                          {/* Row 3: preview + tag badge */}
+                          {/* Row 3: preview + AI category + tag badge */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                               {latestIsSent && <span style={{ color: '#3b82f6', fontWeight: 600 }}>You: </span>}
                               {preview ? preview.substring(0, 55) : ''}
                             </span>
+                            {(() => {
+                              const cat = leadMsg?.ai_category && CATEGORY_META[leadMsg.ai_category];
+                              if (!cat || leadMsg.ai_category === 'other' || leadMsg.ai_category === 'ooo') return null;
+                              return <span title={`AI: ${cat.label}`} style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 9, background: cat.bg, color: cat.color, border: `1px solid ${cat.border}`, flexShrink: 0 }}>{cat.short}</span>;
+                            })()}
                             {tag && <span style={{ fontSize: 11, flexShrink: 0 }} title={tag.label}>{tag.label.split(' ')[0]}</span>}
                             {leadMsg?.replied === 1 && <span style={{ fontSize: 10, flexShrink: 0 }} title="Replied">✅</span>}
                             {isAuto && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 4, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', flexShrink: 0 }}>auto</span>}
