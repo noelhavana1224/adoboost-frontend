@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, Bell, Star, UserCog,
   CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare,
   ShieldAlert, Eye, EyeOff, Lock, CheckCircle2,
-  Zap, Database, BarChart, TrendingUp, LogIn, Linkedin, CalendarCheck,
+  Zap, Database, BarChart, TrendingUp, LogIn, Linkedin, CalendarCheck, Flame,
 } from 'lucide-react';
 
 const NAV = [
@@ -32,6 +32,7 @@ const NAV = [
       { label: 'Archive', to: '/messages/archive' },
     ]
   },
+  { label: 'Hot Leads 🔥', to: '/leads', icon: Flame },
   { label: 'Pipeline', to: '/pipeline', icon: KanbanSquare },
   { label: 'Booking Calendar', to: '/booking-calendar', icon: CalendarCheck },
   { label: 'LinkedIn', to: '/linkedin', icon: Linkedin },

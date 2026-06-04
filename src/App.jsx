@@ -55,6 +55,7 @@ import ImpersonateEntry from './pages/ImpersonateEntry';
 import LinkedIn from './pages/LinkedIn';
 import WarmerInbox from './pages/WarmerInbox';
 import Deliverability from './pages/Deliverability';
+import Leads from './pages/Leads';
 const BookingCalendarPage = React.lazy(() => import('./pages/BookingCalendar'));
 const PublicBooking        = React.lazy(() => import('./pages/PublicBooking'));
 
@@ -135,6 +136,7 @@ export default function App() {
           <Route path="/messages/auto-replies" element={<ProtectedRoute><Messages type="auto-replies" /></ProtectedRoute>} />
           <Route path="/messages/archive"      element={<ProtectedRoute><Messages type="archive" /></ProtectedRoute>} />
           <Route path="/messages/warmer-inbox" element={<ProtectedRoute><WarmerInbox /></ProtectedRoute>} />
+          <Route path="/leads"                 element={<ProtectedRoute><Leads /></ProtectedRoute>} />
           <Route path="/pipeline"            element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
           <Route path="/booking-calendar"   element={<ProtectedRoute><Suspense fallback={null}><BookingCalendarPage /></Suspense></ProtectedRoute>} />
           <Route path="/linkedin"            element={<ProtectedRoute><LinkedIn /></ProtectedRoute>} />
