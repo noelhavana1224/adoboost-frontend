@@ -662,11 +662,13 @@ function ViewCampaignModal({ campaign, onClose }) {
   const [data, setData]   = useState(null);
   const [sends, setSends] = useState([]);
   const [tab, setTab]     = useState('overview');
+  const [abTests, setAbTests] = useState([]);
 
   useEffect(() => {
     if (!campaign) return;
     api.get(`/campaigns/${campaign.id}`).then(r => setData(r.data));
     api.get(`/campaigns/${campaign.id}/sends`).then(r => setSends(r.data));
+    api.get(`/campaigns/${campaign.id}/ab-results`).then(r => setAbTests(r.data.tests || [])).catch(() => setAbTests([]));
   }, [campaign]);
 
   if (!campaign) return null;
@@ -677,10 +679,46 @@ function ViewCampaignModal({ campaign, onClose }) {
   return (
     <Modal open={!!campaign} onClose={onClose} title={`Campaign: ${campaign.name}`} width={720}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-        {['overview', 'sends'].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${tab === t ? 'var(--primary)' : 'var(--border2)'}`, background: tab === t ? 'var(--primary-dim)' : '#fff', color: tab === t ? 'var(--primary)' : 'var(--text2)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: tab === t ? 600 : 400, textTransform: 'capitalize' }}>{t}</button>
+        {['overview', 'sends', ...(abTests.length ? ['ab'] : [])].map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${tab === t ? 'var(--primary)' : 'var(--border2)'}`, background: tab === t ? 'var(--primary-dim)' : '#fff', color: tab === t ? 'var(--primary)' : 'var(--text2)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: tab === t ? 600 : 400, textTransform: 'capitalize' }}>{t === 'ab' ? '🧪 A/B Test' : t}</button>
         ))}
       </div>
+
+      {tab === 'ab' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {abTests.map((test, ti) => {
+            const A = test.variants.A, B = test.variants.B;
+            const Col = ({ v, label, subj, win }) => (
+              <div style={{ flex: 1, border: `2px solid ${win ? '#16a34a' : 'var(--border2)'}`, borderRadius: 10, padding: 14, background: win ? '#f0fff4' : '#fff', position: 'relative' }}>
+                {win && <span style={{ position: 'absolute', top: -10, right: 10, background: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>🏆 WINNER</span>}
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>Subject {label}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12, minHeight: 34 }}>{subj}</div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div><div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>{v.sent}</div><div style={{ fontSize: 10, color: 'var(--text3)' }}>sent</div></div>
+                  <div><div style={{ fontSize: 22, fontWeight: 800, color: 'var(--cyan)' }}>{v.open_rate}%</div><div style={{ fontSize: 10, color: 'var(--text3)' }}>open rate</div></div>
+                  <div><div style={{ fontSize: 22, fontWeight: 800, color: 'var(--purple)' }}>{v.reply_rate}%</div><div style={{ fontSize: 10, color: 'var(--text3)' }}>reply rate</div></div>
+                </div>
+              </div>
+            );
+            return (
+              <div key={ti}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>
+                  {test.step_number === 1 ? '📧 Initial Email' : `🔄 Follow-up ${test.step_number - 1}`} — Subject A/B Test
+                </div>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
+                  <Col v={A} label="A" subj={test.subject_a} win={test.winner === 'A'} />
+                  <Col v={B} label="B" subj={test.subject_b} win={test.winner === 'B'} />
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>
+                  {test.winner === 'tie' ? '🤝 It\'s a tie so far — both subjects performing equally.'
+                    : test.winner ? `Winner determined by open rate. Use this subject in future campaigns.`
+                    : '⏳ Gathering data — need at least 5 sends per variant to call a winner.'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {tab === 'overview' && (
         <div>
@@ -1557,6 +1595,24 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                         </div>
                         <div style={{ marginBottom:12 }}>
                           <SubjectInput value={seq.subject} onChange={val=>updateSeq(i,'subject',val)} emailBody={seq.body} onCreditUsed={onCreditUsed}/>
+                          {/* A/B subject test */}
+                          {seq.subject_b === undefined || seq.subject_b === null || seq.subject_b === '' ? (
+                            <button type="button" onClick={() => updateSeq(i, 'subject_b', ' ')}
+                              style={{ marginTop:7, display:'inline-flex', alignItems:'center', gap:5, background:'none', border:'1px dashed var(--border2)', borderRadius:7, padding:'4px 10px', fontSize:11.5, color:'#7c3aed', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+                              <Sparkles size={11}/> A/B test this subject
+                            </button>
+                          ) : (
+                            <div style={{ marginTop:8, background:'#faf5ff', border:'1px solid #e9d5ff', borderRadius:9, padding:'10px 12px' }}>
+                              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                                <span style={{ fontSize:11.5, fontWeight:700, color:'#7c3aed', display:'flex', alignItems:'center', gap:5 }}>🧪 Subject B (A/B test)</span>
+                                <button type="button" onClick={() => updateSeq(i, 'subject_b', '')} style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>Remove</button>
+                              </div>
+                              <input value={seq.subject_b.trim()} onChange={e => updateSeq(i, 'subject_b', e.target.value)}
+                                placeholder="Alternate subject line — we'll split 50/50 and pick the winner"
+                                style={{ width:'100%', border:'1px solid #e9d5ff', borderRadius:7, padding:'8px 11px', fontSize:13, outline:'none', boxSizing:'border-box', fontFamily:'inherit', background:'#fff' }}/>
+                              <div style={{ fontSize:10.5, color:'#9333ea', marginTop:5 }}>Half your contacts get Subject A, half get B. Results show in the campaign report.</div>
+                            </div>
+                          )}
                         </div>
                         <RichBodyEditor key={`seq-body-${i}-${seq.subject}`} value={seq.body} onChange={val=>updateSeq(i,'body',val)} subject={seq.subject} onCreditUsed={onCreditUsed} placeholder={`Hi {{first_name}},\n\nI noticed {{company}} is...`}/>
                       </>
@@ -1589,7 +1645,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
       {/* Sub-modals (always mounted so they don't lose state) */}
       <AISequenceModal open={showAISeq} onClose={() => setShowAISeq(false)}
         onApply={(steps) => {
-          setSequences(steps.map((s,i) => ({ subject:s.subject||'', body:s.body||'', delay_days:s.delay_days??(i===0?0:i*3), delay_hours:s.delay_hours??0, step_type:s.step_type||'email', linkedin_note:s.linkedin_note||'' })));
+          setSequences(steps.map((s,i) => ({ subject:s.subject||'', subject_b:s.subject_b||'', body:s.body||'', delay_days:s.delay_days??(i===0?0:i*3), delay_hours:s.delay_hours??0, step_type:s.step_type||'email', linkedin_note:s.linkedin_note||'' })));
           setShowAISeq(false); onCreditUsed(); toast.success('✨ AI sequence applied!');
         }}/>
       <EmailPreviewModal open={showPreview} onClose={() => setShowPreview(false)}
