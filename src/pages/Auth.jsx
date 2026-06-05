@@ -472,9 +472,11 @@ export default function Auth({ mode = 'login' }) {
             {mode === 'register' && (
               <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
                 By creating an account you agree to our{' '}
-                <a href="#" style={{ color: '#64748b', textDecoration: 'underline' }}>Terms</a>
+                <a href="https://adobosolutions.com/terms.html" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }}>Terms</a>
                 {' '}·{' '}
-                <a href="#" style={{ color: '#64748b', textDecoration: 'underline' }}>Privacy Policy</a>
+                <a href="https://adobosolutions.com/privacy.html" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }}>Privacy Policy</a>
+                {' '}·{' '}
+                <a href="https://adobosolutions.com/anti-spam.html" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }}>Anti-Spam</a>
               </p>
             )}
             </>)}
