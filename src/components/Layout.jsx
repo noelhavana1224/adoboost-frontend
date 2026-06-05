@@ -107,7 +107,7 @@ function PlanBadge({ plan, role }) {
     trial:        { bg:'rgba(255,255,255,0.12)', text:'rgba(255,255,255,0.7)', label:'Trial' },
     starter:      { bg:'rgba(34,197,94,0.2)',    text:'#4ade80',               label:'Starter' },
     professional: { bg:'rgba(37,99,235,0.25)',   text:'#93c5fd',               label:'Pro' },
-    unlimited:    { bg:'rgba(251,191,36,0.2)',   text:'#fbbf24',               label:'Unlimited' },
+    unlimited:    { bg:'rgba(251,191,36,0.2)',   text:'#fbbf24',               label:'Agency' },
   };
   const s = styles[plan?.toLowerCase()] || styles.trial;
   return (
@@ -371,8 +371,8 @@ function SidebarUserFooter({ user, isAdmin }) {
 }
 
 // ── Plan Usage Progress Bar ──────────────────────
-function UsageBar({ label, icon, used, limit, color }) {
-  const isUnlimited = limit >= 99999;
+function UsageBar({ label, icon, used, limit, color, alwaysShowLimit }) {
+  const isUnlimited = !alwaysShowLimit && limit >= 99999;
   const pct = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
   const barColor = isUnlimited ? '#10b981' : pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : color || '#2563eb';
   return (
@@ -441,7 +441,7 @@ function UserDropdown({ user, onLogout }) {
     trial:        { bg: 'rgba(100,116,139,0.15)', text: '#64748b',  label: 'Trial' },
     starter:      { bg: 'rgba(34,197,94,0.12)',   text: '#16a34a',  label: 'Starter' },
     professional: { bg: 'rgba(37,99,235,0.12)',   text: '#2563eb',  label: 'Pro' },
-    unlimited:    { bg: 'rgba(251,191,36,0.15)',  text: '#d97706',  label: 'Unlimited' },
+    unlimited:    { bg: 'rgba(251,191,36,0.15)',  text: '#d97706',  label: 'Agency' },
   };
   const ps = planStyles[usage?.plan?.toLowerCase()] || planStyles.trial;
 
@@ -530,6 +530,7 @@ function UserDropdown({ user, onLogout }) {
                   used={usage.usage.contacts}
                   limit={usage.limits.max_contacts}
                   color="#6366f1"
+                  alwaysShowLimit
                 />
                 <UsageBar
                   label="Campaigns"
