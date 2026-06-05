@@ -11,6 +11,7 @@ import {
   CreditCard, Menu, X, Calendar, BarChart2, ShieldCheck, KanbanSquare,
   ShieldAlert, Eye, EyeOff, Lock, CheckCircle2,
   Zap, Database, BarChart, TrendingUp, LogIn, Linkedin, CalendarCheck, Flame, ListChecks, Calculator, Server,
+  Reply, Megaphone, MailWarning, Check, CheckCheck, Trash2,
 } from 'lucide-react';
 
 const NAV = [
@@ -403,6 +404,171 @@ function UsageBar({ label, icon, used, limit, color, alwaysShowLimit }) {
       {!isUnlimited && pct >= 90 && (
         <div style={{ fontSize: 10, color: '#ef4444', marginTop: 3, fontWeight: 600 }}>
           ⚠️ Almost at limit — consider upgrading
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Notification Bell ────────────────────────────
+const NOTIF_ICONS = {
+  list:         ListChecks,
+  server:       Server,
+  reply:        Reply,
+  'mail-warning': MailWarning,
+  zap:          Zap,
+  megaphone:    Megaphone,
+  open:         Eye,
+  click:        TrendingUp,
+};
+function timeAgo(ts) {
+  if (!ts) return '';
+  const d = new Date((ts || '').replace(' ', 'T') + (String(ts).includes('Z') ? '' : 'Z'));
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (isNaN(s)) return '';
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  if (s < 604800) return `${Math.floor(s/86400)}d ago`;
+  return d.toLocaleDateString();
+}
+function NotificationBell() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef(null);
+
+  const loadCount = () => {
+    api.get('/notifications/unread-count').then(r => setUnread(r.data.unread || 0)).catch(() => {});
+  };
+  const loadList = () => {
+    setLoading(true);
+    api.get('/notifications').then(r => {
+      setItems(r.data.notifications || []);
+      setUnread(r.data.unread || 0);
+    }).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadCount();
+    const t = setInterval(loadCount, 60000); // poll every 60s
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => { if (open) loadList(); }, [open]);
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const markRead = (id) => {
+    api.post(`/notifications/${id}/read`).catch(() => {});
+    setItems(prev => prev.map(n => n.id === id ? { ...n, is_read: 1 } : n));
+    setUnread(prev => Math.max(0, prev - 1));
+  };
+  const markAll = () => {
+    api.post('/notifications/read-all').catch(() => {});
+    setItems(prev => prev.map(n => ({ ...n, is_read: 1 })));
+    setUnread(0);
+  };
+  const remove = (id, e) => {
+    e.stopPropagation();
+    api.delete(`/notifications/${id}`).catch(() => {});
+    setItems(prev => prev.filter(n => n.id !== id));
+  };
+  const onClickItem = (n) => {
+    if (!n.is_read) markRead(n.id);
+    if (n.link) { setOpen(false); navigate(n.link); }
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        title="Notifications"
+        style={{
+          background: open ? 'var(--bg3)' : 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--text3)', position: 'relative', padding: 6, borderRadius: 8, transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.background = 'none'; }}
+      >
+        <Bell size={17} />
+        {unread > 0 && (
+          <span style={{
+            position: 'absolute', top: 1, right: 1, minWidth: 15, height: 15, padding: '0 3px',
+            background: '#ef4444', color: '#fff', borderRadius: 8, fontSize: 9, fontWeight: 800,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', lineHeight: 1,
+          }}>{unread > 9 ? '9+' : unread}</span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 360,
+          background: '#fff', borderRadius: 14, border: '1px solid var(--border2)',
+          boxShadow: '0 16px 48px rgba(0,0,0,0.13), 0 4px 12px rgba(0,0,0,0.06)',
+          zIndex: 100, overflow: 'hidden', animation: 'dropIn 0.18s cubic-bezier(0.16,1,0.3,1)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Notifications {unread > 0 && <span style={{ color: '#ef4444' }}>({unread})</span>}</div>
+            {unread > 0 && (
+              <button onClick={markAll} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: 11, fontWeight: 600, fontFamily: 'inherit' }}>
+                <CheckCheck size={13} /> Mark all read
+              </button>
+            )}
+          </div>
+
+          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '28px 0' }}>
+                <div style={{ width: 20, height: 20, border: '2px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : items.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--text3)' }}>
+                <Bell size={26} style={{ opacity: 0.3, marginBottom: 8 }} />
+                <div style={{ fontSize: 13 }}>You're all caught up</div>
+              </div>
+            ) : items.map(n => {
+              const Ico = NOTIF_ICONS[n.icon] || Bell;
+              return (
+                <div key={n.id} onClick={() => onClickItem(n)}
+                  style={{
+                    display: 'flex', gap: 10, padding: '11px 14px', cursor: n.link ? 'pointer' : 'default',
+                    borderBottom: '1px solid var(--border)', background: n.is_read ? '#fff' : 'rgba(37,99,235,0.05)',
+                    transition: 'background 0.12s', position: 'relative',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.background = n.is_read ? '#fff' : 'rgba(37,99,235,0.05)'}
+                >
+                  <div style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: n.is_read ? '#f1f5f9' : 'rgba(37,99,235,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: n.is_read ? '#94a3b8' : '#2563eb' }}>
+                    <Ico size={15} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{n.title}</div>
+                    {n.body && <div style={{ fontSize: 11.5, color: 'var(--text2)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{n.body}</div>}
+                    <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3 }}>{timeAgo(n.created_at)}</div>
+                  </div>
+                  {!n.is_read && <span style={{ position: 'absolute', top: 14, right: 30, width: 7, height: 7, background: '#2563eb', borderRadius: '50%' }} />}
+                  <button onClick={(e) => remove(n.id, e)} title="Dismiss"
+                    style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: 2, alignSelf: 'flex-start' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#cbd5e1'}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ padding: '9px 14px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+            <button onClick={() => { setOpen(false); navigate('/settings/user'); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit' }}>
+              Notification settings
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1017,17 +1183,7 @@ export default function Layout({ children }) {
             {new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-            <button style={{
-              background:'none', border:'none', cursor:'pointer',
-              color:'var(--text3)', position:'relative', padding:6,
-              borderRadius:8, transition:'background 0.15s',
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              <Bell size={17} />
-              <span style={{ position:'absolute', top:4, right:4, width:7, height:7, background:'#ef4444', borderRadius:'50%', border:'2px solid #fff' }} />
-            </button>
+            <NotificationBell />
             <button style={{
               background:'none', border:'none', cursor:'pointer',
               color:'var(--text3)', padding:6, borderRadius:8, transition:'background 0.15s',

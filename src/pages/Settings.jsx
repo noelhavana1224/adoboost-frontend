@@ -463,6 +463,11 @@ export function UserPreferences() {
   const [saving, setSaving] = useState(false);
   const unsubRef = React.useRef(null);
 
+  // In-app notification preferences
+  const [notifPrefs, setNotifPrefs] = useState(null);
+  const [notifTypes, setNotifTypes] = useState([]);
+  const [savingNotif, setSavingNotif] = useState(false);
+
   useEffect(() => {
     if (user) setForm({
       notify_replies: user.notify_replies !== 0,
@@ -471,6 +476,22 @@ export function UserPreferences() {
       notify_email: user.notify_email || user.email || '',
     });
   }, [user]);
+
+  useEffect(() => {
+    api.get('/notifications/prefs').then(r => {
+      setNotifPrefs(r.data.prefs || {});
+      setNotifTypes(r.data.types || []);
+    }).catch(() => {});
+  }, []);
+
+  const toggleNotif = async (key) => {
+    const next = { ...notifPrefs, [key]: !notifPrefs[key] };
+    setNotifPrefs(next);
+    setSavingNotif(true);
+    try { await api.put('/notifications/prefs', { prefs: next }); }
+    catch { toast.error('Failed to save'); }
+    finally { setSavingNotif(false); }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true);
@@ -538,6 +559,40 @@ export function UserPreferences() {
 
           <Btn type="submit" loading={saving} style={{ alignSelf: 'flex-start' }}>Update Settings</Btn>
         </form>
+      </Card>
+
+      {/* In-app notification preferences */}
+      <Card style={{ padding: 24, maxWidth: 600, marginTop: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>🔔 Notifications</div>
+          {savingNotif && <span style={{ fontSize: 11, color: 'var(--text3)' }}>Saving…</span>}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16 }}>
+          Choose which alerts show up in your notification bell. Toggle any off to stop receiving them.
+        </div>
+        {!notifPrefs ? (
+          <div style={{ fontSize: 12, color: 'var(--text3)' }}>Loading…</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {notifTypes.map(t => (
+              <label key={t.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{t.label}</div>
+                {/* toggle switch */}
+                <span
+                  onClick={(e) => { e.preventDefault(); toggleNotif(t.key); }}
+                  style={{
+                    position: 'relative', width: 38, height: 22, borderRadius: 11, flexShrink: 0,
+                    background: notifPrefs[t.key] ? 'var(--primary)' : '#cbd5e1', transition: 'background 0.2s',
+                  }}>
+                  <span style={{
+                    position: 'absolute', top: 2, left: notifPrefs[t.key] ? 18 : 2, width: 18, height: 18,
+                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );
