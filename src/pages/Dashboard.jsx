@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { StatCard, Card, Badge, Spinner } from '../components/UI';
-import { Send, Mail, MousePointer, Reply, AlertCircle, TrendingUp, Zap, BarChart2, Check, ArrowRight, X, Rocket, Users, Inbox } from 'lucide-react';
+import { Send, Mail, MousePointer, Reply, AlertCircle, TrendingUp, Zap, BarChart2, Check, ArrowRight, X, Rocket, Users, Inbox, Flame } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import api from '../utils/api';
 import VAUpsellBanner from '../components/VAUpsellBanner';
@@ -69,7 +69,7 @@ function WelcomeBanner({ user, totalSent }) {
 }
 
 // ── Onboarding getting-started checklist ─────────────────────────────────────
-const STEP_ICONS = { inbox: Inbox, contacts: Users, campaign: Send, launch: Rocket };
+const STEP_ICONS = { inbox: Inbox, warmup: Flame, contacts: Users, campaign: Send, launch: Rocket };
 
 function OnboardingChecklist() {
   const [data, setData] = useState(null);
