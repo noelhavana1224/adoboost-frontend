@@ -58,6 +58,22 @@ function VarsDropdown({ onInsert, label = 'Insert Variable' }) {
                 <code style={{ fontSize: 10, background: '#f1f5f9', padding: '1px 5px', borderRadius: 4, color: '#2563eb' }}>{v.value}</code>
               </button>
             ))}
+            <div style={{ padding: '6px 10px', fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+              Spintax (randomizes per email)
+            </div>
+            <button type="button" onClick={() => { onInsert('{Hi|Hey|Hello}'); setOpen(false); }} style={{
+              width: '100%', padding: '8px 12px', border: 'none', background: 'none',
+              textAlign: 'left', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+              <span style={{ color: 'var(--text)' }}>Spin block</span>
+              <code style={{ fontSize: 10, background: '#fef3c7', padding: '1px 5px', borderRadius: 4, color: '#d97706' }}>{'{a|b|c}'}</code>
+            </button>
+            <div style={{ padding: '7px 12px 9px', fontSize: 10.5, color: 'var(--text3)', lineHeight: 1.5 }}>
+              Each recipient gets one random option — e.g. <code style={{ background:'#f1f5f9', padding:'0 3px', borderRadius:3 }}>{'{quick|fast}'}</code> question. Improves deliverability.
+            </div>
           </div>
         </>
       )}
