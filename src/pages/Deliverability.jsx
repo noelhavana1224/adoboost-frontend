@@ -77,6 +77,101 @@ function DomainCard({ d }) {
   );
 }
 
+// ── DNS Authentication (SPF / DKIM / DMARC / MX) ────────────────────────────
+const CHECK_STYLE = {
+  pass: { bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: '✓' },
+  warn: { bg: '#fffbeb', color: '#d97706', border: '#fcd34d', icon: '!' },
+  fail: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', icon: '✕' },
+};
+function gradeColor(g) { return g === 'A' ? '#16a34a' : g === 'B' ? '#65a30d' : g === 'C' ? '#d97706' : '#dc2626'; }
+
+function DnsDomainCard({ d }) {
+  if (d.error) {
+    return <div style={{ background:'#fff', borderRadius:14, border:'1px solid #fecaca', padding:'14px 18px', fontSize:13, color:'#dc2626' }}>{d.domain}: {d.error}</div>;
+  }
+  return (
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div style={{ padding:'14px 18px', display:'flex', alignItems:'center', gap:12, borderBottom:'1px solid #f1f5f9' }}>
+        <div style={{ width:42, height:42, borderRadius:10, background: gradeColor(d.grade)+'15', border:`1px solid ${gradeColor(d.grade)}40`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontWeight:900, fontSize:18, color: gradeColor(d.grade) }}>
+          {d.grade}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontWeight:700, fontSize:14, color:'#0f172a', display:'flex', alignItems:'center', gap:6 }}>
+            <Globe size={12} color="#94a3b8" /> {d.domain}
+          </div>
+          <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>Authentication score: <strong style={{ color: gradeColor(d.grade) }}>{d.score}/100</strong></div>
+        </div>
+      </div>
+      <div style={{ padding:'12px 18px', display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:10 }}>
+        {d.checks.map(c => {
+          const s = CHECK_STYLE[c.status] || CHECK_STYLE.warn;
+          return (
+            <div key={c.id} style={{ border:`1px solid ${s.border}`, background:s.bg, borderRadius:10, padding:'10px 12px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
+                <span style={{ width:18, height:18, borderRadius:'50%', background:s.color, color:'#fff', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{s.icon}</span>
+                <span style={{ fontWeight:700, fontSize:13, color:'#0f172a' }}>{c.label}</span>
+              </div>
+              <div style={{ fontSize:11.5, color:'#475569', lineHeight:1.5 }}>{c.detail}</div>
+              {c.fix && <div style={{ fontSize:11, color:s.color, marginTop:5, lineHeight:1.5 }}><strong>Fix:</strong> {c.fix}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DnsAuthSection() {
+  const [domains, setDomains] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const run = useCallback(async () => {
+    setLoading(true);
+    toast.loading('Checking DNS records…', { id: 'dns' });
+    try {
+      const { data } = await api.get('/analytics/dns-health/all');
+      setDomains(data.domains || []);
+      setLoaded(true);
+      toast.success('DNS check complete', { id: 'dns' });
+    } catch { toast.error('DNS check failed', { id: 'dns' }); }
+    finally { setLoading(false); }
+  }, []);
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:10 }}>
+        <div>
+          <h2 style={{ fontSize:17, fontWeight:800, color:'#0f172a', margin:0, display:'flex', alignItems:'center', gap:8 }}>
+            <ShieldCheck size={18} color="#16a34a" /> DNS Authentication
+          </h2>
+          <p style={{ fontSize:12.5, color:'#64748b', margin:'3px 0 0' }}>
+            SPF, DKIM, DMARC &amp; MX setup for your sending domains — the foundation of inbox placement.
+          </p>
+        </div>
+        <button onClick={run} disabled={loading}
+          style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background: loading ? '#94a3b8' : 'linear-gradient(135deg,#16a34a,#15803d)', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+          <RefreshCw size={14} style={loading ? { animation:'spin 1s linear infinite' } : {}} />
+          {loading ? 'Checking…' : loaded ? 'Re-check' : 'Check DNS'}
+        </button>
+      </div>
+      {!loaded ? (
+        <div style={{ background:'#f0fdf4', border:'1px dashed #86efac', borderRadius:12, padding:'18px', fontSize:13, color:'#166534' }}>
+          Run a check to verify SPF, DKIM, DMARC and MX records on every domain you send from. Missing or misconfigured records are the #1 cause of cold emails landing in spam.
+        </div>
+      ) : domains.length === 0 ? (
+        <div style={{ background:'#fff', borderRadius:12, border:'2px dashed #e2e8f0', padding:'30px', textAlign:'center', fontSize:13, color:'#94a3b8' }}>
+          No sending domains found. Connect an email account first.
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {domains.map(d => <DnsDomainCard key={d.domain} d={d} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Deliverability() {
   const [domains, setDomains] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -148,6 +243,13 @@ export default function Deliverability() {
           Being on a blocklist (Spamhaus, Barracuda, SpamCop, SORBS, SURBL) means receiving servers may route your emails to spam or reject them. Catching it early lets you pause, fix the cause, and request delisting before reply rates tank.
         </span>
       </div>
+
+      {/* DNS authentication (SPF/DKIM/DMARC/MX) */}
+      <DnsAuthSection />
+
+      <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Shield size={18} color="#2563eb" /> Blacklist Monitor
+      </h2>
 
       {/* Domain list */}
       {loading ? (
