@@ -421,6 +421,12 @@ function ThreadReader({ thread, onClose, onUpdate, onDelete, onArchive, isArchiv
       const { data: accs } = await api.get('/email-accounts');
       setAccounts(accs);
       if (!accs.length) return;
+      // Highest priority: reply FROM the mailbox that actually received this message
+      const inboxMsg = thread.msgs.find(m => m.received_account_id);
+      if (inboxMsg?.received_account_id) {
+        const m = accs.find(a => a.id === inboxMsg.received_account_id);
+        if (m) { setAccountId(m.id); return; }
+      }
       const sentMsg = thread.msgs.find(m => m.status === 'sent');
       if (sentMsg?.from_email) {
         const match = accs.find(a => a.from_email?.toLowerCase() === sentMsg.from_email?.toLowerCase());
@@ -730,6 +736,7 @@ export default function Messages({ type = 'inbox' }) {
   const [filterAccount, setFilterAccount]   = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');  // AI reply category
   const [categories, setCategories]     = useState({});
+  const [mailboxes, setMailboxes]       = useState([]);
   const [campaigns, setCampaigns]       = useState([]);
   const [emailAccounts, setEmailAccounts]   = useState([]);
   const [openThread, setOpenThread]     = useState(null);
@@ -755,14 +762,15 @@ export default function Messages({ type = 'inbox' }) {
       const ep = type === 'inbox' ? '/messages/inbox'
                : type === 'auto-replies' ? '/messages/auto-replies'
                : '/messages/archived';
-      const { data } = await api.get(ep, { params: { search: search || undefined, page, limit: 100, category: (type === 'inbox' && categoryFilter) ? categoryFilter : undefined } });
+      const { data } = await api.get(ep, { params: { search: search || undefined, page, limit: 100, category: (type === 'inbox' && categoryFilter) ? categoryFilter : undefined, account: (type === 'inbox' && filterAccount) ? filterAccount : undefined } });
       setMessages(data.messages || []);
       setTotal(data.total || 0);
       setUnread(data.unread || 0);
       if (data.categories) setCategories(data.categories);
+      if (data.mailboxes) setMailboxes(data.mailboxes);
     } catch { toast.error('Failed to load'); }
     finally { setLoading(false); }
-  }, [type, search, page, categoryFilter]);
+  }, [type, search, page, categoryFilter, filterAccount]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -840,9 +848,8 @@ export default function Messages({ type = 'inbox' }) {
   // Client-side filtering
   const allThreads = groupThreads(messages);
   const campaignFiltered = filterCampaign ? allThreads.filter(t => t.msgs.some(m => m.campaign_id === filterCampaign)) : allThreads;
-  const acctCampIds = filterAccount ? campaigns.filter(c => c.email_account_id === filterAccount).map(c => c.id) : [];
-  const accountFiltered = filterAccount ? campaignFiltered.filter(t => t.msgs.some(m => acctCampIds.includes(m.campaign_id))) : campaignFiltered;
-  const threads = filterTag ? accountFiltered.filter(t => t.msgs.some(m => m.tag === filterTag)) : accountFiltered;
+  // Account filtering is now done server-side (by received mailbox) via the `account` param
+  const threads = filterTag ? campaignFiltered.filter(t => t.msgs.some(m => m.tag === filterTag)) : campaignFiltered;
 
   return (
     <div style={{ margin: '-24px', height: 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
@@ -913,12 +920,16 @@ export default function Messages({ type = 'inbox' }) {
             </div>
           )}
           {emailAccounts.length > 0 && (
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }} title="Filter by the mailbox that received the reply">
               <Mail size={11} style={{ position: 'absolute', left: 9, color: '#64748b', pointerEvents: 'none' }}/>
               <select value={filterAccount} onChange={e => { setFilterAccount(e.target.value); setPage(1); }}
-                style={{ border: `1px solid ${filterAccount ? '#2563eb' : 'var(--border2)'}`, borderRadius: 7, padding: '6px 26px 6px 26px', fontSize: 12, outline: 'none', background: filterAccount ? '#eff6ff' : '#f8fafc', color: filterAccount ? '#2563eb' : '#475569', cursor: 'pointer', fontFamily: 'inherit', fontWeight: filterAccount ? 600 : 400, appearance: 'none', minWidth: 130 }}>
-                <option value="">All Accounts</option>
-                {emailAccounts.map(a => <option key={a.id} value={a.id}>{a.from_email}</option>)}
+                style={{ border: `1px solid ${filterAccount ? '#2563eb' : 'var(--border2)'}`, borderRadius: 7, padding: '6px 26px 6px 26px', fontSize: 12, outline: 'none', background: filterAccount ? '#eff6ff' : '#f8fafc', color: filterAccount ? '#2563eb' : '#475569', cursor: 'pointer', fontFamily: 'inherit', fontWeight: filterAccount ? 600 : 400, appearance: 'none', minWidth: 150 }}>
+                <option value="">All Inboxes</option>
+                {(mailboxes.length ? mailboxes : emailAccounts).map(a => {
+                  const mb = mailboxes.find(m => m.id === a.id);
+                  const u = mb?.unread || 0;
+                  return <option key={a.id} value={a.id}>{a.from_email}{u > 0 ? `  (${u})` : ''}</option>;
+                })}
               </select>
               <ChevronDown size={10} style={{ position: 'absolute', right: 8, color: '#64748b', pointerEvents: 'none' }}/>
             </div>
@@ -1067,6 +1078,11 @@ export default function Messages({ type = 'inbox' }) {
                               <span style={{ fontWeight: hasUnread ? 700 : 500, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {leadMsg?.from_name || leadMsg?.from_email}
                               </span>
+                              {mailboxes.length > 1 && (leadMsg?.inbox_email || msgs.find(m => m.inbox_email)?.inbox_email) && (
+                                <span title={`Received at ${leadMsg?.inbox_email || msgs.find(m => m.inbox_email)?.inbox_email}`} style={{ fontSize: 9, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: 8, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <Mail size={8}/> {(leadMsg?.inbox_email || msgs.find(m => m.inbox_email)?.inbox_email || '').split('@')[0]}
+                                </span>
+                              )}
                             </div>
                             <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0, marginLeft: 6 }}>{timeAgo(latest.received_at)}</span>
                           </div>
