@@ -68,12 +68,58 @@ function planSlug(name) {
   return null; // trial / unknown → not purchasable
 }
 
+// Load the PayPal JS SDK once (subscriptions mode)
+let _ppPromise = null;
+function loadPayPalSdk(clientId) {
+  if (window.paypal) return Promise.resolve(window.paypal);
+  if (_ppPromise) return _ppPromise;
+  _ppPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&vault=true&intent=subscription`;
+    s.onload = () => resolve(window.paypal);
+    s.onerror = () => reject(new Error('PayPal SDK failed to load'));
+    document.body.appendChild(s);
+  });
+  return _ppPromise;
+}
+
+// Renders a PayPal subscription button for one plan
+function PayPalSubscribeButton({ clientId, planId, userId, color, onDone }) {
+  const ref = React.useRef(null);
+  const mounted = React.useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadPayPalSdk(clientId).then(paypal => {
+      if (cancelled || mounted.current || !ref.current) return;
+      mounted.current = true;
+      paypal.Buttons({
+        style: { shape: 'pill', color: 'blue', layout: 'horizontal', height: 38, label: 'subscribe', tagline: false },
+        createSubscription: (data, actions) => actions.subscription.create({ plan_id: planId, custom_id: userId }),
+        onApprove: async (data) => {
+          try {
+            await api.post('/paypal/activate', { subscription_id: data.subscriptionID });
+            toast.success('🎉 Subscription active! Welcome aboard.');
+            onDone && onDone();
+          } catch {
+            toast('Payment received — your plan will update shortly.', { icon: '⏳' });
+            onDone && onDone();
+          }
+        },
+        onError: () => toast.error('PayPal could not start. Please try again.'),
+      }).render(ref.current);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [clientId, planId, userId]);
+  return <div ref={ref} style={{ minHeight: 38 }} />;
+}
+
 export function Billing() {
   const { user, loading: userLoading } = useScopedUser();
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [billingConfigured, setBillingConfigured] = useState(false);
   const [upgrading, setUpgrading] = useState(null);
+  const [paypal, setPaypal] = useState(null); // { configured, client_id, plans }
 
   useEffect(() => {
     api.get('/plans')
@@ -83,6 +129,9 @@ export function Billing() {
     api.get('/billing/status')
       .then(r => setBillingConfigured(!!r.data?.configured))
       .catch(() => setBillingConfigured(false));
+    api.get('/paypal/config')
+      .then(r => setPaypal(r.data))
+      .catch(() => setPaypal(null));
   }, []);
 
   const handleUpgrade = async (plan) => {
@@ -242,36 +291,75 @@ export function Billing() {
                   ))}
                 </div>
 
-                {isCurrent ? (
-                  <div style={{ fontSize:12, color:style.color, fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>
-                    <Check size={13} /> Current Plan
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleUpgrade(p)}
-                    disabled={upgrading === p.id || user?.role === 'team_member'}
-                    style={{
-                    width:'100%', padding:'8px 12px', borderRadius:8, border:`1.5px solid ${style.color}`,
-                    background:'transparent', color:style.color, fontSize:12.5, fontWeight:700,
-                    cursor: user?.role === 'team_member' ? 'not-allowed' : 'pointer', transition:'all 0.18s', fontFamily:'inherit',
-                    opacity: upgrading === p.id ? 0.6 : 1,
-                  }}
-                    onMouseEnter={e => { if (user?.role === 'team_member') return; e.currentTarget.style.background=`linear-gradient(135deg,${style.gradA},${style.gradB})`; e.currentTarget.style.color='#fff'; e.currentTarget.style.border='1.5px solid transparent'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color=style.color; e.currentTarget.style.border=`1.5px solid ${style.color}`; }}
-                  >
-                    {upgrading === p.id ? 'Starting checkout…' : (billingConfigured ? 'Upgrade' : 'Contact to Upgrade')}
-                  </button>
-                )}
+                {(() => {
+                  const slug = planSlug(p.name);
+                  const ppPlanId = paypal?.configured && slug ? paypal.plans?.[slug] : null;
+                  if (isCurrent) {
+                    return (
+                      <div style={{ fontSize:12, color:style.color, fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>
+                        <Check size={13} /> Current Plan
+                      </div>
+                    );
+                  }
+                  // PayPal configured for this plan + not a team member → real subscribe button
+                  if (ppPlanId && user?.role !== 'team_member') {
+                    return (
+                      <PayPalSubscribeButton
+                        clientId={paypal.client_id}
+                        planId={ppPlanId}
+                        userId={user?.id}
+                        color={style.color}
+                        onDone={() => window.location.reload()}
+                      />
+                    );
+                  }
+                  // Fallback (no PayPal yet, or team member)
+                  return (
+                    <button
+                      onClick={() => handleUpgrade(p)}
+                      disabled={upgrading === p.id || user?.role === 'team_member'}
+                      style={{
+                      width:'100%', padding:'8px 12px', borderRadius:8, border:`1.5px solid ${style.color}`,
+                      background:'transparent', color:style.color, fontSize:12.5, fontWeight:700,
+                      cursor: user?.role === 'team_member' ? 'not-allowed' : 'pointer', transition:'all 0.18s', fontFamily:'inherit',
+                      opacity: upgrading === p.id ? 0.6 : 1,
+                    }}
+                      onMouseEnter={e => { if (user?.role === 'team_member') return; e.currentTarget.style.background=`linear-gradient(135deg,${style.gradA},${style.gradB})`; e.currentTarget.style.color='#fff'; e.currentTarget.style.border='1.5px solid transparent'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color=style.color; e.currentTarget.style.border=`1.5px solid ${style.color}`; }}
+                    >
+                      {upgrading === p.id ? 'Starting checkout…' : (billingConfigured ? 'Upgrade' : 'Contact to Upgrade')}
+                    </button>
+                  );
+                })()}
               </div>
             );
           })}
         </div>
       </div>
 
-      {user?.role === 'team_member'
-        ? <Alert type="info">To upgrade the plan, ask your account owner to contact AdoBoost support.</Alert>
-        : <Alert type="info">To change your subscription plan, contact <strong>AdoBoost support</strong> and we'll upgrade your account.</Alert>
-      }
+      {user?.role === 'team_member' ? (
+        <Alert type="info">To upgrade the plan, ask your account owner to contact AdoBoost support.</Alert>
+      ) : paypal?.configured ? (
+        <Alert type="info">
+          Subscriptions are billed securely through PayPal — you can pay with a PayPal balance or any card. Cancel anytime; your plan stays active until the end of the paid period.
+          {user?.plan?.toLowerCase() !== 'trial' && (
+            <>
+              {' '}
+              <button
+                onClick={async () => {
+                  if (!confirm('Cancel your subscription? You keep access until the end of the current period.')) return;
+                  try { await api.post('/paypal/cancel'); toast.success('Subscription cancelled.'); }
+                  catch (e) { toast.error(e.response?.data?.error || 'Could not cancel. Contact support.'); }
+                }}
+                style={{ background: 'none', border: 'none', color: '#dc2626', textDecoration: 'underline', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', padding: 0 }}>
+                Cancel subscription
+              </button>
+            </>
+          )}
+        </Alert>
+      ) : (
+        <Alert type="info">To change your subscription plan, contact <strong>AdoBoost support</strong> and we'll upgrade your account.</Alert>
+      )}
     </div>
   );
 }
