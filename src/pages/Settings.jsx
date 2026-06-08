@@ -119,7 +119,8 @@ export function Billing() {
   const [plansLoading, setPlansLoading] = useState(true);
   const [billingConfigured, setBillingConfigured] = useState(false);
   const [upgrading, setUpgrading] = useState(null);
-  const [paypal, setPaypal] = useState(null); // { configured, client_id, plans }
+  const [paypal, setPaypal] = useState(null); // { configured, client_id, plans, plans_annual }
+  const [interval, setInterval] = useState('monthly'); // 'monthly' | 'annual'
 
   useEffect(() => {
     api.get('/plans')
@@ -223,6 +224,25 @@ export function Billing() {
             Choose Your Plan
           </div>
           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          {paypal?.annual_available && (
+            <div style={{ display: 'inline-flex', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 999, padding: 3, gap: 2 }}>
+              {['monthly', 'annual'].map(opt => (
+                <button key={opt} onClick={() => setInterval(opt)}
+                  style={{
+                    border: 'none', cursor: 'pointer', fontFamily: 'inherit', borderRadius: 999,
+                    padding: '5px 14px', fontSize: 12, fontWeight: 700,
+                    background: interval === opt ? 'var(--primary)' : 'transparent',
+                    color: interval === opt ? '#fff' : 'var(--text2)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                  {opt === 'monthly' ? 'Monthly' : 'Annual'}
+                  {opt === 'annual' && (
+                    <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 999, background: interval === 'annual' ? 'rgba(255,255,255,0.25)' : '#dcfce7', color: interval === 'annual' ? '#fff' : '#16a34a' }}>2 MO FREE</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 20 }}>
@@ -268,10 +288,27 @@ export function Billing() {
                 </div>
 
                 <div style={{ fontWeight:700, fontSize:15, marginBottom:6, color:'var(--text)', letterSpacing:'-0.02em' }}>{p.name}</div>
-                <div style={{ marginBottom:14 }}>
-                  <span style={{ fontSize:26, fontWeight:800, color:style.color, letterSpacing:'-0.04em' }}>${p.price_monthly}</span>
-                  <span style={{ fontSize:12, color:'var(--text3)', fontWeight:400 }}>/mo</span>
-                </div>
+                {(() => {
+                  const slug = planSlug(p.name);
+                  const annualOn = interval === 'annual' && paypal?.annual_available && slug && p.price_monthly > 0;
+                  if (annualOn) {
+                    const yearly = p.price_monthly * 10; // 2 months free
+                    const saved = p.price_monthly * 12 - yearly;
+                    return (
+                      <div style={{ marginBottom:14 }}>
+                        <span style={{ fontSize:26, fontWeight:800, color:style.color, letterSpacing:'-0.04em' }}>${yearly}</span>
+                        <span style={{ fontSize:12, color:'var(--text3)', fontWeight:400 }}>/yr</span>
+                        <div style={{ fontSize:11, color:'#16a34a', fontWeight:700, marginTop:2 }}>Save ${saved}/yr · ${(yearly/12).toFixed(0)}/mo</div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ marginBottom:14 }}>
+                      <span style={{ fontSize:26, fontWeight:800, color:style.color, letterSpacing:'-0.04em' }}>${p.price_monthly}</span>
+                      <span style={{ fontSize:12, color:'var(--text3)', fontWeight:400 }}>/mo</span>
+                    </div>
+                  );
+                })()}
 
                 <div style={{ marginBottom:16 }}>
                   {bullets.map(b => (
@@ -293,7 +330,10 @@ export function Billing() {
 
                 {(() => {
                   const slug = planSlug(p.name);
-                  const ppPlanId = paypal?.configured && slug ? paypal.plans?.[slug] : null;
+                  const useAnnual = interval === 'annual' && paypal?.annual_available;
+                  const ppPlanId = paypal?.configured && slug
+                    ? (useAnnual ? paypal.plans_annual?.[slug] : paypal.plans?.[slug])
+                    : null;
                   if (isCurrent) {
                     return (
                       <div style={{ fontSize:12, color:style.color, fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>
@@ -305,6 +345,7 @@ export function Billing() {
                   if (ppPlanId && user?.role !== 'team_member') {
                     return (
                       <PayPalSubscribeButton
+                        key={ppPlanId}
                         clientId={paypal.client_id}
                         planId={ppPlanId}
                         userId={user?.id}
