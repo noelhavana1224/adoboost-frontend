@@ -332,7 +332,15 @@ function WarmupCard({ account, poolSize, onUpdate }) {
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', fontWeight: 600 }}>⏸ Paused</span>
             )}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 6 }}>{account.from_email}</div>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {account.from_email}
+            {/^.*hostinger/i.test(`${account.host||''} ${account.imap_host||''}`) && (
+              <span title="Hostinger inboxes are capped at 100 emails/day. Warmup automatically stays under this so your campaign keeps its budget — keep your campaign daily limit modest (e.g. ≤ 50)."
+                style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d', cursor: 'help' }}>
+                ⚠️ Hostinger · 100/day cap
+              </span>
+            )}
+          </div>
           {/* Progress stats */}
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>📅 Day <strong>{warmupDays}</strong></span>
