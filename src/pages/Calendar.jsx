@@ -37,16 +37,26 @@ export default function SendingCalendar() {
     return send?.count || 0;
   };
 
+  const sameDay = (raw, date) => {
+    if (!raw) return false;
+    const d = new Date(raw);
+    return !isNaN(d.getTime()) && d.toDateString() === date.toDateString();
+  };
+
+  // Returns campaigns that START or END on this day, tagged with which.
   const getCampaignsForDay = (day) => {
     const date = new Date(year, month, day);
-    return campaigns.filter(c => {
-      // A campaign appears only on its launch/scheduled day — not every day.
-      // Scheduled campaigns use scheduled_at; immediate ones use created_at (launch day).
-      const launchRaw = c.scheduled_at || c.created_at;
-      if (!launchRaw) return false;
-      const launch = new Date(launchRaw);
-      return launch.toDateString() === date.toDateString();
-    });
+    const out = [];
+    for (const c of campaigns) {
+      const startRaw = c.first_scheduled_at || c.scheduled_at || c.started_at || c.created_at;
+      const endRaw   = c.last_scheduled_at;
+      const isStart = sameDay(startRaw, date);
+      // Only show an "ends" marker for campaigns that still have work queued
+      const isEnd   = endRaw && (c.pending_count > 0) && sameDay(endRaw, date) && !isStart;
+      if (isStart) out.push({ ...c, _marker: 'start' });
+      else if (isEnd) out.push({ ...c, _marker: 'end' });
+    }
+    return out;
   };
 
   // Block Trial users
@@ -119,8 +129,8 @@ export default function SendingCalendar() {
                   </div>
                 )}
                 {dayCampaigns.slice(0,2).map(c => (
-                  <div key={c.id} style={{ fontSize:10, background: c.status==='active'?'#f0fff4':'#fffff0', color: c.status==='active'?'#276749':'#975a16', borderRadius:4, padding:'1px 5px', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                    {c.name}
+                  <div key={c.id + c._marker} title={`${c.name} — ${c._marker==='end'?'projected end':'starts'}`} style={{ fontSize:10, background: c._marker==='end' ? '#eef2ff' : c.status==='active'?'#f0fff4':'#fffff0', color: c._marker==='end' ? '#4338ca' : c.status==='active'?'#276749':'#975a16', borderRadius:4, padding:'1px 5px', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {c._marker==='end' ? '🏁 ' : '🚀 '}{c.name}
                   </div>
                 ))}
                 {dayCampaigns.length > 2 && <div style={{ fontSize:10, color:'var(--text3)' }}>+{dayCampaigns.length-2} more</div>}
