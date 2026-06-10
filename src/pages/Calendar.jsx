@@ -40,12 +40,12 @@ export default function SendingCalendar() {
   const getCampaignsForDay = (day) => {
     const date = new Date(year, month, day);
     return campaigns.filter(c => {
-      if (c.status === 'active') return true;
-      if (c.scheduled_at) {
-        const sched = new Date(c.scheduled_at);
-        return sched.toDateString() === date.toDateString();
-      }
-      return false;
+      // A campaign appears only on its launch/scheduled day — not every day.
+      // Scheduled campaigns use scheduled_at; immediate ones use created_at (launch day).
+      const launchRaw = c.scheduled_at || c.created_at;
+      if (!launchRaw) return false;
+      const launch = new Date(launchRaw);
+      return launch.toDateString() === date.toDateString();
     });
   };
 
