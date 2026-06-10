@@ -595,11 +595,23 @@ export default function Campaigns() {
         daily_limit: full.daily_limit || 50,
         track_opens: !!full.track_opens,
         track_clicks: !!full.track_clicks,
+        // Preserve the full inbox rotation pool + send settings so the copy is
+        // a faithful clone (was only copying the single primary inbox).
+        rotation_account_ids: full.rotation_account_ids || '[]',
+        send_days:        full.send_days || 'mon,tue,wed,thu,fri',
+        timezone:         full.timezone || 'UTC',
+        send_time_start:  full.send_time_start || '08:00',
+        send_time_end:    full.send_time_end || '18:00',
+        all_hours:        !!full.all_hours,
+        visibility:       full.visibility || 'everyone',
         sequences: (full.sequences || []).map(s => ({
           subject:     s.subject,
+          subject_b:   s.subject_b || '',
           body:        s.body,
           delay_days:  s.delay_days || 0,
           delay_hours: s.delay_hours || 0,
+          step_type:   s.step_type || 'email',
+          linkedin_note: s.linkedin_note || '',
         })),
       };
       await api.post('/campaigns', newCamp);
