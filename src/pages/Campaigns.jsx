@@ -644,7 +644,7 @@ export default function Campaigns() {
                 <TD style={{ color: 'var(--cyan)' }}>{pct(c.opened_count, c.sent_count)}</TD>
                 <TD style={{ color: 'var(--green)' }}>{pct(c.clicked_count, c.sent_count)}</TD>
                 <TD style={{ color: 'var(--purple)' }}>{pct(c.replied_count, c.sent_count)}</TD>
-                <TD style={{ color: 'var(--red)' }}>{pct(c.bounced_count, c.sent_count)}</TD>
+                <TD style={{ color: 'var(--red)' }}>{pct(c.bounced_count, (c.sent_count||0)+(c.bounced_count||0))}</TD>
                 <TD style={{ color: 'var(--text2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.list_name || '—'}</TD>
                 <TD>
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -751,7 +751,7 @@ function ViewCampaignModal({ campaign, onClose }) {
       {tab === 'overview' && (
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 16 }}>
-            {[['Sent', sent, 'var(--primary)'], ['Opened', pctV(campaign.opened_count, sent), 'var(--cyan)'], ['Clicked', pctV(campaign.clicked_count, sent), 'var(--green)'], ['Replied', pctV(campaign.replied_count, sent), 'var(--purple)'], ['Bounced', pctV(campaign.bounced_count, sent), 'var(--red)']].map(([l, v, c]) => (
+            {[['Sent', sent, 'var(--primary)'], ['Opened', pctV(campaign.opened_count, sent), 'var(--cyan)'], ['Clicked', pctV(campaign.clicked_count, sent), 'var(--green)'], ['Replied', pctV(campaign.replied_count, sent), 'var(--purple)'], ['Bounced', pctV(campaign.bounced_count, (sent||0)+(campaign.bounced_count||0)), 'var(--red)']].map(([l, v, c]) => (
               <div key={l} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: c }}>{v}</div>
                 <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{l}</div>
