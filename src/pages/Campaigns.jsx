@@ -1181,7 +1181,7 @@ const DEFAULT_FORM = {
   timezone: 'America/New_York',
   send_time_start: '08:00', send_time_end: '18:00',
   linkedin_account_id: '',
-  all_hours: false, start_immediately: false,
+  all_hours: false, start_when: 'manual', scheduled_at: '',
   email_account_id: '', rotation_ids: [], list_id: '',
   daily_limit: 50, track_opens: true, track_clicks: true,
 };
@@ -1290,7 +1290,8 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         send_time_start: campaign.send_time_start || '08:00',
         send_time_end: campaign.send_time_end || '18:00',
         all_hours: !!campaign.all_hours,
-        start_immediately: !!campaign.start_immediately,
+        start_when: campaign.schedule_type === 'scheduled' ? 'scheduled' : (campaign.start_immediately ? 'now' : 'manual'),
+        scheduled_at: campaign.scheduled_at && !/[zZ]$/.test(campaign.scheduled_at) ? campaign.scheduled_at.slice(0,16) : (campaign.scheduled_at ? '' : ''),
         email_account_id: campaign.email_account_id || '',
         rotation_ids: rotationIds,
         list_id: campaign.list_id || '',
@@ -1323,20 +1324,42 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isActive && sequences.some(s => (!s.step_type || s.step_type === 'email') && !s.subject)) return toast.error('All email steps need a subject');
+    if (form.start_when === 'scheduled' && !form.scheduled_at) { return toast.error('Pick a date and time to schedule the campaign'); }
     setLoading(true);
     try {
+      const scheduled = form.start_when === 'scheduled';
       const payload = {
         ...form,
         send_days: (form.send_days||[]).join(','),
         email_account_id: (form.rotation_ids||[]).length > 0 ? form.rotation_ids[0] : form.email_account_id,
         rotation_account_ids: JSON.stringify(form.rotation_ids || []),
         linkedin_account_id: Array.isArray(form.linkedin_account_id) ? form.linkedin_account_id : (form.linkedin_account_id ? [form.linkedin_account_id] : []),
+        schedule_type: scheduled ? 'scheduled' : 'immediate',
+        scheduled_at: scheduled ? form.scheduled_at : null,
+        start_immediately: form.start_when === 'now',
         sequences: isActive ? undefined : sequences,
       };
-      campaign
-        ? await api.put(`/campaigns/${campaign.id}`, payload)
-        : await api.post('/campaigns', payload);
-      toast.success(campaign ? 'Campaign updated ✅' : 'Campaign created ✅');
+      let campId = campaign?.id;
+      if (campaign) {
+        await api.put(`/campaigns/${campaign.id}`, payload);
+      } else {
+        const { data: created } = await api.post('/campaigns', payload);
+        campId = created?.id;
+      }
+      // Auto-launch for "start now" or "scheduled" (scheduled sends are anchored
+      // to the exact time, so they sit pending until then). Manual = stays draft.
+      if (campId && !isActive && (form.start_when === 'now' || form.start_when === 'scheduled')) {
+        try {
+          const { data: lr } = await api.post(`/campaigns/${campId}/launch`);
+          toast.success(scheduled
+            ? `📅 Scheduled — first email fires ${new Date(lr.first_send).toLocaleString()}`
+            : `🚀 Launched — ${lr.scheduled} emails queued`);
+        } catch (le) {
+          toast.error(le.response?.data?.error || 'Saved, but launch failed — launch it manually.');
+        }
+      } else {
+        toast.success(campaign ? 'Campaign updated ✅' : 'Campaign created ✅');
+      }
       onSaved();
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
     finally { setLoading(false); }
@@ -1460,21 +1483,43 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
             )}
           </div>
 
-          {/* Start immediately */}
-          <div style={{ border:'1.5px solid #e2e8f0', borderRadius:10, padding:'14px' }}>
-            <button type="button" onClick={() => f('start_immediately', !form.start_immediately)}
-              style={{ display:'flex', alignItems:'flex-start', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit', width:'100%', textAlign:'left' }}>
-              <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${form.start_immediately?'#2563eb':'#cbd5e1'}`, background:form.start_immediately?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>
-                {form.start_immediately && <span style={{ color:'#fff', fontSize:11, fontWeight:900 }}>✓</span>}
-              </div>
-              <div>
-                <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Start Campaign Immediately</div>
-                <div style={{ fontSize:11, color:'#64748b', marginTop:3, lineHeight:1.5 }}>
-                  When enabled, campaign starts sending as soon as you create it, bypassing manual launch.
-                  Send volume is controlled by each inbox's daily limit set in <strong>Email Accounts → Sending Speed</strong>.
-                </div>
-              </div>
-            </button>
+          {/* When to start */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>When to start</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {[
+                { id:'manual', title:'Launch manually', desc:'Save as a draft. You click Launch when you’re ready.' },
+                { id:'now', title:'🚀 Start immediately', desc:'Begins sending right after you create it.' },
+                { id:'scheduled', title:'📅 Schedule for a specific date & time', desc:'The first email fires at exactly the time you pick.' },
+              ].map(opt => {
+                const active = form.start_when === opt.id;
+                return (
+                  <div key={opt.id} onClick={() => f('start_when', opt.id)}
+                    style={{ border:`1.5px solid ${active?'#2563eb':'#e2e8f0'}`, background:active?'#eff6ff':'#fff', borderRadius:10, padding:'12px 14px', cursor:'pointer', transition:'all .15s' }}>
+                    <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                      <div style={{ width:18, height:18, borderRadius:'50%', border:`2px solid ${active?'#2563eb':'#cbd5e1'}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:1 }}>
+                        {active && <div style={{ width:9, height:9, borderRadius:'50%', background:'#2563eb' }}/>}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>{opt.title}</div>
+                        <div style={{ fontSize:11, color:'#64748b', marginTop:2, lineHeight:1.5 }}>{opt.desc}</div>
+                        {opt.id === 'scheduled' && active && (
+                          <div style={{ marginTop:10 }} onClick={e => e.stopPropagation()}>
+                            <input type="datetime-local" value={form.scheduled_at}
+                              min={new Date(Date.now() + 5*60000).toISOString().slice(0,16)}
+                              onChange={e => f('scheduled_at', e.target.value)}
+                              style={{ border:'1.5px solid #cbd5e1', borderRadius:8, padding:'9px 12px', fontSize:13, fontFamily:'inherit', color:'#0f172a', outline:'none' }}/>
+                            <div style={{ fontSize:11, color:'#64748b', marginTop:6 }}>
+                              Interpreted in the campaign timezone: <strong>{form.timezone}</strong>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Footer */}
