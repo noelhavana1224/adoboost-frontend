@@ -221,7 +221,7 @@ export default function Reports() {
           open_rate:   c.sent_count > 0 ? ((c.opened_count  || 0) / c.sent_count * 100).toFixed(1) : '0.0',
           click_rate:  c.sent_count > 0 ? ((c.clicked_count || 0) / c.sent_count * 100).toFixed(1) : '0.0',
           reply_rate:  c.sent_count > 0 ? ((c.replied_count || 0) / c.sent_count * 100).toFixed(1) : '0.0',
-          bounce_rate: c.sent_count > 0 ? ((c.bounced_count || 0) / c.sent_count * 100).toFixed(1) : '0.0',
+          bounce_rate: ((c.sent_count||0)+(c.bounced_count||0)) > 0 ? ((c.bounced_count || 0) / ((c.sent_count||0)+(c.bounced_count||0)) * 100).toFixed(1) : '0.0',
           failed_count: 0,
           unsubscribed_count: 0,
         }));
