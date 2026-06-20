@@ -173,7 +173,7 @@ const RANGE_OPTS = [
 function DeliverabilitySection() {
   const [d, setD] = useState(null);
   useEffect(() => { api.get('/analytics/deliverability').then(r => setD(r.data)).catch(() => {}); }, []);
-  if (!d) return null;
+  if (!d || !d.leads || !d.warmup || !d.blacklist || !d.replyCategories) return null;
 
   const totalLeads = (d.leads.interested || 0) + (d.leads.positive || 0);
   const health = d.warmup.avgHealth || 0;
