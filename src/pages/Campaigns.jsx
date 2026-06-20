@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -6,9 +6,9 @@ import { PageHeader, Card, Btn, Badge, Spinner, Empty, Modal, Input, Select, Tab
 import { Send, Plus, Play, Pause, Trash2, Edit2, Eye, X, Copy, ChevronDown, Sparkles, Shield, Linkedin } from 'lucide-react';
 
 const STATUS_COLOR = { draft:'default', active:'green', paused:'yellow', completed:'blue' };
-const pct = (n,d) => d>0?((n/d)*100).toFixed(1)+'%':'â€”';
+const pct = (n,d) => d>0?((n/d)*100).toFixed(1)+'%':'—';
 
-// â”€â”€ Personalization variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Personalization variables ────────────────────
 const VARS = [
   { label: 'First Name',      value: '{{first_name}}' },
   { label: 'Last Name',       value: '{{last_name}}' },
@@ -23,7 +23,7 @@ const VARS = [
   { label: 'Unsubscribe URL', value: '{{unsubscribe_url}}' },
 ];
 
-// â”€â”€ Personalization Dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Personalization Dropdown ─────────────────────
 function VarsDropdown({ onInsert, label = 'Insert Variable' }) {
   const [open, setOpen] = useState(false);
   return (
@@ -72,7 +72,7 @@ function VarsDropdown({ onInsert, label = 'Insert Variable' }) {
               <code style={{ fontSize: 10, background: '#fef3c7', padding: '1px 5px', borderRadius: 4, color: '#d97706' }}>{'{a|b|c}'}</code>
             </button>
             <div style={{ padding: '7px 12px 9px', fontSize: 10.5, color: 'var(--text3)', lineHeight: 1.5 }}>
-              Each recipient gets one random option â€” e.g. <code style={{ background:'#f1f5f9', padding:'0 3px', borderRadius:3 }}>{'{quick|fast}'}</code> question. Improves deliverability.
+              Each recipient gets one random option — e.g. <code style={{ background:'#f1f5f9', padding:'0 3px', borderRadius:3 }}>{'{quick|fast}'}</code> question. Improves deliverability.
             </div>
           </div>
         </>
@@ -81,7 +81,7 @@ function VarsDropdown({ onInsert, label = 'Insert Variable' }) {
   );
 }
 
-// â”€â”€ AI Credits Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AI Credits Bar ───────────────────────────────
 function AICreditsBar({ refreshKey }) {
   const [credits, setCredits] = useState(null);
   useEffect(() => {
@@ -113,7 +113,7 @@ function AICreditsBar({ refreshKey }) {
   );
 }
 
-// â”€â”€ Subject Line Input with AI + Variable Dropdown â”€
+// ── Subject Line Input with AI + Variable Dropdown ─
 function SubjectInput({ value, onChange, emailBody = '', onCreditUsed }) {
   const inputRef     = useRef(null);
   const [aiLoading,  setAiLoading]  = useState(false);
@@ -144,7 +144,7 @@ function SubjectInput({ value, onChange, emailBody = '', onCreditUsed }) {
       onCreditUsed?.();
     } catch (e) {
       if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted. Upgrade your plan.');
-      else toast.error('AI unavailable â€” check OPENAI_API_KEY in backend .env');
+      else toast.error('AI unavailable — check OPENAI_API_KEY in backend .env');
     } finally { setAiLoading(false); }
   };
 
@@ -159,7 +159,7 @@ function SubjectInput({ value, onChange, emailBody = '', onCreditUsed }) {
             borderRadius:6, fontSize:12, color:'#7c3aed', cursor: aiLoading ? 'not-allowed' : 'pointer',
             fontFamily:'inherit', fontWeight:600, opacity: aiLoading ? 0.7 : 1,
           }}>
-            <Sparkles size={11}/>{aiLoading ? 'Generatingâ€¦' : 'AI Subjects'}
+            <Sparkles size={11}/>{aiLoading ? 'Generating…' : 'AI Subjects'}
           </button>
           <VarsDropdown onInsert={insertVar} label="Add Variable" />
         </div>
@@ -179,7 +179,7 @@ function SubjectInput({ value, onChange, emailBody = '', onCreditUsed }) {
           <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:200, background:'#fff', border:'1px solid #c4b5fd', borderRadius:10, boxShadow:'0 8px 28px rgba(0,0,0,0.15)', overflow:'hidden' }}>
             <div style={{ padding:'8px 12px', borderBottom:'1px solid var(--border)', background:'#f5f3ff', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <span style={{ fontSize:11, fontWeight:700, color:'#7c3aed', display:'flex', alignItems:'center', gap:5 }}>
-                <Sparkles size={11}/>AI-Generated Subject Lines â€” click to use
+                <Sparkles size={11}/>AI-Generated Subject Lines — click to use
               </span>
               <button type="button" onClick={() => setShowPicker(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', lineHeight:1 }}><X size={13}/></button>
             </div>
@@ -198,17 +198,17 @@ function SubjectInput({ value, onChange, emailBody = '', onCreditUsed }) {
   );
 }
 
-// â”€â”€ Rich Text Editor for Email Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Rich Text Editor for Email Body ─────────────
 function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUsed }) {
   const editorRef    = useRef(null);
   const [initialized, setInitialized] = useState(false);
 
-  // â”€â”€ AI Rewrite state â”€â”€
+  // ── AI Rewrite state ──
   const [rewriteOpen,    setRewriteOpen]    = useState(false);
   const [rewriteLoading, setRewriteLoading] = useState(false);
   const [rewritePreview, setRewritePreview] = useState(null); // { tone, text }
 
-  // â”€â”€ AI Spam Score state â”€â”€
+  // ── AI Spam Score state ──
   const [spamLoading, setSpamLoading] = useState(false);
   const [spamResult,  setSpamResult]  = useState(null);
 
@@ -248,7 +248,7 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
 
   const handleRewrite = async (tone) => {
     const cleanBody = editorRef.current?.innerText?.trim() || '';
-    if (!cleanBody) { toast.error('Email body is empty â€” write your email first.'); return; }
+    if (!cleanBody) { toast.error('Email body is empty — write your email first.'); return; }
     setRewriteLoading(true);
     setRewriteOpen(false);
     try {
@@ -257,7 +257,7 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
       onCreditUsed?.();
     } catch (e) {
       if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted.');
-      else toast.error('AI rewrite failed â€” check OPENAI_API_KEY');
+      else toast.error('AI rewrite failed — check OPENAI_API_KEY');
     } finally { setRewriteLoading(false); }
   };
 
@@ -272,7 +272,7 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
       onCreditUsed?.();
     } catch (e) {
       if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted.');
-      else toast.error('Spam check failed â€” check OPENAI_API_KEY');
+      else toast.error('Spam check failed — check OPENAI_API_KEY');
     } finally { setSpamLoading(false); }
   };
 
@@ -306,12 +306,12 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
         onFocusCapture={e => { const el = e.currentTarget.querySelector('[contenteditable]'); if (el && e.target === el) e.currentTarget.style.borderColor = '#6366f1'; }}
         onBlurCapture={e => { e.currentTarget.style.borderColor = '#d1d5db'; }}>
 
-        {/* â”€â”€ Toolbar â”€â”€ */}
+        {/* ── Toolbar ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '6px 10px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', flexWrap: 'wrap', borderRadius: '10px 10px 0 0' }}>
 
           {/* Undo / Redo */}
-          <T title="Undo" onCmd={() => exec('undo')}>â†©</T>
-          <T title="Redo" onCmd={() => exec('redo')}>â†ª</T>
+          <T title="Undo" onCmd={() => exec('undo')}>↩</T>
+          <T title="Redo" onCmd={() => exec('redo')}>↪</T>
           {sep()}
 
           {/* Font family */}
@@ -413,14 +413,14 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
 
           {sep()}
 
-          {/* â”€â”€ AI: Rewrite button â”€â”€ */}
+          {/* ── AI: Rewrite button ── */}
           <div style={{ position:'relative' }}>
             <button type="button"
               onMouseDown={e => { e.preventDefault(); if (!rewriteLoading) setRewriteOpen(p => !p); }}
               disabled={rewriteLoading}
               style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 8px', background: rewriteOpen?'#f5f3ff':'none', border:`1px solid ${rewriteOpen?'#c4b5fd':'transparent'}`, borderRadius:6, cursor: rewriteLoading?'not-allowed':'pointer', color:'#7c3aed', fontSize:12, fontFamily:'inherit', fontWeight:600, opacity: rewriteLoading?0.6:1 }}
               title="AI Rewrite">
-              <Sparkles size={11}/>{rewriteLoading ? 'Rewritingâ€¦' : 'Rewrite'}
+              <Sparkles size={11}/>{rewriteLoading ? 'Rewriting…' : 'Rewrite'}
             </button>
             {rewriteOpen && (
               <>
@@ -444,17 +444,17 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
             )}
           </div>
 
-          {/* â”€â”€ AI: Spam Score button â”€â”€ */}
+          {/* ── AI: Spam Score button ── */}
           <button type="button"
             onMouseDown={e => { e.preventDefault(); handleSpamScore(); }}
             disabled={spamLoading}
             style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 8px', background:'none', border:'1px solid transparent', borderRadius:6, cursor: spamLoading?'not-allowed':'pointer', color:'#059669', fontSize:12, fontFamily:'inherit', fontWeight:600, opacity: spamLoading?0.6:1 }}
             title="Check spam score">
-            <Shield size={11}/>{spamLoading ? 'Checkingâ€¦' : 'Spam Score'}
+            <Shield size={11}/>{spamLoading ? 'Checking…' : 'Spam Score'}
           </button>
         </div>
 
-        {/* â”€â”€ AI Rewrite Preview â”€â”€ */}
+        {/* ── AI Rewrite Preview ── */}
         {rewritePreview && (
           <div style={{ padding:'12px 14px', borderBottom:'1px solid #c4b5fd', background:'#f5f3ff' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
@@ -464,11 +464,11 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
               <div style={{ display:'flex', gap:6 }}>
                 <button type="button" onClick={() => applyRewrite(rewritePreview.text)}
                   style={{ padding:'4px 10px', background:'#7c3aed', border:'none', borderRadius:5, color:'#fff', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
-                  âœ“ Accept
+                  ✓ Accept
                 </button>
                 <button type="button" onClick={() => setRewritePreview(null)}
                   style={{ padding:'4px 10px', background:'#fff', border:'1px solid #c4b5fd', borderRadius:5, color:'#7c3aed', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
-                  âœ— Discard
+                  ✗ Discard
                 </button>
               </div>
             </div>
@@ -489,10 +489,10 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
         />
       </div>
 
-      {/* â”€â”€ Spam Score Panel â”€â”€ */}
+      {/* ── Spam Score Panel ── */}
       {spamResult && (() => {
         const gradeColor = GRADES[spamResult.grade] || '#374151';
-        const verdictIcon = spamResult.verdict === 'inbox' ? 'âœ…' : spamResult.verdict === 'promotions' ? 'ðŸ“' : 'ðŸš«';
+        const verdictIcon = spamResult.verdict === 'inbox' ? '✅' : spamResult.verdict === 'promotions' ? '📁' : '🚫';
         return (
           <div style={{ marginTop:8, border:'1px solid #d1fae5', borderRadius:10, overflow:'hidden', fontSize:13 }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'#f0fdf4', borderBottom:'1px solid #d1fae5' }}>
@@ -521,7 +521,7 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
                           <strong>"{issue.text}"</strong>
                         </div>
                         <div style={{ fontSize:11, color:'#059669', marginTop:2 }}>
-                          ðŸ’¡ {issue.suggestion}
+                          💡 {issue.suggestion}
                         </div>
                       </div>
                     </div>
@@ -531,7 +531,7 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
             )}
             {spamResult.issues?.length === 0 && (
               <div style={{ padding:'10px 14px', background:'#fff', fontSize:13, color:'#059669', fontWeight:600 }}>
-                ðŸŽ‰ No spam issues detected â€” looks clean!
+                🎉 No spam issues detected — looks clean!
               </div>
             )}
           </div>
@@ -548,7 +548,7 @@ function RichBodyEditor({ value, onChange, placeholder, subject = '', onCreditUs
   );
 }
 
-// â”€â”€ Main Campaigns Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main Campaigns Component ─────────────────────
 export default function Campaigns() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -584,7 +584,7 @@ export default function Campaigns() {
     catch { toast.error('Failed'); }
   };
 
-  // â”€â”€ Clone campaign â”€â”€
+  // ── Clone campaign ──
   const handleClone = async (campaign) => {
     try {
       const { data: full } = await api.get(`/campaigns/${campaign.id}`);
@@ -615,7 +615,7 @@ export default function Campaigns() {
         })),
       };
       await api.post('/campaigns', newCamp);
-      toast.success(`âœ… Campaign cloned as "${newCamp.name}"`);
+      toast.success(`✅ Campaign cloned as "${newCamp.name}"`);
       load();
     } catch (err) { toast.error(err.response?.data?.error || 'Clone failed'); }
   };
@@ -645,7 +645,7 @@ export default function Campaigns() {
                 <TD style={{ color: 'var(--green)' }}>{pct(c.clicked_count, c.sent_count)}</TD>
                 <TD style={{ color: 'var(--purple)' }}>{pct(c.replied_count, c.sent_count)}</TD>
                 <TD style={{ color: 'var(--red)' }}>{pct(c.bounced_count, (c.sent_count||0)+(c.bounced_count||0))}</TD>
-                <TD style={{ color: 'var(--text2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.list_name || 'â€”'}</TD>
+                <TD style={{ color: 'var(--text2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.list_name || '—'}</TD>
                 <TD>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <Btn size="sm" variant="ghost" onClick={() => setViewCampaign(c)} title="View"><Eye size={12}/></Btn>
@@ -685,7 +685,7 @@ export default function Campaigns() {
   );
 }
 
-// â”€â”€ View Campaign Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── View Campaign Modal ──────────────────────────
 function ViewCampaignModal({ campaign, onClose }) {
   const [data, setData]   = useState(null);
   const [sends, setSends] = useState([]);
@@ -708,7 +708,7 @@ function ViewCampaignModal({ campaign, onClose }) {
     <Modal open={!!campaign} onClose={onClose} title={`Campaign: ${campaign.name}`} width={720}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
         {['overview', 'sends', ...(abTests.length ? ['ab'] : [])].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${tab === t ? 'var(--primary)' : 'var(--border2)'}`, background: tab === t ? 'var(--primary-dim)' : '#fff', color: tab === t ? 'var(--primary)' : 'var(--text2)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: tab === t ? 600 : 400, textTransform: 'capitalize' }}>{t === 'ab' ? 'ðŸ§ª A/B Test' : t}</button>
+          <button key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${tab === t ? 'var(--primary)' : 'var(--border2)'}`, background: tab === t ? 'var(--primary-dim)' : '#fff', color: tab === t ? 'var(--primary)' : 'var(--text2)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: tab === t ? 600 : 400, textTransform: 'capitalize' }}>{t === 'ab' ? '🧪 A/B Test' : t}</button>
         ))}
       </div>
 
@@ -718,7 +718,7 @@ function ViewCampaignModal({ campaign, onClose }) {
             const A = test.variants.A, B = test.variants.B;
             const Col = ({ v, label, subj, win }) => (
               <div style={{ flex: 1, border: `2px solid ${win ? '#16a34a' : 'var(--border2)'}`, borderRadius: 10, padding: 14, background: win ? '#f0fff4' : '#fff', position: 'relative' }}>
-                {win && <span style={{ position: 'absolute', top: -10, right: 10, background: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>ðŸ† WINNER</span>}
+                {win && <span style={{ position: 'absolute', top: -10, right: 10, background: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>🏆 WINNER</span>}
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>Subject {label}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12, minHeight: 34 }}>{subj}</div>
                 <div style={{ display: 'flex', gap: 12 }}>
@@ -731,16 +731,16 @@ function ViewCampaignModal({ campaign, onClose }) {
             return (
               <div key={ti}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>
-                  {test.step_number === 1 ? 'ðŸ“§ Initial Email' : `ðŸ”„ Follow-up ${test.step_number - 1}`} â€” Subject A/B Test
+                  {test.step_number === 1 ? '📧 Initial Email' : `🔄 Follow-up ${test.step_number - 1}`} — Subject A/B Test
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
                   <Col v={A} label="A" subj={test.subject_a} win={test.winner === 'A'} />
                   <Col v={B} label="B" subj={test.subject_b} win={test.winner === 'B'} />
                 </div>
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>
-                  {test.winner === 'tie' ? 'ðŸ¤ It\'s a tie so far â€” both subjects performing equally.'
+                  {test.winner === 'tie' ? '🤝 It\'s a tie so far — both subjects performing equally.'
                     : test.winner ? `Winner determined by open rate. Use this subject in future campaigns.`
-                    : 'â³ Gathering data â€” need at least 5 sends per variant to call a winner.'}
+                    : '⏳ Gathering data — need at least 5 sends per variant to call a winner.'}
                 </div>
               </div>
             );
@@ -764,7 +764,7 @@ function ViewCampaignModal({ campaign, onClose }) {
               {data.sequences.map((s, i) => (
                 <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 8, background: 'var(--bg3)' }}>
                   <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: i === 0 ? 'var(--primary)' : 'var(--orange)' }}>
-                    {i === 0 ? 'ðŸ“§ Initial Email' : `ðŸ”„ Follow-up ${i}`}
+                    {i === 0 ? '📧 Initial Email' : `🔄 Follow-up ${i}`}
                     {i > 0 && <span style={{ fontWeight: 400, color: 'var(--text3)', marginLeft: 8 }}>({s.delay_days}d {s.delay_hours}h delay)</span>}
                   </div>
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{s.subject}</div>
@@ -786,7 +786,7 @@ function ViewCampaignModal({ campaign, onClose }) {
                 toast.success('Failed sends queued for retry!');
                 api.get(`/campaigns/${campaign.id}/sends`).then(r => setSends(r.data));
               } catch { toast.error('Retry failed'); }
-            }}>ðŸ”„ Retry Failed</Btn>
+            }}>🔄 Retry Failed</Btn>
           </div>
           <div style={{ maxHeight: 400, overflowY: 'auto' }}>
             {sends.length === 0 ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--text3)' }}>No sends yet</div> : (
@@ -796,10 +796,10 @@ function ViewCampaignModal({ campaign, onClose }) {
                     <TD style={{ fontSize: 12 }}>{s.email}</TD>
                     <TD style={{ fontSize: 12 }}>#{s.step_number}</TD>
                     <TD><Badge color={s.status === 'sent' ? 'green' : s.status === 'failed' ? 'red' : s.status === 'pending' ? 'yellow' : 'default'} style={{ fontSize: 10 }}>{s.status}</Badge></TD>
-                    <TD style={{ fontSize: 11, color: 'var(--red)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.error_message}>{s.error_message || 'â€”'}</TD>
-                    <TD style={{ fontSize: 11, color: 'var(--text3)' }}>{s.scheduled_at ? new Date(s.scheduled_at).toLocaleString() : 'â€”'}</TD>
-                    <TD style={{ fontSize: 11, color: 'var(--text3)' }}>{s.sent_at ? new Date(s.sent_at).toLocaleString() : 'â€”'}</TD>
-                    <TD style={{ fontSize: 12 }}>{s.opened_at ? 'âœ…' : 'â€”'}</TD>
+                    <TD style={{ fontSize: 11, color: 'var(--red)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.error_message}>{s.error_message || '—'}</TD>
+                    <TD style={{ fontSize: 11, color: 'var(--text3)' }}>{s.scheduled_at ? new Date(s.scheduled_at).toLocaleString() : '—'}</TD>
+                    <TD style={{ fontSize: 11, color: 'var(--text3)' }}>{s.sent_at ? new Date(s.sent_at).toLocaleString() : '—'}</TD>
+                    <TD style={{ fontSize: 12 }}>{s.opened_at ? '✅' : '—'}</TD>
                   </TR>
                 ))}
               </Table>
@@ -811,7 +811,7 @@ function ViewCampaignModal({ campaign, onClose }) {
   );
 }
 
-// â”€â”€ Inbox Rotation Dropdown Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Inbox Rotation Dropdown Select ──────────────
 function RotationSelect({ accounts, value, onChange, disabled }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
@@ -836,7 +836,7 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
         Email Account(s)
         {value.length > 1 && (
           <span style={{ marginLeft:8, fontSize:11, padding:'2px 8px', borderRadius:10, background:'#eff6ff', color:'#2563eb', fontWeight:700 }}>
-            ðŸ”„ Rotation: {value.length} accounts
+            🔄 Rotation: {value.length} accounts
           </span>
         )}
       </label>
@@ -845,7 +845,7 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
         style={{ width:'100%', border:`1px solid ${open?'var(--primary)':'var(--border2)'}`, borderRadius:8, padding:'9px 12px', background:disabled?'var(--bg3)':'#fff', cursor:disabled?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, fontFamily:'inherit', textAlign:'left', transition:'border-color 0.15s' }}>
         <div style={{ flex:1, minWidth:0 }}>
           {selectedAccounts.length === 0 ? (
-            <span style={{ fontSize:13, color:'var(--text3)' }}>Select account(s)â€¦</span>
+            <span style={{ fontSize:13, color:'var(--text3)' }}>Select account(s)…</span>
           ) : selectedAccounts.length === 1 ? (
             <div>
               <span style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{selectedAccounts[0].name}</span>
@@ -880,21 +880,21 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
                 onMouseEnter={e => { if (!selected) e.currentTarget.style.background='var(--bg3)'; }}
                 onMouseLeave={e => { if (!selected) e.currentTarget.style.background='#fff'; }}>
                 <div style={{ width:18, height:18, borderRadius:5, border:`2px solid ${selected?'var(--primary)':'var(--border2)'}`, background:selected?'var(--primary)':'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all 0.15s' }}>
-                  {selected && <span style={{ color:'#fff', fontSize:11, fontWeight:700, lineHeight:1 }}>âœ“</span>}
+                  {selected && <span style={{ color:'#fff', fontSize:11, fontWeight:700, lineHeight:1 }}>✓</span>}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:selected?600:400, color:'var(--text)' }}>{a.name}</div>
                   <div style={{ fontSize:11, color:'var(--text3)' }}>{a.from_email}</div>
                 </div>
-                {a.signature && <span style={{ fontSize:10, color:'#16a34a', fontWeight:600, flexShrink:0 }}>âœï¸ Sig</span>}
-                {selected && <span style={{ fontSize:10, color:'var(--primary)', fontWeight:700, flexShrink:0 }}>âœ“</span>}
+                {a.signature && <span style={{ fontSize:10, color:'#16a34a', fontWeight:600, flexShrink:0 }}>✍️ Sig</span>}
+                {selected && <span style={{ fontSize:10, color:'var(--primary)', fontWeight:700, flexShrink:0 }}>✓</span>}
               </label>
             );
           })}
           {accounts.length === 0 && <div style={{ padding:'14px', fontSize:13, color:'var(--text3)', textAlign:'center' }}>No accounts connected</div>}
           {value.length > 1 && (
             <div style={{ padding:'8px 12px', background:'#f0f9ff', borderTop:'1px solid #bae6fd', fontSize:11, color:'#0284c7' }}>
-              ðŸ”„ Smart rotation across {value.length} accounts â€” volume is automatically <strong>weighted toward your healthiest inboxes</strong> with capacity left. Low-health or errored inboxes are throttled or skipped.
+              🔄 Smart rotation across {value.length} accounts — volume is automatically <strong>weighted toward your healthiest inboxes</strong> with capacity left. Low-health or errored inboxes are throttled or skipped.
             </div>
           )}
         </div>
@@ -905,19 +905,23 @@ function RotationSelect({ accounts, value, onChange, disabled }) {
   );
 }
 
-// ── Send Test Email Modal ─────────────────────────
-function TestEmailModal({ open, onClose, sequences, accounts = [], rotationIds = [] }) {
-  const [toEmail, setToEmail] = React.useState('');
-  const [stepIdx, setStepIdx] = React.useState(0);
-  const [sending, setSending] = React.useState(false);
+// ── Send Test Email Modal ────────────────────────
+// Sends a real test email through the selected account so the user can see
+// exactly how the email looks in an inbox before launching the campaign.
 
-  React.useEffect(() => { if (open) { setStepIdx(0); setToEmail(''); } }, [open]);
+function TestEmailModal({ open, onClose, sequences, accounts = [], rotationIds = [] }) {
+  const [toEmail, setToEmail] = useState('');
+  const [stepIdx, setStepIdx] = useState(0);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => { if (open) { setStepIdx(0); setToEmail(''); } }, [open]);
 
   if (!open || !sequences?.length) return null;
   const emailSeqs = sequences.filter(s => !s.step_type || s.step_type === 'email');
   if (!emailSeqs.length) return null;
   const seq = emailSeqs[stepIdx] || emailSeqs[0];
   const selectedAccountId = rotationIds[0] || (accounts[0]?.id || '');
+  const fromAccount = accounts.find(a => a.id === selectedAccountId);
 
   const handleSend = async () => {
     if (!toEmail.trim()) return toast.error('Enter a recipient email');
@@ -934,19 +938,17 @@ function TestEmailModal({ open, onClose, sequences, accounts = [], rotationIds =
       });
       toast.success('Test email sent to ' + toEmail.trim());
       onClose();
-    } catch(e) {
+    } catch (e) {
       toast.error(e.response?.data?.error || 'Failed to send test email');
     } finally { setSending(false); }
   };
-
-  const fromAccount = accounts.find(a => a.id === selectedAccountId);
 
   return (
     <Modal open={open} onClose={onClose} title="Send Test Email" width={480}>
       <div style={{ padding:'4px 0' }}>
         <p style={{ fontSize:13, color:'var(--text3)', marginBottom:20, lineHeight:1.5 }}>
           Send a real test to any inbox to see exactly how your email looks before launching.
-          Tracking links/pixels are stripped — subject is prefixed with <b>[TEST]</b>.
+          Tracking links/pixels are stripped &mdash; subject is prefixed with <b>[TEST]</b>.
         </p>
         {emailSeqs.length > 1 && (
           <div style={{ marginBottom:16 }}>
@@ -955,7 +957,7 @@ function TestEmailModal({ open, onClose, sequences, accounts = [], rotationIds =
               style={{ width:'100%', padding:'9px 12px', border:'1px solid var(--border2)', borderRadius:8, fontSize:13, background:'#fff', fontFamily:'inherit', color:'var(--text)' }}>
               {emailSeqs.map((s, i) => (
                 <option key={i} value={i}>
-                  {i === 0 ? 'Step 1 — Initial Email' : 'Step ' + (i+1) + ' — Follow-up'}{s.subject ? ': ' + s.subject : ''}
+                  {(i === 0 ? 'Step 1: Initial Email' : 'Step ' + (i+1) + ': Follow-up')}{s.subject ? ' — ' + s.subject : ''}
                 </option>
               ))}
             </select>
@@ -978,7 +980,7 @@ function TestEmailModal({ open, onClose, sequences, accounts = [], rotationIds =
           <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
           <Btn type="button" onClick={handleSend} disabled={sending || !toEmail.trim()}
             style={{ background:'linear-gradient(135deg,#ea580c,#dc2626)', border:'none', color:'#fff', minWidth:120 }}>
-            {sending ? 'Sending…' : React.createElement(React.Fragment, null, React.createElement(Send, {size:13, style:{marginRight:5}}), 'Send Test')}
+            <Send size={13} style={{ marginRight:5 }}/>{sending ? 'Sending...' : 'Send Test'}
           </Btn>
         </div>
       </div>
@@ -986,7 +988,7 @@ function TestEmailModal({ open, onClose, sequences, accounts = [], rotationIds =
   );
 }
 
-// â”€â”€ Email Preview Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Email Preview Modal ──────────────────────────
 // Renders the email with the first real contact + selected account data so
 // the sender can see exactly how the email will look in a recipient's inbox.
 
@@ -1029,7 +1031,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   const fromName  = selectedAccount.from_name  || selectedAccount.name || 'Your Name';
   const fromEmail = selectedAccount.from_email || selectedAccount.username || 'you@yourdomain.com';
 
-  // Parse signature â€” stored as JSON { mode, html, plain }
+  // Parse signature — stored as JSON { mode, html, plain }
   // Also substitute {{from_name}} / {{from_email}} that templates embed inside the sig HTML
   let signatureHtml = '';
   try {
@@ -1097,7 +1099,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   const renderedSubject = previewRender(seq.subject || '(No subject)');
   const today = new Date().toLocaleDateString('en-US', { weekday:'short', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
 
-  // Full iframe content â€” body + unsubscribe footer in one document (mirrors the real email)
+  // Full iframe content — body + unsubscribe footer in one document (mirrors the real email)
   const iframeSrc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.7;color:#1a1a1a;margin:0;padding:0}
     a{color:#4f46e5} img{max-width:100%}
@@ -1109,7 +1111,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   // Label: are we using real contact data or fallback?
   const dataLabel = previewContact
     ? `Previewing with: ${sampleData.full_name} <${sampleData.email}>`
-    : loadingContact ? 'Loading contactâ€¦' : 'No list selected â€” showing sample names';
+    : loadingContact ? 'Loading contact…' : 'No list selected — showing sample names';
 
   // Show which account is being previewed when multiple are selected
   const accountLabel = selectedAccount.from_email
@@ -1117,7 +1119,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
     : '';
 
   return (
-    <Modal open={open} onClose={onClose} title="ðŸ“§ Email Preview" width={660}>
+    <Modal open={open} onClose={onClose} title="📧 Email Preview" width={660}>
       {/* Step navigation */}
       {sequences.length > 1 && (
         <div style={{ display:'flex', gap:6, marginBottom:14 }}>
@@ -1128,7 +1130,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
               background: step===i ? 'var(--primary-dim)' : '#fff',
               color: step===i ? 'var(--primary)' : 'var(--text2)', cursor:'pointer', fontFamily:'inherit',
             }}>
-              {i===0 ? 'ðŸ“§ Initial' : `ðŸ”„ Follow-up ${i}`}
+              {i===0 ? '📧 Initial' : `🔄 Follow-up ${i}`}
               {i>0 && s.delay_days > 0 && <span style={{ fontSize:10, opacity:0.7 }}> +{s.delay_days}d</span>}
             </button>
           ))}
@@ -1137,8 +1139,8 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
 
       {/* Data source info bar */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, fontSize:11, color:'#64748b' }}>
-        <span>ðŸ‘¤ {dataLabel}</span>
-        {accountLabel && <span>ðŸ“¬ {accountLabel}</span>}
+        <span>👤 {dataLabel}</span>
+        {accountLabel && <span>📬 {accountLabel}</span>}
       </div>
 
       {/* Email chrome */}
@@ -1167,7 +1169,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
           </div>
         </div>
 
-        {/* Body â€” signature + unsubscribe footer rendered inside the iframe */}
+        {/* Body — signature + unsubscribe footer rendered inside the iframe */}
         <div style={{ background:'#fff', padding:'18px 20px' }}>
           <iframe
             title="email-preview"
@@ -1181,9 +1183,9 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
 
       {/* Hint */}
       <div style={{ marginTop:10, background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, padding:'8px 12px', fontSize:12, color:'#92400e', display:'flex', alignItems:'flex-start', gap:8 }}>
-        <span style={{ fontSize:14 }}>ðŸ’¡</span>
+        <span style={{ fontSize:14 }}>💡</span>
         <div>
-          <span style={{ color:'#dc2626', fontWeight:600 }}>Red variables</span> aren't recognised â€” check your spelling.&nbsp;
+          <span style={{ color:'#dc2626', fontWeight:600 }}>Red variables</span> aren't recognised — check your spelling.&nbsp;
           <span style={{ color:'#d97706', fontWeight:600 }}>Orange variables</span> are valid but empty for this contact (real emails use their actual value).&nbsp;
           {!previewContact && !loadingContact && 'Select a contact list to preview with real data.'}
         </div>
@@ -1192,7 +1194,7 @@ function EmailPreviewModal({ open, onClose, sequences, accounts = [], rotationId
   );
 }
 
-// â”€â”€ Timezone list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Timezone list ────────────────────────────────
 const TIMEZONES = [
   { v:'UTC',                    l:'(UTC+00:00) UTC' },
   { v:'America/New_York',       l:'(GMT-05:00) Eastern Time (US & Canada)' },
@@ -1267,7 +1269,7 @@ const DEFAULT_FORM = {
   daily_limit: 50, track_opens: true, track_clicks: true,
 };
 
-// â”€â”€ LinkedIn Account Rotation Selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── LinkedIn Account Rotation Selector ──────────
 function LinkedInRotationSelect({ accounts, value, onChange }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
@@ -1292,13 +1294,13 @@ function LinkedInRotationSelect({ accounts, value, onChange }) {
         <Linkedin size={14} color="#2563eb" />
         <label style={{ fontSize:12, fontWeight:700, color:'#1e40af' }}>
           LinkedIn Account(s)
-          {vals.length > 1 && <span style={{ marginLeft:8, fontSize:11, padding:'2px 7px', borderRadius:10, background:'#dbeafe', color:'#2563eb', fontWeight:700 }}>ðŸ”„ Rotation: {vals.length} accounts</span>}
+          {vals.length > 1 && <span style={{ marginLeft:8, fontSize:11, padding:'2px 7px', borderRadius:10, background:'#dbeafe', color:'#2563eb', fontWeight:700 }}>🔄 Rotation: {vals.length} accounts</span>}
         </label>
       </div>
       <div style={{ position:'relative' }}>
         <button type="button" onClick={() => setOpen(p => !p)}
           style={{ width:'100%', border:'1px solid #93c5fd', borderRadius:7, padding:'8px 12px', fontSize:13, background:'#fff', outline:'none', color:'var(--text)', cursor:'pointer', textAlign:'left', display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:'inherit' }}>
-          <span>{selected.length === 0 ? 'Select LinkedIn account(s)â€¦' : selected.map(a => a.name).join(', ')}</span>
+          <span>{selected.length === 0 ? 'Select LinkedIn account(s)…' : selected.map(a => a.name).join(', ')}</span>
           <ChevronDown size={13} color="#94a3b8"/>
         </button>
         {open && (
@@ -1306,7 +1308,7 @@ function LinkedInRotationSelect({ accounts, value, onChange }) {
             <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:99 }}/>
             <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:100, background:'#fff', border:'1px solid #93c5fd', borderRadius:9, boxShadow:'0 4px 20px rgba(0,0,0,0.12)', overflow:'hidden' }}>
               {accounts.length === 0 ? (
-                <div style={{ padding:'12px 14px', fontSize:12, color:'var(--text3)' }}>No LinkedIn accounts yet â€” add one in the LinkedIn tab.</div>
+                <div style={{ padding:'12px 14px', fontSize:12, color:'var(--text3)' }}>No LinkedIn accounts yet — add one in the LinkedIn tab.</div>
               ) : accounts.map(a => {
                 const sel = vals.includes(a.id);
                 return (
@@ -1316,9 +1318,9 @@ function LinkedInRotationSelect({ accounts, value, onChange }) {
                     onMouseLeave={e => { if (!sel) e.currentTarget.style.background='#fff'; }}>
                     <div>
                       <div style={{ fontSize:13, fontWeight:600, color: sel?'#1d4ed8':'var(--text)' }}>{a.name}</div>
-                      <div style={{ fontSize:11, color:'var(--text3)' }}>{a.daily_limit}/day Â· {a.status}</div>
+                      <div style={{ fontSize:11, color:'var(--text3)' }}>{a.daily_limit}/day · {a.status}</div>
                     </div>
-                    {sel && <span style={{ color:'#2563eb', fontWeight:700, fontSize:14 }}>âœ“</span>}
+                    {sel && <span style={{ color:'#2563eb', fontWeight:700, fontSize:14 }}>✓</span>}
                   </button>
                 );
               })}
@@ -1333,7 +1335,7 @@ function LinkedInRotationSelect({ accounts, value, onChange }) {
   );
 }
 
-// â”€â”€ Create/Edit Campaign Modal (2-step wizard) â”€â”€â”€
+// ── Create/Edit Campaign Modal (2-step wizard) ───
 function CampaignModal({ open, campaign, onClose, onSaved }) {
   const { user } = useAuth();
   const canUseLinkedIn = ['professional', 'unlimited'].includes(user?.plan);
@@ -1434,13 +1436,13 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
         try {
           const { data: lr } = await api.post(`/campaigns/${campId}/launch`);
           toast.success(scheduled
-            ? `ðŸ“… Scheduled â€” first email fires ${new Date(lr.first_send).toLocaleString()}`
-            : `ðŸš€ Launched â€” ${lr.scheduled} emails queued`);
+            ? `📅 Scheduled — first email fires ${new Date(lr.first_send).toLocaleString()}`
+            : `🚀 Launched — ${lr.scheduled} emails queued`);
         } catch (le) {
-          toast.error(le.response?.data?.error || 'Saved, but launch failed â€” launch it manually.');
+          toast.error(le.response?.data?.error || 'Saved, but launch failed — launch it manually.');
         }
       } else {
-        toast.success(campaign ? 'Campaign updated âœ…' : 'Campaign created âœ…');
+        toast.success(campaign ? 'Campaign updated ✅' : 'Campaign created ✅');
       }
       onSaved();
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
@@ -1451,10 +1453,10 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
 
   return (
     <Modal open={open} onClose={onClose}
-      title={campaign ? `Edit â€” ${campaign.name}` : 'Create your next lead-generating campaign'}
+      title={campaign ? `Edit — ${campaign.name}` : 'Create your next lead-generating campaign'}
       width={740}>
 
-      {/* â”€â”€ Wizard Step Indicator â”€â”€ */}
+      {/* ── Wizard Step Indicator ── */}
       <div style={{ display:'flex', alignItems:'center', gap:0, marginBottom:22, background:'#f8fafc', borderRadius:10, padding:'4px', border:'1px solid #e2e8f0' }}>
         {[{id:'schedule',label:'1  Schedule & Settings'},{id:'emails',label:'2  Write Emails'}].map((s,i) => (
           <button key={s.id} type="button"
@@ -1469,22 +1471,22 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
 
       {isActive && (
         <div style={{ background:'#fffff0', border:'1px solid #faf089', borderRadius:8, padding:'10px 14px', marginBottom:14, fontSize:13, color:'#975a16' }}>
-          âš ï¸ Campaign is <strong>active</strong>. Name, schedule &amp; limit can be changed; sequences cannot.
+          ⚠️ Campaign is <strong>active</strong>. Name, schedule &amp; limit can be changed; sequences cannot.
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• STEP 1: SCHEDULE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ═══════════════ STEP 1: SCHEDULE ═══════════════ */}
       {wizardStep === 'schedule' && (
         <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
           {/* Campaign name */}
-          <Input label="Campaign Name *" value={form.name} onChange={e => f('name', e.target.value)} required placeholder="Q3 Outreach â€” SaaS Decision Makers" />
+          <Input label="Campaign Name *" value={form.name} onChange={e => f('name', e.target.value)} required placeholder="Q3 Outreach — SaaS Decision Makers" />
 
           {/* Sharing */}
           <div>
             <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Sharing</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              {[{v:'everyone',label:'ðŸ‘¥ Everyone',desc:'Team members can see & edit'},{v:'only_me',label:'ðŸ”’ Only Me',desc:'Private to your account'}].map(opt => (
+              {[{v:'everyone',label:'👥 Everyone',desc:'Team members can see & edit'},{v:'only_me',label:'🔒 Only Me',desc:'Private to your account'}].map(opt => (
                 <button key={opt.v} type="button" onClick={() => f('visibility', opt.v)}
                   style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:10, border:`2px solid ${form.visibility===opt.v?'#2563eb':'#e2e8f0'}`, background:form.visibility===opt.v?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all 0.15s' }}>
                   <div style={{ width:18, height:18, borderRadius:9, border:`2px solid ${form.visibility===opt.v?'#2563eb':'#cbd5e1'}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -1501,13 +1503,13 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
 
           {/* Send days */}
           <div>
-            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Send Time â€” Days</div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Send Time — Days</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
               {/* ALL DAYS shortcut */}
               <button type="button" onClick={() => f('send_days', allDaysSelected ? [] : DAYS.map(d=>d.id))}
                 style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:`2px solid ${allDaysSelected?'#2563eb':'#e2e8f0'}`, background:allDaysSelected?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, color:allDaysSelected?'#1d4ed8':'#475569', transition:'all 0.15s' }}>
                 <div style={{ width:16, height:16, borderRadius:3, border:`2px solid ${allDaysSelected?'#2563eb':'#cbd5e1'}`, background:allDaysSelected?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  {allDaysSelected && <span style={{ color:'#fff', fontSize:10, fontWeight:900, lineHeight:1 }}>âœ“</span>}
+                  {allDaysSelected && <span style={{ color:'#fff', fontSize:10, fontWeight:900, lineHeight:1 }}>✓</span>}
                 </div>
                 ALL DAYS
               </button>
@@ -1517,7 +1519,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                   <button key={d.id} type="button" onClick={() => toggleDay(d.id)}
                     style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:`2px solid ${sel?'#2563eb':'#e2e8f0'}`, background:sel?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, color:sel?'#1d4ed8':'#475569', transition:'all 0.15s' }}>
                     <div style={{ width:16, height:16, borderRadius:3, border:`2px solid ${sel?'#2563eb':'#cbd5e1'}`, background:sel?'#2563eb':'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      {sel && <span style={{ color:'#fff', fontSize:10, fontWeight:900, lineHeight:1 }}>âœ“</span>}
+                      {sel && <span style={{ color:'#fff', fontSize:10, fontWeight:900, lineHeight:1 }}>✓</span>}
                     </div>
                     {d.label}
                   </button>
@@ -1560,7 +1562,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
             </div>
             {form.all_hours && (
               <div style={{ marginTop:8, fontSize:12, color:'#64748b', background:'#f8fafc', borderRadius:7, padding:'7px 10px' }}>
-                âš¡ Emails will send at any time of day â€” useful for global audiences across timezones.
+                ⚡ Emails will send at any time of day — useful for global audiences across timezones.
               </div>
             )}
           </div>
@@ -1570,9 +1572,9 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
             <div style={{ fontSize:12, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>When to start</div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id:'manual', title:'Launch manually', desc:'Save as a draft. You click Launch when youâ€™re ready.' },
-                { id:'now', title:'ðŸš€ Start immediately', desc:'Begins sending right after you create it.' },
-                { id:'scheduled', title:'ðŸ“… Schedule for a specific date & time', desc:'The first email fires at exactly the time you pick.' },
+                { id:'manual', title:'Launch manually', desc:'Save as a draft. You click Launch when you’re ready.' },
+                { id:'now', title:'🚀 Start immediately', desc:'Begins sending right after you create it.' },
+                { id:'scheduled', title:'📅 Schedule for a specific date & time', desc:'The first email fires at exactly the time you pick.' },
               ].map(opt => {
                 const active = form.start_when === opt.id;
                 return (
@@ -1610,13 +1612,13 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
             <button type="button"
               onClick={() => { if (!form.name) return toast.error('Campaign name is required'); setWizardStep('emails'); }}
               style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 22px', background:'linear-gradient(135deg,#2563eb,#7c3aed)', color:'#fff', border:'none', borderRadius:9, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 2px 8px rgba(37,99,235,0.35)' }}>
-              Next: Write Emails â†’
+              Next: Write Emails →
             </button>
           </div>
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• STEP 2: EMAILS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ═══════════════ STEP 2: EMAILS ═══════════════ */}
       {wizardStep === 'emails' && (
         <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
@@ -1634,13 +1636,13 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
             const totalLimit = selected.reduce((sum, a) => sum + (a.daily_limit || 50), 0);
             return (
               <div style={{ background:'#f0fff4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13 }}>
-                <div style={{ fontWeight:700, color:'#16a34a', marginBottom:4 }}>ðŸ“Š Campaign Capacity: <strong>{totalLimit.toLocaleString()} emails/day</strong></div>
+                <div style={{ fontWeight:700, color:'#16a34a', marginBottom:4 }}>📊 Campaign Capacity: <strong>{totalLimit.toLocaleString()} emails/day</strong></div>
                 <div style={{ color:'#166534', fontSize:12 }}>{selected.map(a => <span key={a.id} style={{ marginRight:12 }}>{a.name}: <strong>{a.daily_limit||50}/day</strong></span>)}</div>
               </div>
             );
           })()}
 
-          {/* LinkedIn rotation selector â€” shown when plan allows and LinkedIn steps exist */}
+          {/* LinkedIn rotation selector — shown when plan allows and LinkedIn steps exist */}
           {canUseLinkedIn && sequences.some(s => s.step_type && s.step_type !== 'email') && (
             <LinkedInRotationSelect
               accounts={linkedinAccounts}
@@ -1662,6 +1664,10 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                     style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:7, fontSize:12, color:'#16a34a', cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
                     <Eye size={12}/>Preview
                   </button>
+                  <button type="button" onClick={() => setShowTestEmail(true)}
+                    style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', background:'#fff7ed', border:'1px solid #fdba74', borderRadius:7, fontSize:12, color:'#ea580c', cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
+                    <Send size={12}/>Send Test
+                  </button>
                   <Btn type="button" size="sm" variant="secondary"
                     onClick={() => setSequences(s => [...s, { subject:'', body:'', delay_days: s.length>0?3:0, delay_hours:0, step_type:'email', linkedin_note:'' }])}>
                     <Plus size={12}/> Add Follow-up
@@ -1674,7 +1680,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                     </Btn>
                   ) : (
                     <Btn type="button" size="sm" variant="ghost" disabled title="Requires Professional or Agency plan">
-                      <Linkedin size={12}/> LinkedIn Step ðŸ”’
+                      <Linkedin size={12}/> LinkedIn Step 🔒
                     </Btn>
                   )}
                 </div>
@@ -1683,8 +1689,8 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
               {sequences.map((seq, i) => {
                 const isLiStep = seq.step_type && seq.step_type !== 'email';
                 const stepLabel = isLiStep
-                  ? (seq.step_type === 'linkedin_view' ? 'ðŸ‘ View LinkedIn Profile' : 'ðŸ”— LinkedIn Connection Request')
-                  : (i === 0 ? 'ðŸ“§ Initial Email' : `ðŸ”„ Follow-up ${i}`);
+                  ? (seq.step_type === 'linkedin_view' ? '👁 View LinkedIn Profile' : '🔗 LinkedIn Connection Request')
+                  : (i === 0 ? '📧 Initial Email' : `🔄 Follow-up ${i}`);
                 const stepColor = isLiStep ? '#2563eb' : (i === 0 ? 'var(--primary)' : 'var(--orange)');
                 return (
                   <div key={i} style={{ border:`1.5px solid ${isLiStep?'#bfdbfe':'var(--border2)'}`, borderRadius:10, padding:16, marginBottom:12, background: isLiStep?'#f8faff':'var(--bg3)' }}>
@@ -1710,8 +1716,8 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                       <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                         <div style={{ display:'flex', gap:8 }}>
                           {[
-                            { v:'linkedin_view',    label:'ðŸ‘ View Profile',       desc:'Warms up the contact before connecting' },
-                            { v:'linkedin_connect', label:'ðŸ”— Send Connection',    desc:'Sends a connection request (with optional note)' },
+                            { v:'linkedin_view',    label:'👁 View Profile',       desc:'Warms up the contact before connecting' },
+                            { v:'linkedin_connect', label:'🔗 Send Connection',    desc:'Sends a connection request (with optional note)' },
                           ].map(opt => (
                             <button key={opt.v} type="button" onClick={() => updateSeq(i,'step_type',opt.v)}
                               style={{ flex:1, padding:'8px 10px', borderRadius:8, border:`2px solid ${seq.step_type===opt.v?'#2563eb':'#e2e8f0'}`, background:seq.step_type===opt.v?'#eff6ff':'#fff', cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all 0.15s' }}>
@@ -1723,10 +1729,10 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                         {seq.step_type === 'linkedin_connect' && (
                           <div>
                             <label style={{ fontSize:12, fontWeight:600, color:'var(--text2)', display:'block', marginBottom:4 }}>
-                              Connection Note <span style={{ fontWeight:400, color:'var(--text3)' }}>(optional Â· max 300 chars)</span>
+                              Connection Note <span style={{ fontWeight:400, color:'var(--text3)' }}>(optional · max 300 chars)</span>
                             </label>
                             <textarea value={seq.linkedin_note||''} onChange={e=>updateSeq(i,'linkedin_note',e.target.value.slice(0,300))}
-                              placeholder="Hi {{first_name}}, I'd love to connect! I noticed you work at {{company}}â€¦"
+                              placeholder="Hi {{first_name}}, I'd love to connect! I noticed you work at {{company}}…"
                               style={{ width:'100%', border:'1px solid var(--border2)', borderRadius:8, padding:'9px 12px', fontSize:13, boxSizing:'border-box', resize:'vertical', minHeight:70, fontFamily:'inherit', outline:'none' }}/>
                             <div style={{ fontSize:11, color:'var(--text3)', marginTop:2, display:'flex', justifyContent:'space-between' }}>
                               <span>Variables: <code style={{ background:'var(--bg3)', padding:'1px 4px', borderRadius:3 }}>{'{{first_name}}'}</code> <code style={{ background:'var(--bg3)', padding:'1px 4px', borderRadius:3 }}>{'{{company}}'}</code></span>
@@ -1743,7 +1749,7 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                             <span style={{ fontSize:12, color:'var(--text3)', fontWeight:600 }}>Load from template:</span>
                             <select onChange={e => { const tpl=templates.find(t=>t.id===e.target.value); if(!tpl)return; updateSeq(i,'subject',tpl.subject||''); updateSeq(i,'body',tpl.body||''); e.target.value=''; toast.success(`Template "${tpl.name}" loaded!`); }}
                               style={{ border:'1px solid var(--border2)', borderRadius:6, padding:'4px 8px', fontSize:12, background:'#fff', outline:'none', color:'var(--text2)', cursor:'pointer' }}>
-                              <option value="">â€” Select a template â€”</option>
+                              <option value="">— Select a template —</option>
                               {templates.map(t=><option key={t.id} value={t.id}>{t.name} ({t.category})</option>)}
                             </select>
                           </div>
@@ -1759,11 +1765,11 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
                           ) : (
                             <div style={{ marginTop:8, background:'#faf5ff', border:'1px solid #e9d5ff', borderRadius:9, padding:'10px 12px' }}>
                               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-                                <span style={{ fontSize:11.5, fontWeight:700, color:'#7c3aed', display:'flex', alignItems:'center', gap:5 }}>ðŸ§ª Subject B (A/B test)</span>
+                                <span style={{ fontSize:11.5, fontWeight:700, color:'#7c3aed', display:'flex', alignItems:'center', gap:5 }}>🧪 Subject B (A/B test)</span>
                                 <button type="button" onClick={() => updateSeq(i, 'subject_b', '')} style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>Remove</button>
                               </div>
                               <input value={seq.subject_b.trim()} onChange={e => updateSeq(i, 'subject_b', e.target.value)}
-                                placeholder="Alternate subject line â€” we'll split 50/50 and pick the winner"
+                                placeholder="Alternate subject line — we'll split 50/50 and pick the winner"
                                 style={{ width:'100%', border:'1px solid #e9d5ff', borderRadius:7, padding:'8px 11px', fontSize:13, outline:'none', boxSizing:'border-box', fontFamily:'inherit', background:'#fff' }}/>
                               <div style={{ fontSize:10.5, color:'#9333ea', marginTop:5 }}>Half your contacts get Subject A, half get B. Results show in the campaign report.</div>
                             </div>
@@ -1787,11 +1793,11 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
           <div style={{ display:'flex', gap:8, justifyContent:'space-between', alignItems:'center' }}>
             <button type="button" onClick={() => setWizardStep('schedule')}
               style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 16px', background:'none', border:'1.5px solid #e2e8f0', borderRadius:9, fontSize:13, color:'#64748b', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
-              â† Back to Schedule
+              ← Back to Schedule
             </button>
             <div style={{ display:'flex', gap:8 }}>
               <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
-              <Btn type="submit" loading={loading}>{campaign ? 'Save Changes' : 'Create Campaign ðŸš€'}</Btn>
+              <Btn type="submit" loading={loading}>{campaign ? 'Save Changes' : 'Create Campaign 🚀'}</Btn>
             </div>
           </div>
         </form>
@@ -1801,16 +1807,17 @@ function CampaignModal({ open, campaign, onClose, onSaved }) {
       <AISequenceModal open={showAISeq} onClose={() => setShowAISeq(false)}
         onApply={(steps) => {
           setSequences(steps.map((s,i) => ({ subject:s.subject||'', subject_b:s.subject_b||'', body:s.body||'', delay_days:s.delay_days??(i===0?0:i*3), delay_hours:s.delay_hours??0, step_type:s.step_type||'email', linkedin_note:s.linkedin_note||'' })));
-          setShowAISeq(false); onCreditUsed(); toast.success('âœ¨ AI sequence applied!');
+          setShowAISeq(false); onCreditUsed(); toast.success('✨ AI sequence applied!');
         }}/>
-      <TestEmailModal open={showTestEmail} onClose={() => setShowTestEmail(false)} sequences={sequences} accounts={accounts} rotationIds={form.rotation_ids||[]} />
       <EmailPreviewModal open={showPreview} onClose={() => setShowPreview(false)}
         sequences={sequences} accounts={accounts} rotationIds={form.rotation_ids||[]} listId={form.list_id||''}/>
+      <TestEmailModal open={showTestEmail} onClose={() => setShowTestEmail(false)}
+        sequences={sequences} accounts={accounts} rotationIds={form.rotation_ids||[]}/>
     </Modal>
   );
 }
 
-// â”€â”€ AI Sequence Generator Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AI Sequence Generator Modal ──────────────────
 function AISequenceModal({ open, onClose, onApply }) {
   const [audience, setAudience] = useState('');
   const [offer,    setOffer]    = useState('');
@@ -1833,19 +1840,19 @@ function AISequenceModal({ open, onClose, onApply }) {
       setPreview(data.steps);
     } catch (e) {
       if (e.response?.status === 402) toast.error(e.response.data.error || 'AI credits exhausted.');
-      else toast.error('Sequence generation failed â€” check OPENAI_API_KEY');
+      else toast.error('Sequence generation failed — check OPENAI_API_KEY');
     } finally { setLoading(false); }
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="âœ¨ AI Sequence Generator" width={640}>
+    <Modal open={open} onClose={handleClose} title="✨ AI Sequence Generator" width={640}>
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
         {/* Input form */}
         {!preview && (
           <>
             <div style={{ background:'linear-gradient(135deg,#f5f3ff,#ede9fe)', border:'1px solid #c4b5fd', borderRadius:10, padding:'12px 14px', fontSize:13, color:'#5b21b6', lineHeight:1.6 }}>
-              <strong><Sparkles size={13} style={{ display:'inline', marginRight:4 }}/>How it works:</strong> Describe your audience, what you offer, and your industry. AI writes a humanized 3-step cold email sequence (intro â†’ follow-up â†’ breakup) optimised for inbox delivery.
+              <strong><Sparkles size={13} style={{ display:'inline', marginRight:4 }}/>How it works:</strong> Describe your audience, what you offer, and your industry. AI writes a humanized 3-step cold email sequence (intro → follow-up → breakup) optimised for inbox delivery.
             </div>
             <Input label="Target Audience *" placeholder="e.g. Marketing Directors at SaaS companies" value={audience} onChange={e => setAudience(e.target.value)} />
             <Input label="Your Offer / Product *" placeholder="e.g. AI-powered email automation tool that saves 5 hrs/week" value={offer} onChange={e => setOffer(e.target.value)} />
@@ -1854,7 +1861,7 @@ function AISequenceModal({ open, onClose, onApply }) {
               <Btn type="button" variant="secondary" onClick={handleClose}>Cancel</Btn>
               <Btn type="button" onClick={generate} loading={loading}
                 style={{ background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none' }}>
-                <Sparkles size={13}/> {loading ? 'Writingâ€¦' : 'Generate Sequence (5 credits)'}
+                <Sparkles size={13}/> {loading ? 'Writing…' : 'Generate Sequence (5 credits)'}
               </Btn>
             </div>
           </>
@@ -1864,14 +1871,14 @@ function AISequenceModal({ open, onClose, onApply }) {
         {preview && (
           <>
             <div style={{ background:'#f0fdf4', border:'1px solid #86efac', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#166534', fontWeight:600 }}>
-              âœ… 3-step sequence generated! Review below, then click "Use This Sequence" to apply.
+              ✅ 3-step sequence generated! Review below, then click "Use This Sequence" to apply.
             </div>
             <div style={{ maxHeight:420, overflowY:'auto', display:'flex', flexDirection:'column', gap:12 }}>
               {preview.map((step, i) => (
                 <div key={i} style={{ border:'1px solid var(--border2)', borderRadius:10, overflow:'hidden' }}>
                   <div style={{ padding:'8px 12px', background: i===0?'#eff6ff': i===1?'#fff7ed':'#fdf4ff', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'1px solid var(--border)' }}>
                     <span style={{ fontWeight:700, fontSize:12, color: i===0?'#2563eb': i===1?'#c2410c':'#7c3aed' }}>
-                      {i===0 ? 'ðŸ“§ Step 1 â€” Day 0' : i===1 ? `ðŸ”„ Step 2 â€” Day ${step.delay_days}` : `ðŸ’” Step 3 â€” Day ${step.delay_days}`}
+                      {i===0 ? '📧 Step 1 — Day 0' : i===1 ? `🔄 Step 2 — Day ${step.delay_days}` : `💔 Step 3 — Day ${step.delay_days}`}
                     </span>
                     <span style={{ fontSize:11, color:'var(--text3)' }}>Subject: <strong>{step.subject}</strong></span>
                   </div>
@@ -1882,7 +1889,7 @@ function AISequenceModal({ open, onClose, onApply }) {
               ))}
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <Btn type="button" variant="secondary" onClick={() => setPreview(null)}>â† Regenerate</Btn>
+              <Btn type="button" variant="secondary" onClick={() => setPreview(null)}>← Regenerate</Btn>
               <Btn type="button" onClick={() => onApply(preview)}
                 style={{ background:'linear-gradient(135deg,#7c3aed,#4f46e5)', border:'none' }}>
                 <Sparkles size={13}/> Use This Sequence
@@ -1894,6 +1901,3 @@ function AISequenceModal({ open, onClose, onApply }) {
     </Modal>
   );
 }
-
-
-
