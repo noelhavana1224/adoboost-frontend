@@ -930,7 +930,7 @@ function TestEmailModal({ open, onClose, sequences, accounts = [], rotationIds =
     if (!seq.body) return toast.error('This step has no email body');
     setSending(true);
     try {
-      await api.post('/smtptest/send-test', {
+      await api.post('/smtp-test/send-test', {
         email_account_id: selectedAccountId,
         to_email: toEmail.trim(),
         subject: seq.subject,
