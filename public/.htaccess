@@ -1,0 +1,37 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  # Don't rewrite real files/dirs
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  # SPA fallback → index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Force UTF-8 for JS files so emojis and special chars render correctly
+<IfModule mod_mime.c>
+  AddCharset UTF-8 .js .jsx .ts .tsx
+</IfModule>
+<FilesMatch "\.js$">
+  <IfModule mod_headers.c>
+    Header set Content-Type "text/javascript; charset=utf-8"
+  </IfModule>
+</FilesMatch>
+
+# index.html must never be cached → users always get the latest asset hashes
+<FilesMatch "index\.html$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </IfModule>
+</FilesMatch>
+
+# Hashed assets are immutable → cache hard
+<FilesMatch "\.(css|woff2?|png|jpg|jpeg|gif|svg)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </IfModule>
+</FilesMatch>
+RewriteRule ^\.builds - [F,L]
